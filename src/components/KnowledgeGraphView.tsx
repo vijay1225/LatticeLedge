@@ -11,7 +11,9 @@ import {
   Check,
   Zap,
   FileText,
-  Info
+  Info,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import * as d3Force from 'd3-force';
 import { KnowledgeGraphData, KnowledgeGraphNode } from '../types';
@@ -55,6 +57,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [filterQuery, setFilterQuery] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [hideQuickNotes, setHideQuickNotes] = useState(false);
 
   // Simulation references
   const simulationRef = useRef<d3Force.Simulation<D3Node, D3Link> | null>(null);
@@ -67,7 +70,18 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
 
   // Initialize D3 Force Simulation
   useEffect(() => {
-    const nodes: D3Node[] = graphData.nodes.map(node => {
+    // Filter out quick notes if user has toggled them off
+    const sourceNodes = hideQuickNotes 
+      ? graphData.nodes.filter(n => n.type !== 'quick')
+      : graphData.nodes;
+
+    const activeNodeIdSet = new Set(sourceNodes.map(n => n.id));
+
+    const sourceEdges = graphData.edges.filter(e => 
+      activeNodeIdSet.has(e.source) && activeNodeIdSet.has(e.target)
+    );
+
+    const nodes: D3Node[] = sourceNodes.map(node => {
       const isPlanet = node.type === 'wiki';
       const isSatellite = node.type === 'quick';
 
@@ -80,7 +94,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
       };
     });
 
-    const links: D3Link[] = graphData.edges.map(edge => {
+    const links: D3Link[] = sourceEdges.map(edge => {
       const isSatelliteTether = 
         (edge.source.includes('quick-') && !edge.target.includes('quick-')) ||
         (edge.target.includes('quick-') && !edge.source.includes('quick-'));
@@ -92,6 +106,10 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
         type: isSatelliteTether ? 'satellite' : edge.type === 'explicit' ? 'explicit' : 'semantic'
       };
     });
+
+    if (selectedNode?.isSatellite && hideQuickNotes) {
+      setSelectedNode(null);
+    }
 
     nodesRef.current = nodes;
     linksRef.current = links;
@@ -119,7 +137,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
     return () => {
       sim.stop();
     };
-  }, [graphData]);
+  }, [graphData, hideQuickNotes]);
 
   // Main Canvas Rendering Loop
   const renderCanvas = useCallback(() => {
@@ -736,14 +754,29 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
             <span className="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
             <span className="text-zinc-200 font-medium">Wiki Planets</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-sky-400" />
-            <span className="text-zinc-300">Quick Satellites</span>
-          </div>
+          {!hideQuickNotes && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-sky-400" />
+              <span className="text-zinc-300">Quick Satellites</span>
+            </div>
+          )}
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
             <span className="text-zinc-400">Concept Tags</span>
           </div>
+          <div className="h-3 w-px bg-zinc-800" />
+          <button
+            onClick={() => setHideQuickNotes(prev => !prev)}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+              hideQuickNotes 
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold' 
+                : 'bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700'
+            }`}
+            title={hideQuickNotes ? 'Show Quick Note Satellites' : 'Hide Quick Notes to simplify large graph'}
+          >
+            {hideQuickNotes ? <Eye className="w-3 h-3 text-amber-400" /> : <EyeOff className="w-3 h-3" />}
+            <span>{hideQuickNotes ? 'Show Quick Notes' : 'Hide Quick Notes'}</span>
+          </button>
         </div>
 
         <div className="text-[10px] text-zinc-400 flex items-center gap-1 font-medium">
