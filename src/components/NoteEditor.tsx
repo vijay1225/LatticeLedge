@@ -14,7 +14,10 @@ import {
   ArrowUpRight, 
   Lightbulb, 
   Plus,
-  Sparkles
+  Sparkles,
+  Expand,
+  FoldHorizontal,
+  Maximize2
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -35,6 +38,8 @@ interface NoteEditorProps {
   isSummaryLoading: boolean;
   onNavigateToNote: (titleOrId: string) => void;
   onTagClick?: (tag: string) => void;
+  isFocusMode?: boolean;
+  onToggleFocusMode?: () => void;
 }
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -44,9 +49,31 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onRefreshSummary,
   isSummaryLoading,
   onNavigateToNote,
-  onTagClick
+  onTagClick,
+  isFocusMode,
+  onToggleFocusMode
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Full-width vs standard reading width toggle (defaults to true for maximum writing space)
+  const [isFullWidth, setIsFullWidth] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('LATTICE_LEDGER_FULL_WIDTH');
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleFullWidth = () => {
+    setIsFullWidth(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('LATTICE_LEDGER_FULL_WIDTH', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Compute backlinks (notes that point to this note)
   const backlinks = findBacklinks(note.title, allNotes);
@@ -123,7 +150,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto px-6 lg:px-12 py-6 max-w-5xl mx-auto w-full flex flex-col select-text">
+    <div 
+      className={`flex-1 h-full overflow-y-auto flex flex-col select-text transition-all duration-150 ${
+        isFullWidth || isFocusMode
+          ? 'w-full max-w-none px-4 sm:px-8 lg:px-12 py-5' 
+          : 'max-w-4xl mx-auto px-4 sm:px-6 py-5 w-full'
+      }`}
+    >
       {/* Title Bar */}
       <div className="mb-3 flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -163,9 +196,40 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 text-[11px] text-zinc-500 bg-zinc-900/60 px-2 py-1 rounded-md border border-zinc-800 shrink-0">
-          <Sparkles className="w-3 h-3 text-indigo-400" />
-          <span>Live Formatted Canvas</span>
+        {/* Header Controls: Full Width & Focus Mode */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={toggleFullWidth}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+              isFullWidth
+                ? 'bg-zinc-800 text-indigo-300 border-zinc-700 shadow-sm'
+                : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:text-zinc-200 hover:bg-zinc-800'
+            }`}
+            title={isFullWidth ? "Switch to standard readable width" : "Expand to full-width wide canvas"}
+          >
+            {isFullWidth ? <FoldHorizontal className="w-3.5 h-3.5 text-indigo-400" /> : <Expand className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{isFullWidth ? 'Full Width' : 'Standard Width'}</span>
+          </button>
+
+          {onToggleFocusMode && (
+            <button
+              onClick={onToggleFocusMode}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                isFocusMode
+                  ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50 shadow-sm font-semibold'
+                  : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:text-zinc-200 hover:bg-zinc-800'
+              }`}
+              title="Focus / Zen Mode (Hides all sidebars for distraction-free writing)"
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">{isFocusMode ? 'Exit Focus' : 'Focus Mode'}</span>
+            </button>
+          )}
+
+          <div className="hidden lg:flex items-center gap-1 text-[11px] text-zinc-500 bg-zinc-900/40 px-2 py-1 rounded-md border border-zinc-800/80 shrink-0">
+            <Sparkles className="w-3 h-3 text-indigo-400" />
+            <span>WYSIWYG</span>
+          </div>
         </div>
       </div>
 
@@ -317,9 +381,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       {/* TRUE IN-PLACE WYSIWYG CANVAS: Write directly in formatted text */}
       <div 
         onClick={handleEditorClick}
-        className="flex-1 rounded-lg bg-zinc-900/30 border border-zinc-800/80 hover:border-zinc-700/80 transition-colors cursor-text"
+        className="flex-1 rounded-lg bg-zinc-900/20 border border-zinc-800/70 hover:border-zinc-700/80 transition-colors cursor-text min-h-[520px] flex flex-col shadow-sm"
       >
-        <EditorContent editor={editor} />
+        <EditorContent editor={editor} className="flex-1 flex flex-col" />
       </div>
 
       {/* BI-DIRECTIONAL BACKLINKS - ALWAYS VISIBLE / UNCOLLAPSED */}

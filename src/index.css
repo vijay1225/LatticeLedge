@@ -13,9 +13,10 @@
 .tiptap.ProseMirror {
   outline: none !important;
   color: #e4e4e7;
-  font-size: 0.925rem;
-  line-height: 1.7;
-  min-height: 380px;
+  font-size: 0.95rem;
+  line-height: 1.75;
+  min-height: 500px;
+  flex: 1 1 auto;
 }
 
 .tiptap.ProseMirror p {

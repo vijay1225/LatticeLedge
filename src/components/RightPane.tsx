@@ -1,13 +1,24 @@
 import React, { useState } from 'react';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 
-export const RightPane: React.FC = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+interface RightPaneProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export const RightPane: React.FC<RightPaneProps> = ({
+  isCollapsed: controlledCollapsed,
+  onToggleCollapse
+}) => {
+  // Default to true (collapsed) so the empty reserved pane doesn't eat 288px of writing space
+  const [internalCollapsed, setInternalCollapsed] = useState(true);
+  const isCollapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
+  const toggle = onToggleCollapse || (() => setInternalCollapsed(!isCollapsed));
 
   if (isCollapsed) {
     return (
       <button
-        onClick={() => setIsCollapsed(false)}
+        onClick={toggle}
         className="hidden xl:flex items-center justify-center w-8 border-l border-zinc-800/80 bg-zinc-950 text-zinc-600 hover:text-zinc-300 transition-colors"
         title="Open Reserved Pane"
       >
@@ -21,7 +32,7 @@ export const RightPane: React.FC = () => {
       <div className="h-12 px-3.5 border-b border-zinc-800/60 flex items-center justify-between text-zinc-500">
         <span className="font-medium text-[11px] uppercase tracking-wider">Reserved Pane</span>
         <button
-          onClick={() => setIsCollapsed(true)}
+          onClick={toggle}
           className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors"
           title="Collapse Pane"
         >

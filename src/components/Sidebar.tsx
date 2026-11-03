@@ -9,7 +9,8 @@ import {
   Plus, 
   Search,
   Sparkles,
-  Layers
+  Layers,
+  PanelLeftClose
 } from 'lucide-react';
 import { ViewMode } from '../types';
 
@@ -24,6 +25,7 @@ interface SidebarProps {
   onNewWikiPage: () => void;
   notesCount: number;
   quickNotesCount: number;
+  onToggleCollapse?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -36,7 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSearch,
   onNewWikiPage,
   notesCount,
-  quickNotesCount
+  quickNotesCount,
+  onToggleCollapse
 }) => {
   return (
     <aside className="w-60 border-r border-zinc-800/80 bg-zinc-950 flex flex-col h-full shrink-0 select-none text-xs">
@@ -51,25 +54,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </span>
         </div>
 
-        {/* History Navigation: < and > arrows (Obsidian / Logseq style) */}
-        <div className="flex items-center bg-zinc-900 rounded border border-zinc-800 p-0.5">
-          <button
-            onClick={onGoBack}
-            disabled={!canGoBack}
-            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-25 transition-colors"
-            title="Back (Alt+Left)"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </button>
-          <div className="w-px h-2.5 bg-zinc-800 mx-0.5" />
-          <button
-            onClick={onGoForward}
-            disabled={!canGoForward}
-            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-25 transition-colors"
-            title="Forward (Alt+Right)"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+        <div className="flex items-center gap-1.5">
+          {/* History Navigation: < and > arrows (Obsidian / Logseq style) */}
+          <div className="flex items-center bg-zinc-900 rounded border border-zinc-800 p-0.5">
+            <button
+              onClick={onGoBack}
+              disabled={!canGoBack}
+              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-25 transition-colors"
+              title="Back (Alt+Left)"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <div className="w-px h-2.5 bg-zinc-800 mx-0.5" />
+            <button
+              onClick={onGoForward}
+              disabled={!canGoForward}
+              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-25 transition-colors"
+              title="Forward (Alt+Right)"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors"
+              title="Collapse Sidebar (Ctrl+\)"
+            >
+              <PanelLeftClose className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

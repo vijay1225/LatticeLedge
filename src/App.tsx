@@ -64,6 +64,8 @@ export function App() {
   const [mobileQuickText, setMobileQuickText] = useState('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [showPagesList, setShowPagesList] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   // Note History Navigation (< and > like Obsidian / Logseq)
   const [history, setHistory] = useState<string[]>(['wiki-harry-potter']);
@@ -94,12 +96,17 @@ export function App() {
       } else if (e.altKey && e.key === 'ArrowRight') {
         e.preventDefault();
         handleGoForward();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+        e.preventDefault();
+        setIsSidebarCollapsed(prev => !prev);
+      } else if (e.key === 'Escape' && isFocusMode) {
+        setIsFocusMode(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [historyIndex, history]);
+  }, [historyIndex, history, isFocusMode]);
 
   const navigateToNote = (titleOrId: string) => {
     let target = notes.find(n => n.id === titleOrId);
@@ -250,23 +257,38 @@ export function App() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-zinc-800 selection:text-white">
       {/* 1. LEFT PANE: Master Navigation & Mode Switcher */}
-      <div className="hidden md:flex h-full">
-        <Sidebar
-          currentMode={currentMode}
-          onSelectMode={setCurrentMode}
-          canGoBack={historyIndex > 0}
-          canGoForward={historyIndex < history.length - 1}
-          onGoBack={handleGoBack}
-          onGoForward={handleGoForward}
-          onOpenSearch={() => setIsSearchOpen(true)}
-          onNewWikiPage={handleCreateNewWikiPage}
-          notesCount={wikiNotes.length}
-          quickNotesCount={quickNotes.length}
-        />
-      </div>
+      {!isFocusMode && (
+        <>
+          {!isSidebarCollapsed ? (
+            <div className="hidden md:flex h-full">
+              <Sidebar
+                currentMode={currentMode}
+                onSelectMode={setCurrentMode}
+                canGoBack={historyIndex > 0}
+                canGoForward={historyIndex < history.length - 1}
+                onGoBack={handleGoBack}
+                onGoForward={handleGoForward}
+                onOpenSearch={() => setIsSearchOpen(true)}
+                onNewWikiPage={handleCreateNewWikiPage}
+                notesCount={wikiNotes.length}
+                quickNotesCount={quickNotes.length}
+                onToggleCollapse={() => setIsSidebarCollapsed(true)}
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsSidebarCollapsed(false)}
+              className="hidden md:flex items-center justify-center w-8 border-r border-zinc-800/80 bg-zinc-950 text-zinc-600 hover:text-zinc-300 transition-colors shrink-0"
+              title="Expand Sidebar (Ctrl+\)"
+            >
+              <PanelLeftOpen className="w-4 h-4" />
+            </button>
+          )}
+        </>
+      )}
 
       {/* 2. CENTER PANE: Active Workspace */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-zinc-950">
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-zinc-950 relative">
         {/* Mobile Header Bar */}
         <header className="md:hidden flex items-center justify-between px-3 h-12 border-b border-zinc-800 bg-zinc-950 shrink-0">
           <div className="flex items-center gap-1.5">
@@ -303,56 +325,58 @@ export function App() {
           {currentMode === 'notes' && (
             <div className="flex-1 flex overflow-hidden">
               {/* Collapsible Secondary Pages List */}
-              {showPagesList ? (
-                <div className="w-56 border-r border-zinc-800/80 bg-zinc-950/60 hidden lg:flex flex-col h-full shrink-0 text-xs">
-                  <div className="h-12 px-3 border-b border-zinc-800/60 flex items-center justify-between text-zinc-500">
-                    <span className="font-medium text-[11px] uppercase tracking-wider">
-                      Pages ({wikiNotes.length})
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={handleCreateNewWikiPage}
-                        className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200"
-                        title="New Page"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setShowPagesList(false)}
-                        className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200"
-                        title="Collapse Pages List"
-                      >
-                        <PanelLeftClose className="w-3.5 h-3.5" />
-                      </button>
+              {!isFocusMode && (
+                showPagesList ? (
+                  <div className="w-56 border-r border-zinc-800/80 bg-zinc-950/60 hidden lg:flex flex-col h-full shrink-0 text-xs">
+                    <div className="h-12 px-3 border-b border-zinc-800/60 flex items-center justify-between text-zinc-500">
+                      <span className="font-medium text-[11px] uppercase tracking-wider">
+                        Pages ({wikiNotes.length})
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={handleCreateNewWikiPage}
+                          className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200"
+                          title="New Page"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setShowPagesList(false)}
+                          className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200"
+                          title="Collapse Pages List"
+                        >
+                          <PanelLeftClose className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
+                      {wikiNotes.map(n => (
+                        <button
+                          key={n.id}
+                          onClick={() => navigateToNote(n.id)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                            activeNote?.id === n.id
+                              ? 'bg-zinc-800 text-zinc-100 font-medium'
+                              : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-3 h-3 text-zinc-500 shrink-0" />
+                            <span className="truncate">{n.title}</span>
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
-                    {wikiNotes.map(n => (
-                      <button
-                        key={n.id}
-                        onClick={() => navigateToNote(n.id)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                          activeNote?.id === n.id
-                            ? 'bg-zinc-800 text-zinc-100 font-medium'
-                            : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-3 h-3 text-zinc-500 shrink-0" />
-                          <span className="truncate">{n.title}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowPagesList(true)}
-                  className="hidden lg:flex items-center justify-center w-8 border-r border-zinc-800/80 bg-zinc-950 text-zinc-600 hover:text-zinc-300 transition-colors shrink-0"
-                  title="Show Pages List"
-                >
-                  <PanelLeftOpen className="w-4 h-4" />
-                </button>
+                ) : (
+                  <button
+                    onClick={() => setShowPagesList(true)}
+                    className="hidden lg:flex items-center justify-center w-8 border-r border-zinc-800/80 bg-zinc-950 text-zinc-600 hover:text-zinc-300 transition-colors shrink-0"
+                    title="Show Pages List"
+                  >
+                    <PanelLeftOpen className="w-4 h-4" />
+                  </button>
+                )
               )}
 
               {/* Expansive Active Note Editor */}
@@ -367,6 +391,8 @@ export function App() {
                   onTagClick={() => {
                     setIsSearchOpen(true);
                   }}
+                  isFocusMode={isFocusMode}
+                  onToggleFocusMode={() => setIsFocusMode(prev => !prev)}
                 />
               ) : (
                 <div className="flex-1 flex items-center justify-center text-zinc-600 text-xs">
@@ -404,7 +430,22 @@ export function App() {
       </main>
 
       {/* 3. RIGHT PANE: Kept empty / reserved per specification with collapse button */}
-      <RightPane />
+      {!isFocusMode && <RightPane />}
+
+      {/* Floating Focus Mode Banner */}
+      {isFocusMode && (
+        <div className="fixed top-3 right-6 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/95 border border-indigo-500/40 text-xs text-zinc-200 backdrop-blur-md shadow-2xl animate-in fade-in duration-200">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="font-medium text-[11px]">Focus Mode Active</span>
+          <button
+            onClick={() => setIsFocusMode(false)}
+            className="ml-1 px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-[10px] font-mono flex items-center gap-1 transition-colors"
+            title="Exit Focus Mode (Esc)"
+          >
+            <span>Exit (Esc)</span>
+          </button>
+        </div>
+      )}
 
       {/* Mobile Bottom Navigation Bar & FAB */}
       <MobileBottomNav
