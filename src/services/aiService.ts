@@ -105,12 +105,12 @@ export async function generateNoteSummary(
     const prompt = `Analyze the following note titled "${note.title}":
 ${note.content}
 
-Generate a concise structured JSON object with the following fields:
+Generate an ultra-concise structured JSON object with the following fields:
 {
-  "tldr": ["1-3 brief key takeaways"],
-  "actionItems": ["any actions, quests, tasks, or follow-ups mentioned in the note"],
-  "tags": ["relevant tags starting with #"],
-  "keyEntities": ["key people, places, spells, or artifacts mentioned"]
+  "tldr": ["Strictly 2 to 3 bullet points, each 1 brief sentence. The entire summary must NEVER exceed 4 lines."],
+  "actionItems": ["any quests or action items, max 3"],
+  "tags": ["relevant tags starting with #, max 4"],
+  "keyEntities": ["key people, places, spells, max 4"]
 }
 
 Respond ONLY with valid JSON.`;

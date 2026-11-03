@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Info, Sparkles } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Info, Sparkles, Play, Pause } from 'lucide-react';
 import { KnowledgeGraphData, KnowledgeGraphNode } from '../types';
 
 interface KnowledgeGraphViewProps {
@@ -7,206 +7,239 @@ interface KnowledgeGraphViewProps {
   onSelectNode: (noteId: string) => void;
 }
 
-interface SimNode extends KnowledgeGraphNode {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
+interface SphereNode extends KnowledgeGraphNode {
+  // 3D coordinates on celestial sphere
+  x3d: number;
+  y3d: number;
+  z3d: number;
+  // 2D screen projected coordinates
+  screenX: number;
+  screenY: number;
+  scale: number;
 }
 
 export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   graphData,
   onSelectNode
 }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [hoveredNode, setHoveredNode] = useState<SimNode | null>(null);
+  const [rotation, setRotation] = useState({ x: 0.2, y: 0.3 });
+  const [isRotating, setIsRotating] = useState(true);
+  const [hoveredNode, setHoveredNode] = useState<SphereNode | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  const simNodesRef = useRef<SimNode[]>([]);
+  const sphereNodesRef = useRef<SphereNode[]>([]);
 
-  // Initialize simulation positions
+  // Initialize spherical / ball coordinates
   useEffect(() => {
-    const width = 800;
-    const height = 600;
+    const total = graphData.nodes.length;
+    // Map nodes onto a sphere using Fibonacci spiral distribution
+    const radius = 170; // Ball radius in 3D
 
-    simNodesRef.current = graphData.nodes.map((node, i) => {
-      const angle = (i / graphData.nodes.length) * 2 * Math.PI;
-      const radius = 120 + (i % 3) * 60;
+    sphereNodesRef.current = graphData.nodes.map((node, i) => {
+      // Wiki nodes placed on slightly larger orbit, tags in center/inner
+      const r = node.type === 'wiki' ? radius : node.type === 'quick' ? radius * 1.15 : radius * 0.75;
+      
+      const phi = Math.acos(1 - (2 * (i + 0.5)) / total);
+      const theta = Math.PI * (1 + Math.sqrt(5)) * (i + 0.5);
+
+      const x = r * Math.sin(phi) * Math.cos(theta);
+      const y = r * Math.sin(phi) * Math.sin(theta);
+      const z = r * Math.cos(phi);
+
       return {
         ...node,
-        x: width / 2 + Math.cos(angle) * radius + (Math.random() - 0.5) * 40,
-        y: height / 2 + Math.sin(angle) * radius + (Math.random() - 0.5) * 40,
-        vx: 0,
-        vy: 0
+        x3d: x,
+        y3d: y,
+        z3d: z,
+        screenX: 0,
+        screenY: 0,
+        scale: 1
       };
     });
   }, [graphData]);
 
-  // Physics animation loop
+  // Main rendering & rotation animation loop
   useEffect(() => {
     let animId: number;
 
-    const runPhysics = () => {
-      const nodes = simNodesRef.current;
-      const edges = graphData.edges;
-      const nodeMap = new Map(nodes.map(n => [n.id, n]));
-
-      // 1. Repulsion between all nodes
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const dx = nodes[j].x - nodes[i].x;
-          const dy = nodes[j].y - nodes[i].y;
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          if (dist < 180) {
-            const force = (180 - dist) / dist * 0.15;
-            nodes[i].vx -= dx * force;
-            nodes[i].vy -= dy * force;
-            nodes[j].vx += dx * force;
-            nodes[j].vy += dy * force;
-          }
-        }
-      }
-
-      // 2. Attraction along edges
-      for (const edge of edges) {
-        const source = nodeMap.get(edge.source);
-        const target = nodeMap.get(edge.target);
-        if (source && target) {
-          const dx = target.x - source.x;
-          const dy = target.y - source.y;
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const targetDist = edge.type === 'explicit' ? 90 : 130;
-          const force = (dist - targetDist) * (edge.type === 'explicit' ? 0.008 : 0.003);
-          
-          source.vx += dx * force;
-          source.vy += dy * force;
-          target.vx -= dx * force;
-          target.vy -= dy * force;
-        }
-      }
-
-      // 3. Center gravity & damping
-      for (const node of nodes) {
-        node.vx += (400 - node.x) * 0.001;
-        node.vy += (300 - node.y) * 0.001;
-        node.vx *= 0.88;
-        node.vy *= 0.88;
-        node.x += node.vx;
-        node.y += node.vy;
-      }
-
-      drawCanvas();
-      animId = requestAnimationFrame(runPhysics);
-    };
-
-    const drawCanvas = () => {
+    const render = () => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
+
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+
+      // Ensure canvas pixel dimensions match actual container size
+      if (canvas.width !== Math.floor(rect.width * dpr) || canvas.height !== Math.floor(rect.height * dpr)) {
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
+      }
+
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const width = canvas.width;
-      const height = canvas.height;
+      const width = canvas.width / dpr;
+      const height = canvas.height / dpr;
+      const centerX = width / 2;
+      const centerY = height / 2;
 
-      ctx.clearRect(0, 0, width, height);
       ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, width, height);
 
-      // Pan & Zoom transform
-      ctx.translate(width / 2 + pan.x, height / 2 + pan.y);
-      ctx.scale(zoom, zoom);
-      ctx.translate(-400, -300);
+      // Auto rotation when enabled
+      if (isRotating && !isDragging) {
+        setRotation(prev => ({
+          x: prev.x + 0.0015,
+          y: prev.y + 0.003
+        }));
+      }
 
-      const nodeMap = new Map(simNodesRef.current.map(n => [n.id, n]));
+      const cosX = Math.cos(rotation.x);
+      const sinX = Math.sin(rotation.x);
+      const cosY = Math.cos(rotation.y);
+      const sinY = Math.sin(rotation.y);
 
-      // 1. Draw Edges
+      // 1. Project 3D nodes to 2D centered coordinates
+      const nodes = sphereNodesRef.current;
+      for (const node of nodes) {
+        // Rotate around Y axis
+        const x1 = node.x3d * cosY - node.z3d * sinY;
+        const z1 = node.z3d * cosY + node.x3d * sinY;
+
+        // Rotate around X axis
+        const y2 = node.y3d * cosX - z1 * sinX;
+        const z2 = z1 * cosX + node.y3d * sinX;
+
+        // Perspective projection
+        const fov = 400;
+        const distance = fov + z2;
+        const scale = distance > 0 ? (fov / distance) * zoom : 0.1;
+
+        node.screenX = centerX + x1 * scale;
+        node.screenY = centerY + y2 * scale;
+        node.scale = scale;
+        node.z3d = z2; // store rotated z for depth sorting
+      }
+
+      // Sort nodes by depth (z3d) so background nodes draw first
+      const sortedNodes = [...nodes].sort((a, b) => a.z3d - b.z3d);
+      const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+      // 2. Draw Subtle Sphere Wireframe / Glow
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 170 * zoom, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY, 170 * zoom, 60 * zoom, rotation.y, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.05)';
+      ctx.stroke();
+
+      // 3. Draw Edges
       for (const edge of graphData.edges) {
         const source = nodeMap.get(edge.source);
         const target = nodeMap.get(edge.target);
         if (!source || !target) continue;
 
+        const avgZ = (source.z3d + target.z3d) / 2;
+        const alpha = Math.max(0.08, Math.min(0.6, (avgZ + 200) / 400));
+
         ctx.beginPath();
-        ctx.moveTo(source.x, source.y);
-        ctx.lineTo(target.x, target.y);
+        ctx.moveTo(source.screenX, source.screenY);
+        ctx.lineTo(target.screenX, target.screenY);
 
         if (edge.type === 'explicit') {
           // Solid line for [[wiki-links]]
-          ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
-          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = `rgba(129, 140, 248, ${alpha * 0.9})`;
+          ctx.lineWidth = 1.4 * source.scale;
           ctx.setLineDash([]);
         } else {
-          // Dashed line for semantic AI tags
-          ctx.strokeStyle = 'rgba(168, 85, 247, 0.25)';
-          ctx.lineWidth = 1.0;
-          ctx.setLineDash([4, 4]);
+          // Dashed line for semantic tags
+          ctx.strokeStyle = `rgba(168, 85, 247, ${alpha * 0.4})`;
+          ctx.lineWidth = 0.9 * source.scale;
+          ctx.setLineDash([3, 3]);
         }
         ctx.stroke();
       }
 
-      // 2. Draw Nodes
-      for (const node of simNodesRef.current) {
+      // 4. Draw Nodes with depth shading
+      for (const node of sortedNodes) {
         const isHovered = hoveredNode?.id === node.id;
         ctx.setLineDash([]);
 
-        // Outer glow on hover
+        const depthAlpha = Math.max(0.3, Math.min(1.0, (node.z3d + 200) / 400));
+        const nodeRadius = Math.max(3, (node.size * 0.7) * node.scale);
+
+        // Hover outer aura
         if (isHovered) {
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.size + 6, 0, 2 * Math.PI);
-          ctx.fillStyle = node.color + '44';
+          ctx.arc(node.screenX, node.screenY, nodeRadius + 5, 0, 2 * Math.PI);
+          ctx.fillStyle = 'rgba(99, 102, 241, 0.3)';
           ctx.fill();
         }
 
         // Node Circle
         ctx.beginPath();
-        ctx.arc(node.x, node.y, node.size, 0, 2 * Math.PI);
+        ctx.arc(node.screenX, node.screenY, nodeRadius, 0, 2 * Math.PI);
         ctx.fillStyle = node.color;
-        ctx.shadowColor = node.color;
-        ctx.shadowBlur = isHovered ? 12 : 4;
+        ctx.globalAlpha = isHovered ? 1.0 : depthAlpha;
         ctx.fill();
-        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1.0;
 
-        // Label
-        ctx.font = `${node.type === 'wiki' ? 'bold 11px' : '10px'} -apple-system, sans-serif`;
-        ctx.fillStyle = isHovered ? '#ffffff' : '#d6d3d1';
-        ctx.textAlign = 'center';
-        ctx.fillText(node.label, node.x, node.y + node.size + 13);
+        // Label (only show for foreground nodes or on hover to keep sphere clean)
+        if (isHovered || node.z3d > -40) {
+          ctx.font = `${isHovered ? 'bold 11px' : '10px'} -apple-system, sans-serif`;
+          ctx.fillStyle = isHovered ? '#ffffff' : `rgba(212, 212, 216, ${depthAlpha})`;
+          ctx.textAlign = 'center';
+          ctx.fillText(node.label, node.screenX, node.screenY + nodeRadius + 12);
+        }
       }
 
       ctx.restore();
+      animId = requestAnimationFrame(render);
     };
 
-    animId = requestAnimationFrame(runPhysics);
+    animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [graphData, zoom, pan, hoveredNode]);
+  }, [graphData, zoom, rotation, isRotating, isDragging, hoveredNode]);
 
-  // Mouse event handling
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Drag to rotate spherical ball
+  const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    setDragStart({ x: e.clientX, y: e.clientY });
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging) {
-      setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+      const deltaX = e.clientX - dragStart.x;
+      const deltaY = e.clientY - dragStart.y;
+      setRotation(prev => ({
+        x: prev.x + deltaY * 0.005,
+        y: prev.y + deltaX * 0.005
+      }));
+      setDragStart({ x: e.clientX, y: e.clientY });
       return;
     }
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    // Convert screen coordinates to world coordinates
-    const worldX = (mouseX - canvas.width / 2 - pan.x) / zoom + 400;
-    const worldY = (mouseY - canvas.height / 2 - pan.y) / zoom + 300;
-
-    let found: SimNode | null = null;
-    for (const node of simNodesRef.current) {
-      const dist = Math.sqrt((worldX - node.x) ** 2 + (worldY - node.y) ** 2);
-      if (dist < node.size + 5) {
+    let found: SphereNode | null = null;
+    for (const node of sphereNodesRef.current) {
+      const dist = Math.sqrt((mouseX - node.screenX) ** 2 + (mouseY - node.screenY) ** 2);
+      if (dist < (node.size + 6) * node.scale) {
         found = node;
         break;
       }
@@ -225,83 +258,90 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full bg-stone-950 flex flex-col overflow-hidden select-none">
+    <div 
+      ref={containerRef}
+      className="relative w-full h-full bg-zinc-950 flex flex-col overflow-hidden select-none"
+    >
       {/* Top Floating Controls */}
       <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
-        <div className="px-3 py-1.5 rounded-xl bg-stone-900/80 border border-stone-800 backdrop-blur-md text-xs font-semibold text-stone-200 flex items-center gap-2 shadow-lg">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>Interactive Knowledge Graph</span>
-          <span className="text-[10px] text-stone-500 font-normal">
-            ({graphData.nodes.length} nodes, {graphData.edges.length} edges)
+        <div className="px-3 py-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-xs font-medium text-zinc-300 flex items-center gap-2 shadow-sm">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          <span>Spherical Knowledge Graph</span>
+          <span className="text-[10px] text-zinc-500 font-mono">
+            ({graphData.nodes.length} nodes)
           </span>
         </div>
       </div>
 
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5 bg-stone-900/80 border border-stone-800 rounded-xl p-1 backdrop-blur-md shadow-lg">
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-1 bg-zinc-900/90 border border-zinc-800 rounded-lg p-0.5 shadow-sm">
         <button
-          onClick={() => setZoom(z => Math.min(z + 0.15, 2.5))}
-          className="p-1.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
+          onClick={() => setIsRotating(!isRotating)}
+          className={`p-1.5 rounded text-xs transition-colors ${
+            isRotating ? 'text-indigo-400' : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+          title={isRotating ? 'Pause Rotation' : 'Auto-Rotate'}
+        >
+          {isRotating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+        </button>
+        <div className="w-px h-3 bg-zinc-800 mx-0.5" />
+        <button
+          onClick={() => setZoom(z => Math.min(z + 0.15, 2.0))}
+          className="p-1.5 rounded text-zinc-400 hover:text-zinc-200"
           title="Zoom In"
         >
-          <ZoomIn className="w-4 h-4" />
+          <ZoomIn className="w-3.5 h-3.5" />
         </button>
         <button
-          onClick={() => setZoom(z => Math.max(z - 0.15, 0.4))}
-          className="p-1.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
+          onClick={() => setZoom(z => Math.max(z - 0.15, 0.5))}
+          className="p-1.5 rounded text-zinc-400 hover:text-zinc-200"
           title="Zoom Out"
         >
-          <ZoomOut className="w-4 h-4" />
+          <ZoomOut className="w-3.5 h-3.5" />
         </button>
         <button
-          onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
-          className="p-1.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-          title="Reset View"
+          onClick={() => { setZoom(1); setRotation({ x: 0.2, y: 0.3 }); }}
+          className="p-1.5 rounded text-zinc-400 hover:text-zinc-200"
+          title="Reset Centered Ball"
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Canvas */}
+      {/* Responsive Centered Canvas */}
       <canvas
         ref={canvasRef}
-        width={900}
-        height={650}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onClick={handleClick}
-        className="w-full h-full cursor-grab active:cursor-grabbing"
+        className="w-full h-full cursor-grab active:cursor-grabbing block"
       />
 
-      {/* Legend & Instructions Footer */}
-      <div className="absolute bottom-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 px-4 py-2 rounded-xl bg-stone-900/80 border border-stone-800 backdrop-blur-md text-xs text-stone-400 shadow-lg">
-        <div className="flex items-center gap-4 flex-wrap">
+      {/* Legend Footer */}
+      <div className="absolute bottom-3 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-amber-500" />
-            <span className="text-stone-300">Wiki Pages</span>
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="text-zinc-300">Pages</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-            <span className="text-stone-300">Quick Notes</span>
+            <span className="w-2 h-2 rounded-full bg-sky-400" />
+            <span className="text-zinc-300">Quick Notes</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-purple-500" />
-            <span className="text-stone-300">Tags</span>
+            <span className="w-2 h-2 rounded-full bg-purple-400" />
+            <span className="text-zinc-300">Tags</span>
           </div>
-          <div className="h-3 w-px bg-stone-700" />
+          <div className="h-3 w-px bg-zinc-800" />
           <div className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5 bg-amber-500/80" />
-            <span className="text-stone-300">[[wiki-links]]</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-4 border-b border-dashed border-purple-400/80" />
-            <span className="text-stone-300">AI Tag Associations</span>
+            <span className="w-3 h-0.5 bg-indigo-400" />
+            <span>[[links]]</span>
           </div>
         </div>
 
-        <div className="text-[11px] text-stone-500 flex items-center gap-1">
-          <Info className="w-3.5 h-3.5" />
-          <span>Click any node to open note</span>
+        <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+          <Info className="w-3 h-3" />
+          <span>Drag sphere to rotate • Click node to open</span>
         </div>
       </div>
     </div>
