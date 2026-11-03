@@ -91,12 +91,14 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
 - [x] **Implementation Phase 1 Completed & Verified**:
   - [x] Scaffolded React 18 + TypeScript + Vite + Tailwind CSS foundation.
   - [x] Implemented Dual-Tier Note system: Wiki Pages with `[[wiki-links]]` and Quick Notes with auto-tagging.
-  - [x] Implemented Per-Note AI Summary Card placed above note content with TL;DR, Action Items, Auto-Tags, and Model badge.
+  - [x] Implemented Per-Note AI Summary Card: always-expanded, strictly capped $\le 4$ lines.
   - [x] Implemented AI Contextual Reference suggestions surfacing relevant Quick Notes inside Wiki Pages.
-  - [x] Implemented 2D Canvas Force-Directed Knowledge Graph with Wiki nodes, Quick Note nodes, and Tag nodes.
+  - [x] Implemented 3D Spherical Centered Knowledge Graph with interactive Fibonacci sphere distribution and drag rotation.
+  - [x] Implemented dedicated MarkdownRenderer for Read Mode (headings, checklists, blockquotes, styled `[[links]]`).
+  - [x] Kept Bi-directional Backlinks always visible and uncollapsed.
   - [x] Implemented Dual-Tab Search modal (`Ctrl + K`): Instant Search (`#tag`, `[[page`) and Ask AI Knowledge Synthesis with citations.
   - [x] Implemented History Navigation (`<` / `>`) tracking visited notes.
-  - [x] Implemented Mobile Bottom Navigation bar + Floating Action Button (FAB) for instant capture.
+  - [x] Implemented Mobile Bottom Navigation bar + Floating Action Button (FAB) for instant capture on phone (`0.0.0.0:3000`).
   - [x] Reserved Right Pane empty per design specification.
   - [x] Seeded rich Harry Potter test knowledge vault.
   - [x] 100% automated test suite passing (10 tests across graphBuilder, wikiLinks, and aiService).
