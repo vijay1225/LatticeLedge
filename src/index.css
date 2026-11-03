@@ -9,6 +9,138 @@
   }
 }
 
+/* TipTap WYSIWYG Formatted In-Place Editor Styling */
+.tiptap.ProseMirror {
+  outline: none !important;
+  color: #e4e4e7;
+  font-size: 0.925rem;
+  line-height: 1.7;
+  min-height: 380px;
+}
+
+.tiptap.ProseMirror p {
+  margin-bottom: 0.85rem;
+}
+
+.tiptap.ProseMirror p.is-editor-empty:first-child::before {
+  color: #52525b;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap.ProseMirror h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f4f4f5;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(39, 39, 42, 0.8);
+  letter-spacing: -0.025em;
+}
+
+.tiptap.ProseMirror h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f4f4f5;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.tiptap.ProseMirror h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  margin-top: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.tiptap.ProseMirror blockquote {
+  border-left: 2px solid #6366f1;
+  padding-left: 1rem;
+  font-style: italic;
+  color: #a1a1aa;
+  margin: 1rem 0;
+  background: rgba(24, 24, 27, 0.4);
+  border-radius: 0 0.375rem 0.375rem 0;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}
+
+.tiptap.ProseMirror ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.85rem;
+}
+
+.tiptap.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-bottom: 0.85rem;
+}
+
+.tiptap.ProseMirror li {
+  margin-bottom: 0.25rem;
+}
+
+/* TipTap Checklist / Task List */
+.tiptap.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.tiptap.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.tiptap.ProseMirror ul[data-type="taskList"] li > label {
+  flex: 0 0 auto;
+  margin-right: 0.25rem;
+  user-select: none;
+}
+
+.tiptap.ProseMirror ul[data-type="taskList"] li input[type="checkbox"] {
+  accent-color: #6366f1;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  margin-top: 0.25rem;
+}
+
+.tiptap.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  color: #71717a;
+}
+
+.tiptap.ProseMirror code {
+  background: rgba(39, 39, 42, 0.8);
+  color: #a5b4fc;
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.35rem;
+  font-family: monospace;
+  font-size: 0.85em;
+  border: 1px solid rgba(63, 63, 70, 0.5);
+}
+
+.tiptap.ProseMirror pre {
+  background: #121215;
+  color: #f4f4f5;
+  border: 1px solid #27272a;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-family: monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;

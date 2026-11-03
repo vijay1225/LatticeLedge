@@ -93,8 +93,9 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
   - [x] Implemented Dual-Tier Note system: Wiki Pages with `[[wiki-links]]` and Quick Notes with auto-tagging.
   - [x] Implemented Per-Note AI Summary Card: always-expanded, strictly capped $\le 4$ lines.
   - [x] Implemented AI Contextual Reference suggestions surfacing relevant Quick Notes inside Wiki Pages.
-  - [x] Implemented 2D D3 Force-Directed Knowledge Galaxy with Planetary Hubs, orbiting Quick Note Satellites, and a 1-click toggle to Hide/Show Quick Notes for decluttering large vaults.
-  - [x] Implemented dedicated MarkdownRenderer for Read Mode (headings, checklists, blockquotes, styled `[[links]]`).
+  - [x] Implemented 2D D3 Force-Directed Knowledge Galaxy with Planetary Hubs, orbiting Quick Note Satellites, and 1-click toggles to Hide/Show Quick Notes and Hide/Show Tags for decluttering large vaults.
+  - [x] Implemented In-Place WYSIWYG Live Markdown Editor (TipTap Option A): type directly on formatted headings, checklists, quotes, and links without preview/edit mode toggles.
+  - [x] Graph node interactions: Left-click selects & displays connected notes card; Right-click reveals context menu to "Go to Note".
   - [x] Kept Bi-directional Backlinks always visible and uncollapsed.
   - [x] Implemented Dual-Tab Search modal (`Ctrl + K`): Instant Search (`#tag`, `[[page`) and Ask AI Knowledge Synthesis with citations.
   - [x] Implemented History Navigation (`<` / `>`) tracking visited notes.

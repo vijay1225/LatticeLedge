@@ -1,20 +1,30 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Bold, 
   Italic, 
   Code, 
   List, 
+  CheckSquare, 
+  Quote, 
   Link2, 
-  Eye, 
-  Edit3, 
+  Heading1, 
+  Heading2, 
+  Heading3, 
   Clock, 
-  ArrowUpRight,
-  Lightbulb,
-  Plus
+  ArrowUpRight, 
+  Lightbulb, 
+  Plus,
+  Sparkles
 } from 'lucide-react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import Placeholder from '@tiptap/extension-placeholder';
+import { Markdown } from 'tiptap-markdown';
+
 import { Note } from '../types';
 import { AISummaryCard } from './AISummaryCard';
-import { MarkdownRenderer } from './MarkdownRenderer';
 import { findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
 
 interface NoteEditorProps {
@@ -36,8 +46,6 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onNavigateToNote,
   onTagClick
 }) => {
-  // Read / Preview mode toggle
-  const [isPreview, setIsPreview] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Compute backlinks (notes that point to this note)
@@ -46,47 +54,91 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   // Compute contextual suggestions (quick notes related to this page)
   const relatedSuggestions = findRelatedQuickNotes(note, allNotes);
 
-  const insertText = (before: string, after: string = '') => {
-    const textarea = document.getElementById('note-body-textarea') as HTMLTextAreaElement;
-    if (!textarea) return;
+  // Initialize TipTap Live In-Place WYSIWYG Editor
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3]
+        }
+      }),
+      TaskList,
+      TaskItem.configure({
+        nested: true
+      }),
+      Placeholder.configure({
+        placeholder: 'Write directly on this page... Type # for headings, - [ ] for checklists, > for quotes, or [[ to link...'
+      }),
+      Markdown.configure({
+        html: false,
+        tightLists: true,
+        bulletListMarker: '-'
+      })
+    ],
+    content: note.content,
+    editorProps: {
+      attributes: {
+        class: 'tiptap ProseMirror px-5 py-4 focus:outline-none'
+      }
+    },
+    onUpdate: ({ editor }) => {
+      // Extract clean Markdown directly from the formatted editor
+      const markdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
+      onUpdateNote({ content: markdown });
+    }
+  });
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = note.content.substring(start, end) || 'text';
-    const replacement = `${before}${selected}${after}`;
+  // Sync editor content when switching between notes
+  useEffect(() => {
+    if (editor && note) {
+      const currentMarkdown = (editor.storage as any).markdown?.getMarkdown() || '';
+      if (currentMarkdown.trim() !== note.content.trim()) {
+        editor.commands.setContent(note.content);
+      }
+    }
+  }, [note.id, editor]);
 
-    const newContent = 
-      note.content.substring(0, start) + replacement + note.content.substring(end);
+  // Handle clicking [[Wiki Links]] directly inside the formatted editor
+  const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const text = target.innerText || target.textContent || '';
+    
+    // Check if clicked text matches [[Wiki Link]] pattern
+    const match = text.match(/\[\[(.*?)\]\]/);
+    if (match) {
+      e.preventDefault();
+      onNavigateToNote(match[1].trim());
+    }
+  };
 
-    onUpdateNote({ content: newContent });
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + before.length, start + before.length + selected.length);
-    }, 10);
+  const insertWikiLink = () => {
+    if (!editor) return;
+    editor.chain().focus().insertContent('[[Page Name]]').run();
   };
 
   const handleLinkQuickNote = (qNote: Note) => {
-    const appendText = `\n\n> Reference: "${qNote.content.slice(0, 80)}..."`;
-    onUpdateNote({ content: note.content + appendText });
+    if (!editor) return;
+    const quote = `\n> Reference: "${qNote.content.slice(0, 80)}..."\n`;
+    editor.chain().focus().insertContent(quote).run();
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto px-6 lg:px-12 py-6 max-w-5xl mx-auto w-full flex flex-col">
-      {/* Top Header Bar: Title, Date, Mode Switcher */}
+    <div className="flex-1 h-full overflow-y-auto px-6 lg:px-12 py-6 max-w-5xl mx-auto w-full flex flex-col select-text">
+      {/* Title Bar */}
       <div className="mb-3 flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <input
             type="text"
             value={note.title}
             onChange={(e) => onUpdateNote({ title: e.target.value })}
-            placeholder="Untitled Note..."
+            placeholder="Untitled Page..."
             className="w-full text-2xl lg:text-3xl font-bold bg-transparent text-zinc-100 placeholder-zinc-700 focus:outline-none tracking-tight border-none p-0"
           />
 
           <div className="flex items-center gap-3 text-[11px] text-zinc-500 mt-1.5 flex-wrap">
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3 text-zinc-600" />
-              <span>{new Date(note.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(note.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              <span>Updated {new Date(note.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(note.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </span>
 
             {note.tags.map((t, idx) => (
@@ -111,34 +163,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
 
-        {/* Edit / Read Mode Switcher */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
-            <button
-              onClick={() => setIsPreview(false)}
-              className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                !isPreview ? 'bg-zinc-800 text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-              title="Edit markdown"
-            >
-              <Edit3 className="w-3 h-3" />
-              <span>Edit</span>
-            </button>
-            <button
-              onClick={() => setIsPreview(true)}
-              className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                isPreview ? 'bg-indigo-600 text-white font-semibold shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-              title="Read formatted note"
-            >
-              <Eye className="w-3 h-3" />
-              <span>Read Mode</span>
-            </button>
-          </div>
+        <div className="flex items-center gap-1 text-[11px] text-zinc-500 bg-zinc-900/60 px-2 py-1 rounded-md border border-zinc-800 shrink-0">
+          <Sparkles className="w-3 h-3 text-indigo-400" />
+          <span>Live Formatted Canvas</span>
         </div>
       </div>
 
-      {/* ALWAYS EXPANDED AI SUMMARY CARD - Never more than 4 lines */}
+      {/* ALWAYS EXPANDED AI SUMMARY CARD (Strictly <= 4 lines) */}
       <AISummaryCard
         summary={note.summary}
         onRefresh={onRefreshSummary}
@@ -146,7 +177,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         onTagClick={onTagClick}
       />
 
-      {/* Optional AI Contextual Suggestions Tray */}
+      {/* AI Contextual Suggestions Tray */}
       {showSuggestions && relatedSuggestions.length > 0 && (
         <div className="mb-4 p-3 rounded-lg bg-zinc-900/80 border border-indigo-500/20 text-xs space-y-2">
           <div className="flex items-center justify-between text-indigo-300 font-medium">
@@ -179,14 +210,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                   <button
                     onClick={() => handleLinkQuickNote(sug.quickNote)}
                     className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white"
-                    title="Insert reference"
+                    title="Insert reference into note"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
                   <button
                     onClick={() => onNavigateToNote(sug.quickNote.id)}
                     className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white"
-                    title="Open note"
+                    title="Open quick note"
                   >
                     <ArrowUpRight className="w-3 h-3" />
                   </button>
@@ -197,41 +228,84 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
       )}
 
-      {/* Formatting toolbar in edit mode */}
-      {!isPreview && (
-        <div className="mb-2 flex items-center gap-1 text-zinc-500 text-xs">
+      {/* 1-Click Formatting Ribbon (No need to memorize markdown symbols!) */}
+      {editor && (
+        <div className="sticky top-0 z-20 mb-2 flex items-center gap-0.5 p-1 bg-zinc-900/90 border border-zinc-800 rounded-lg text-zinc-400 backdrop-blur-md text-xs shadow-sm flex-wrap">
           <button
-            onClick={() => insertText('**', '**')}
-            className="p-1 rounded hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-            title="Bold"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 1 }) ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Heading 1 (#)"
+          >
+            <Heading1 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 2 }) ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Heading 2 (##)"
+          >
+            <Heading2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('heading', { level: 3 }) ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Heading 3 (###)"
+          >
+            <Heading3 className="w-3.5 h-3.5" />
+          </button>
+
+          <div className="w-px h-3.5 bg-zinc-800 mx-1" />
+
+          <button
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('bold') ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Bold (**text**)"
           >
             <Bold className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => insertText('*', '*')}
-            className="p-1 rounded hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-            title="Italic"
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('italic') ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Italic (*text*)"
           >
             <Italic className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => insertText('`', '`')}
-            className="p-1 rounded hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-            title="Code"
+            onClick={() => editor.chain().focus().toggleCode().run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('code') ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Code (`code`)"
           >
             <Code className="w-3.5 h-3.5" />
           </button>
+
+          <div className="w-px h-3.5 bg-zinc-800 mx-1" />
+
           <button
-            onClick={() => insertText('\n- ')}
-            className="p-1 rounded hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-            title="Bullet List"
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('bulletList') ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Bullet List (-)"
           >
             <List className="w-3.5 h-3.5" />
           </button>
-          <div className="w-px h-3 bg-zinc-800 mx-1" />
           <button
-            onClick={() => insertText('[[', ']]')}
-            className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 text-[11px] font-mono flex items-center gap-1 transition-colors"
+            onClick={() => editor.chain().focus().toggleTaskList().run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('taskList') ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Checklist / Tasks"
+          >
+            <CheckSquare className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('blockquote') ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Quote (>)"
+          >
+            <Quote className="w-3.5 h-3.5" />
+          </button>
+
+          <div className="w-px h-3.5 bg-zinc-800 mx-1" />
+
+          <button
+            onClick={insertWikiLink}
+            className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-indigo-300 text-[11px] font-mono flex items-center gap-1 transition-colors"
             title="Insert [[Wiki Link]]"
           >
             <Link2 className="w-3 h-3 text-indigo-400" />
@@ -240,24 +314,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
       )}
 
-      {/* Editor Body OR Proper Read / Preview Mode */}
-      <div className="flex-1 flex flex-col min-h-[400px]">
-        {isPreview ? (
-          <div className="flex-1 p-6 rounded-lg bg-zinc-900/30 border border-zinc-800/60 overflow-y-auto">
-            <MarkdownRenderer
-              content={note.content}
-              onNavigateToNote={onNavigateToNote}
-            />
-          </div>
-        ) : (
-          <textarea
-            id="note-body-textarea"
-            value={note.content}
-            onChange={(e) => onUpdateNote({ content: e.target.value })}
-            placeholder="Type your thoughts, [[ to link pages, or # to tag..."
-            className="flex-1 w-full p-5 rounded-lg bg-zinc-900/20 border border-zinc-800/60 text-zinc-100 placeholder-zinc-700 focus:outline-none focus:border-zinc-700 font-sans text-sm leading-relaxed resize-none transition-colors"
-          />
-        )}
+      {/* TRUE IN-PLACE WYSIWYG CANVAS: Write directly in formatted text */}
+      <div 
+        onClick={handleEditorClick}
+        className="flex-1 rounded-lg bg-zinc-900/30 border border-zinc-800/80 hover:border-zinc-700/80 transition-colors cursor-text"
+      >
+        <EditorContent editor={editor} />
       </div>
 
       {/* BI-DIRECTIONAL BACKLINKS - ALWAYS VISIBLE / UNCOLLAPSED */}
