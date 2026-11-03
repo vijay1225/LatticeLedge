@@ -20,7 +20,6 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
   const [content, setContent] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
-  // Collect all unique tags from quick notes
   const allTags = Array.from(
     new Set(quickNotes.flatMap(n => n.tags))
   );
@@ -37,23 +36,20 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
     : quickNotes;
 
   return (
-    <div className="flex-1 h-full overflow-y-auto px-6 py-6 max-w-3xl mx-auto w-full">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-amber-400 mb-1">
-          <Zap className="w-5 h-5 fill-amber-400" />
-          <h2 className="text-xl font-bold tracking-tight text-stone-100">
-            Quick Notes Scratchpad
-          </h2>
-        </div>
-        <p className="text-xs text-stone-400">
-          Zero-friction capture. AI automatically extracts keywords, entities, and tags.
+    <div className="flex-1 h-full overflow-y-auto px-6 lg:px-12 py-6 max-w-4xl mx-auto w-full text-xs">
+      <div className="mb-5">
+        <h2 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
+          <span>Quick Notes</span>
+          <Zap className="w-4 h-4 text-zinc-400" />
+        </h2>
+        <p className="text-xs text-zinc-500 mt-0.5">
+          Zero-friction capture. AI extracts keywords and tags automatically.
         </p>
       </div>
 
-      {/* Instant Capture Input Box */}
+      {/* Input Box */}
       <form onSubmit={handleSubmit} className="mb-6">
-        <div className="p-3.5 rounded-2xl bg-stone-900/80 border border-stone-800 shadow-xl focus-within:border-amber-500/50 transition-all">
+        <div className="p-3 rounded-lg bg-zinc-900 border border-zinc-800 focus-within:border-zinc-700 transition-all">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -62,18 +58,18 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
                 handleSubmit(e);
               }
             }}
-            placeholder="Capture fleeting thought, spell, meeting snippet... (Ctrl+Enter to save)"
-            className="w-full bg-transparent text-sm text-stone-100 placeholder-stone-500 focus:outline-none resize-none min-h-[75px]"
+            placeholder="Jot down a quick thought, observation, or snippet... (Ctrl+Enter to save)"
+            className="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none resize-none min-h-[65px]"
           />
-          <div className="flex items-center justify-between pt-2 border-t border-stone-800/60 mt-2">
-            <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60 mt-1">
+            <span className="text-[11px] text-zinc-500 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-indigo-400" />
               <span>AI auto-tags on save</span>
-            </div>
+            </span>
             <button
               type="submit"
               disabled={!content.trim()}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-stone-950 font-semibold text-xs flex items-center gap-1.5 disabled:opacity-40 transition-all shadow-md shadow-amber-500/10"
+              className="px-3 py-1 rounded-md bg-zinc-100 hover:bg-white text-zinc-950 font-semibold text-xs flex items-center gap-1.5 disabled:opacity-40 transition-colors"
             >
               <span>Save Note</span>
               <Send className="w-3 h-3" />
@@ -82,15 +78,15 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
         </div>
       </form>
 
-      {/* Tag Filter Chips */}
+      {/* Tag Filters */}
       {allTags.length > 0 && (
-        <div className="mb-5 flex flex-wrap items-center gap-1.5">
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setSelectedTag(null)}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+            className={`px-2 py-0.5 rounded text-xs transition-colors ${
               selectedTag === null
-                ? 'bg-amber-500 text-stone-950 font-semibold'
-                : 'bg-stone-900 text-stone-400 hover:text-stone-200 border border-stone-800'
+                ? 'bg-zinc-800 text-zinc-100 font-medium'
+                : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             All ({quickNotes.length})
@@ -99,10 +95,10 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
             <button
               key={idx}
               onClick={() => setSelectedTag(selectedTag === t ? null : t)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-2 py-0.5 rounded text-xs transition-colors ${
                 selectedTag === t
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold'
-                  : 'bg-stone-900 text-stone-400 hover:text-stone-200 border border-stone-800'
+                  ? 'bg-zinc-800 text-zinc-100 font-medium border border-zinc-700'
+                  : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
               {t}
@@ -111,44 +107,44 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
         </div>
       )}
 
-      {/* Feed List */}
-      <div className="space-y-3">
+      {/* Feed */}
+      <div className="space-y-2.5">
         {filteredNotes.map((note) => (
           <div
             key={note.id}
-            className="p-4 rounded-xl bg-stone-900/60 border border-stone-800/80 hover:border-stone-700 transition-all shadow-sm group"
+            className="p-3.5 rounded-lg bg-zinc-900/50 border border-zinc-800/80 hover:border-zinc-700/80 transition-all group"
           >
-            <div className="flex items-center justify-between text-xs text-stone-500 mb-2">
-              <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between text-zinc-500 mb-1.5">
+              <div className="flex items-center gap-1 text-[11px]">
                 <Clock className="w-3 h-3" />
                 <span>{new Date(note.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
               </div>
-              <div className="flex items-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => onPromoteToWiki(note)}
-                  className="px-2 py-0.5 rounded text-[11px] text-amber-300 hover:bg-amber-500/10 flex items-center gap-1 transition-colors"
-                  title="Promote to full Wiki Page"
+                  className="px-1.5 py-0.5 rounded text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 flex items-center gap-1"
+                  title="Promote to Wiki Page"
                 >
                   <FileText className="w-3 h-3" />
-                  <span>Convert to Wiki Page</span>
+                  <span>Convert to Page</span>
                 </button>
                 <button
                   onClick={() => onDeleteQuickNote(note.id)}
-                  className="p-1 rounded text-stone-500 hover:text-rose-400 transition-colors"
-                  title="Delete Quick Note"
+                  className="p-1 rounded text-zinc-600 hover:text-rose-400 transition-colors"
+                  title="Delete"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3 h-3" />
                 </button>
               </div>
             </div>
 
-            <p className="text-sm text-stone-200 leading-relaxed whitespace-pre-wrap mb-3">
+            <p className="text-zinc-200 leading-relaxed text-xs whitespace-pre-wrap mb-2">
               {note.content}
             </p>
 
             {note.tags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-stone-800/40">
-                <Tag className="w-3 h-3 text-stone-500 shrink-0" />
+              <div className="flex flex-wrap items-center gap-1 pt-1.5 border-t border-zinc-800/40">
+                <Tag className="w-3 h-3 text-zinc-600 mr-0.5" />
                 {note.tags.map((tag, idx) => (
                   <button
                     key={idx}
@@ -156,7 +152,7 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
                       setSelectedTag(tag);
                       onTagClick?.(tag);
                     }}
-                    className="px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                    className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-[10px] transition-colors"
                   >
                     {tag}
                   </button>
@@ -165,12 +161,6 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
             )}
           </div>
         ))}
-
-        {filteredNotes.length === 0 && (
-          <div className="text-center py-12 text-stone-500 text-sm">
-            No quick notes match the selected filter.
-          </div>
-        )}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, ChevronDown, ChevronUp, CheckSquare, Tag, Copy, Check, RefreshCw, Cpu } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronRight, CheckSquare, Tag, Copy, Check, RefreshCw, Cpu } from 'lucide-react';
 import { AISummary } from '../types';
 
 interface AISummaryCardProps {
@@ -15,146 +15,134 @@ export const AISummaryCard: React.FC<AISummaryCardProps> = ({
   isLoading,
   onTagClick
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Collapsed by default so it never blocks or occupies precious writing space!
+  const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!summary) return;
     const text = `AI Summary (${summary.model}):\n\nTakeaways:\n${summary.tldr.map(t => `• ${t}`).join('\n')}\n\nAction Items:\n${summary.actionItems.map(a => `[ ] ${a}`).join('\n')}\n\nTags: ${summary.tags.join(' ')}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 1500);
   };
 
+  const previewText = summary?.tldr?.[0] || 'No summary generated yet. Click to analyze with AI.';
+
   return (
-    <div className="mb-6 rounded-xl border border-amber-500/20 bg-gradient-to-br from-stone-900/90 via-stone-900/60 to-amber-950/20 backdrop-blur-md shadow-lg shadow-black/20 overflow-hidden transition-all duration-300">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-500/10 bg-stone-900/40">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-amber-500/10 text-amber-400">
-            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+    <div className="mb-4 rounded-lg border border-zinc-800/80 bg-zinc-900/60 hover:border-zinc-700/80 transition-all text-xs">
+      {/* Ultra-compact 1-line professional header bar */}
+      <div 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center justify-between px-3 py-2 cursor-pointer select-none group"
+      >
+        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-800/90 text-zinc-300 font-medium text-[11px] shrink-0 border border-zinc-700/50">
+            <Sparkles className="w-3 h-3 text-indigo-400" />
+            <span>AI Summary</span>
           </div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-amber-200/90">
-            AI Summary Card
-          </span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20">
-            <Cpu className="w-2.5 h-2.5" />
-            {summary?.model || 'Gemini 2.5 Flash'}
+
+          {/* Quick 1-line preview */}
+          <span className="text-zinc-400 font-normal truncate group-hover:text-zinc-200 transition-colors">
+            {isLoading ? 'Analyzing note with Gemini...' : previewText}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
           {summary && (
             <button
               onClick={handleCopy}
-              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-colors text-xs flex items-center gap-1"
-              title="Copy Summary"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+              title="Copy summary"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
             </button>
           )}
 
           <button
             onClick={onRefresh}
             disabled={isLoading}
-            className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500/30 text-amber-200 border border-amber-500/30 text-xs font-medium flex items-center gap-1.5 transition-all disabled:opacity-50"
-            title="Generate or Refresh AI Summary"
+            className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-300 hover:text-zinc-100 text-[11px] font-medium flex items-center gap-1 transition-colors disabled:opacity-40"
+            title="Generate fresh AI summary"
           >
-            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin text-amber-400' : ''}`} />
-            {isLoading ? 'Synthesizing...' : summary ? 'Refresh' : 'Summarize'}
+            <RefreshCw className={`w-2.5 h-2.5 ${isLoading ? 'animate-spin text-indigo-400' : ''}`} />
+            <span>{isLoading ? 'Thinking...' : summary ? 'Refresh' : 'Summarize'}</span>
           </button>
 
           <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-colors"
-            title={isCollapsed ? 'Expand Summary' : 'Collapse Summary'}
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-1 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
           >
-            {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
 
-      {/* Body Content */}
-      {!isCollapsed && (
-        <div className="p-4 space-y-3.5">
-          {isLoading && !summary ? (
-            <div className="py-6 flex flex-col items-center justify-center gap-2 text-stone-400 text-sm">
-              <Sparkles className="w-5 h-5 text-amber-400 animate-spin" />
-              <span>Analyzing note content with Gemini...</span>
-            </div>
-          ) : summary ? (
+      {/* Expanded Details Drawer */}
+      {isExpanded && (
+        <div className="px-3.5 pb-3 pt-2 border-t border-zinc-800/60 space-y-3 bg-zinc-950/30">
+          {summary ? (
             <>
-              {/* TL;DR Bullet Points */}
-              <div className="space-y-1.5">
-                <div className="text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+              {/* Takeaways */}
+              <div className="space-y-1">
+                <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
                   Key Takeaways
                 </div>
-                <ul className="space-y-1 text-sm text-stone-200/90 leading-relaxed">
+                <ul className="space-y-1 text-zinc-300 leading-relaxed text-xs">
                   {summary.tldr.map((point, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-amber-400 mt-1 text-xs">•</span>
+                    <li key={idx} className="flex items-start gap-1.5">
+                      <span className="text-indigo-400 mt-1 text-[10px]">•</span>
                       <span>{point}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              {/* Action Items */}
+              {/* Action items */}
               {summary.actionItems && summary.actionItems.length > 0 && (
-                <div className="space-y-1.5 pt-1 border-t border-stone-800/60">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+                <div className="space-y-1 pt-1 border-t border-zinc-800/40">
+                  <div className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
                     <CheckSquare className="w-3 h-3 text-emerald-400" />
-                    Action Items / Quests
+                    <span>Action Items</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {summary.actionItems.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-stone-800/50 border border-stone-700/40 text-xs text-stone-300"
+                        className="px-2 py-1 rounded bg-zinc-900 border border-zinc-800/80 text-[11px] text-zinc-300 truncate"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                        <span className="truncate">{item}</span>
+                        • {item}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Tags & Key Entities */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-stone-800/60">
-                <Tag className="w-3 h-3 text-stone-400 shrink-0 mr-1" />
-                {summary.tags.map((tag, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => onTagClick?.(tag)}
-                    className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 transition-colors"
-                  >
-                    {tag}
-                  </button>
-                ))}
+              {/* Tags & Model Info */}
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-zinc-800/40 text-[11px]">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Tag className="w-3 h-3 text-zinc-500 shrink-0" />
+                  {summary.tags.map((tag, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => onTagClick?.(tag)}
+                      className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
 
-                {summary.keyEntities && summary.keyEntities.length > 0 && (
-                  <div className="flex items-center gap-1 ml-auto text-[11px] text-stone-400">
-                    <span className="text-stone-500">Entities:</span>
-                    {summary.keyEntities.map((ent, idx) => (
-                      <span key={idx} className="text-stone-300 font-medium">
-                        {ent}{idx < summary.keyEntities.length - 1 ? ',' : ''}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <div className="flex items-center gap-1 text-[10px] text-zinc-500 shrink-0">
+                  <Cpu className="w-3 h-3" />
+                  <span>{summary.model}</span>
+                </div>
               </div>
             </>
           ) : (
-            <div className="py-3 text-center text-sm text-stone-400 flex items-center justify-center gap-2">
-              <span>No summary generated yet. Click</span>
-              <button
-                onClick={onRefresh}
-                className="text-amber-300 underline underline-offset-2 hover:text-amber-200 font-medium"
-              >
-                Summarize
-              </button>
-              <span>to analyze this note with AI.</span>
+            <div className="py-2 text-center text-zinc-500 text-xs">
+              No summary yet. Click &quot;Summarize&quot; to generate with Gemini.
             </div>
           )}
         </div>
