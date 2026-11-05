@@ -354,9 +354,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={(e) => handleModelChange(e.target.value)}
               className="w-full px-2.5 py-1.5 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs focus:outline-none focus:border-zinc-700"
             >
-              <option value="gemini-2.5-flash">gemini-2.5-flash (Ultra fast, recommended)</option>
-              <option value="gemini-2.0-flash">gemini-2.0-flash (High speed general purpose)</option>
-              <option value="gemini-1.5-flash">gemini-1.5-flash (Reliable standard fallback)</option>
+              <option value="gemini-flash-latest">gemini-flash-latest (Recommended - Always active & up-to-date)</option>
+              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Ultra fast, lightweight)</option>
+              <option value="gemini-pro-latest">gemini-pro-latest (High reasoning, latest Pro)</option>
+              <option value="gemini-2.5-flash">gemini-2.5-flash (Legacy Flash)</option>
             </select>
           </div>
 

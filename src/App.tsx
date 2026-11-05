@@ -50,7 +50,7 @@ export function App() {
     return {
       provider: 'gemini',
       apiKey: (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') || '' : ''),
-      modelName: 'gemini-2.5-flash'
+      modelName: 'gemini-flash-latest'
     };
   });
 

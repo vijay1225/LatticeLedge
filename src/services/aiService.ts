@@ -47,7 +47,7 @@ export function isGeminiKeyConfigured(config?: AIProviderConfig): boolean {
 
 /**
  * Executes a Gemini request with automatic fallback across available Flash models
- * (e.g., gemini-2.5-flash -> gemini-2.0-flash -> gemini-1.5-flash).
+ * (e.g., gemini-flash-latest -> gemini-2.5-flash-lite -> gemini-3.8-flash -> gemini-2.5-flash).
  */
 async function callGeminiWithFallback(
   ai: GoogleGenAI,
@@ -56,6 +56,9 @@ async function callGeminiWithFallback(
 ): Promise<{ text: string; usedModel: string }> {
   const candidateModels = Array.from(new Set([
     preferredModel,
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-3.8-flash',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash'
@@ -77,12 +80,13 @@ async function callGeminiWithFallback(
     } catch (err: any) {
       lastError = err;
       const msg = (err?.message || '').toLowerCase();
-      // If the error is model not found or unsupported, fallback to next model
+      // If the error is model not found, deprecated, unsupported, or unavailable to new users, fallback to next model
       if (
         msg.includes('not found') || 
         msg.includes('404') || 
         msg.includes('unsupported') || 
-        msg.includes('is not supported')
+        msg.includes('is not supported') ||
+        msg.includes('no longer available')
       ) {
         console.warn(`[Gemini API] Model ${model} not available on this key/project, attempting next fallback:`, err.message);
         continue;
@@ -110,7 +114,7 @@ export async function generateNoteSummary(
     throw new Error('Gemini API key is required. Please configure your Gemini API key in Settings.');
   }
 
-  const modelName = config?.modelName || 'gemini-2.5-flash';
+  const modelName = config?.modelName || 'gemini-flash-latest';
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `You are a high-speed knowledge synthesizer for LatticeLedger note-taking application.
@@ -204,7 +208,7 @@ export async function queryKnowledgeBase(
     };
   }
 
-  const modelName = config?.modelName || 'gemini-2.5-flash';
+  const modelName = config?.modelName || 'gemini-flash-latest';
   const ai = new GoogleGenAI({ apiKey });
   const context = relevantNotes.map(n => `--- Note: ${n.title} (${n.type}) ---\n${n.content}\n`).join('\n');
 
