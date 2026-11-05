@@ -6,17 +6,18 @@ import {
   Check, 
   AlertCircle, 
   Save, 
-  ExternalLink,
-  ShieldCheck,
-  Sparkles,
-  Download,
-  Upload,
-  FolderSync,
-  Smartphone,
-  HardDrive
+  ExternalLink, 
+  Sparkles, 
+  Download, 
+  Upload, 
+  Database as DatabaseIcon, 
+  HardDrive,
+  Zap,
+  FolderSync
 } from 'lucide-react';
 import { AIProviderConfig, Note } from '../types';
 import { downloadVaultBackup, importVaultFromJson } from '../utils/vaultExportImport';
+import { downloadSqliteDatabaseFile, importSqliteDatabaseFile } from '../services/sqliteService';
 
 interface SettingsModalProps {
   config: AIProviderConfig;
@@ -40,7 +41,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const sqliteInputRef = useRef<HTMLInputElement>(null);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,13 +74,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setTimeout(() => setTestStatus('idle'), 3500);
   };
 
-  const handleExportBackup = () => {
+  // SQLite Database Export (.db)
+  const handleExportSqlite = async () => {
+    try {
+      await downloadSqliteDatabaseFile();
+      setImportStatus('Exported lattice_vault.db! Save this single file to your Google Drive folder.');
+      setTimeout(() => setImportStatus(null), 5000);
+    } catch (err: any) {
+      setImportStatus(`Export failed: ${err.message}`);
+    }
+  };
+
+  // SQLite Database Import (.db or .sqlite)
+  const handleSqliteFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportStatus('Loading SQLite database from Google Drive / file...');
+      const buffer = await file.arrayBuffer();
+      const importedNotes = await importSqliteDatabaseFile(buffer);
+      if (onNotesUpdated) {
+        onNotesUpdated(importedNotes);
+        setImportStatus(`Loaded SQLite database successfully (${importedNotes.length} notes).`);
+      }
+    } catch (err: any) {
+      setImportStatus(`SQLite import error: ${err.message}`);
+    }
+    setTimeout(() => setImportStatus(null), 6000);
+    e.target.value = '';
+  };
+
+  // JSON / Backup Handlers
+  const handleExportJson = () => {
     downloadVaultBackup(notes);
-    setImportStatus(`Exported ${notes.length} notes. Save this file to your Google Drive folder.`);
+    setImportStatus(`Exported JSON backup (${notes.length} notes).`);
     setTimeout(() => setImportStatus(null), 5000);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -90,14 +124,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const result = importVaultFromJson(content);
       if (result.success && result.notes && onNotesUpdated) {
         onNotesUpdated(result.notes);
-        setImportStatus(`Successfully imported ${result.notes.length} notes from Google Drive / file!`);
+        setImportStatus(`Imported ${result.notes.length} notes successfully.`);
       } else {
-        setImportStatus(`Import failed: ${result.error || 'Invalid file format'}`);
+        setImportStatus(`Import failed: ${result.error || 'Invalid format'}`);
       }
       setTimeout(() => setImportStatus(null), 6000);
     };
     reader.readAsText(file);
-    // Reset input
     e.target.value = '';
   };
 
@@ -105,87 +138,117 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <div className="flex-1 h-full overflow-y-auto px-6 lg:px-12 py-8 max-w-2xl mx-auto w-full text-xs">
       <div className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
-          <span>Settings & Storage</span>
+          <span>Settings & Database</span>
           <Sparkles className="w-4 h-4 text-zinc-400" />
         </h2>
         <p className="text-xs text-zinc-500 mt-0.5">
-          Standalone local-first note database, Google Drive folder sharing, and AI configuration.
+          High-speed SQLite database engine, Google Drive single-file vault sync, and AI configuration.
         </p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-4">
-        {/* 1. Standalone Architecture & Google Drive Folder Sync */}
+        {/* 1. High-Speed SQLite Database Engine & Google Drive Vault */}
         <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-medium text-zinc-200">
-              <FolderSync className="w-4 h-4 text-indigo-400" />
-              <span>Google Drive Folder & Shared Database</span>
+              <DatabaseIcon className="w-4 h-4 text-indigo-400" />
+              <span>SQLite Engine (Single File: lattice_vault.db)</span>
             </div>
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <ShieldCheck className="w-3 h-3" />
-              100% Standalone & Offline
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+              <Zap className="w-3 h-3" />
+              B-Tree Indexed (Ultra Fast)
             </span>
           </div>
 
           <p className="text-[11px] text-zinc-400 leading-relaxed">
-            LatticeLedger stores all notes locally on this device. You can link and share the same note vault across your <strong>Phone APK</strong> and upcoming <strong>Desktop app</strong> by keeping your notes in a Google Drive folder.
+            All notes are saved into an indexed <strong>SQLite database</strong> for instantaneous sub-millisecond loading and saving without loose markdown file overhead. You can share this exact same <code>lattice_vault.db</code> file across <strong>Mobile</strong> and <strong>Desktop</strong> via Google Drive.
           </p>
 
-          <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/80 space-y-2.5">
+          <div className="p-3.5 rounded-lg bg-zinc-950 border border-zinc-800/80 space-y-3">
             <div className="flex items-center justify-between text-zinc-300">
               <span className="flex items-center gap-1.5 font-medium">
                 <HardDrive className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Current Vault Database</span>
+                <span>SQLite Vault Records</span>
               </span>
               <span className="font-mono text-indigo-400 font-semibold">{notes.length} notes</span>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap pt-1">
-              <button
-                type="button"
-                onClick={handleExportBackup}
-                className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700/60"
-                title="Export vault file to save to Google Drive"
-              >
-                <Download className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Export Vault to Google Drive</span>
-              </button>
+            {/* Primary SQLite .db Controls */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleExportSqlite}
+                  className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
+                  title="Export real SQLite database file (.db) to Google Drive"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export SQLite DB (lattice_vault.db)</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700/60"
-                title="Select vault file from Google Drive or local storage"
-              >
-                <Upload className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Import from Google Drive</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => sqliteInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700/60"
+                  title="Select lattice_vault.db from Google Drive"
+                >
+                  <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Import SQLite DB from Google Drive</span>
+                </button>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,.md"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+                <input
+                  ref={sqliteInputRef}
+                  type="file"
+                  accept=".db,.sqlite"
+                  onChange={handleSqliteFileChange}
+                  className="hidden"
+                />
+              </div>
+
+              {/* Secondary JSON Export / Import */}
+              <div className="flex items-center gap-2 text-[11px] text-zinc-500 pt-1">
+                <span>Secondary Backup:</span>
+                <button
+                  type="button"
+                  onClick={handleExportJson}
+                  className="underline hover:text-zinc-300"
+                >
+                  Export JSON
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => jsonInputRef.current?.click()}
+                  className="underline hover:text-zinc-300"
+                >
+                  Import JSON
+                </button>
+                <input
+                  ref={jsonInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleJsonFileChange}
+                  className="hidden"
+                />
+              </div>
             </div>
 
             {importStatus && (
-              <div className="text-[11px] font-medium p-2 rounded bg-indigo-950/40 border border-indigo-500/30 text-indigo-300">
+              <div className="text-[11px] font-medium p-2 rounded bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 animate-in fade-in">
                 {importStatus}
               </div>
             )}
           </div>
 
           <div className="flex items-start gap-2 pt-1 text-[11px] text-zinc-500 leading-normal">
-            <Smartphone className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
+            <FolderSync className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
             <span>
-              <strong>Cross-Platform Plan:</strong> The desktop app and mobile APK share identical markdown note structures. Linking to your Google Drive folder allows instantaneous bi-directional sync without depending on any local server!
+              <strong>Google Drive Single-File Strategy:</strong> Because everything resides in <code>lattice_vault.db</code>, Google Drive syncs just one unified database file. When the desktop app opens, it reads this same database file with zero file system fragmentation!
             </span>
           </div>
         </div>
 
-        {/* 2. Model Provider & Gemini API Key (BYOK) */}
+        {/* 2. Model Provider & Gemini API Key (Direct Connection) */}
         <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-3">
           <div className="flex items-center gap-2 font-medium text-zinc-200">
             <Cpu className="w-3.5 h-3.5 text-indigo-400" />
@@ -285,7 +348,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <span>Sample Knowledge Vault</span>
           </div>
           <p className="text-[11px] text-zinc-500">
-            Reload the Harry Potter test vault (pages, quick notes, and bi-directional graph links).
+            Reset SQLite database to the original Harry Potter vault (pages, quick notes, and links).
           </p>
           <button
             type="button"

@@ -8,6 +8,12 @@ import { HARRY_POTTER_SEED_NOTES } from './services/harryPotterSeed';
 import { buildKnowledgeGraph } from './utils/graphBuilder';
 import { generateNoteSummary } from './services/aiService';
 import { extractWikiLinks } from './utils/wikiLinks';
+import { 
+  getAllNotesFromSql, 
+  saveNoteToSql, 
+  deleteNoteFromSql, 
+  resetSqliteToSeed 
+} from './services/sqliteService';
 
 import { Sidebar } from './components/Sidebar';
 import { NoteEditor } from './components/NoteEditor';
@@ -70,6 +76,17 @@ export function App() {
   // Note History Navigation (< and > like Obsidian / Logseq)
   const [history, setHistory] = useState<string[]>(['wiki-harry-potter']);
   const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Load notes directly from SQLite database on mount
+  useEffect(() => {
+    getAllNotesFromSql().then(sqlNotes => {
+      if (sqlNotes && sqlNotes.length > 0) {
+        setNotes(sqlNotes);
+      }
+    }).catch(err => {
+      console.warn('[SQLite] Fallback to cache:', err);
+    });
+  }, []);
 
   useEffect(() => {
     try {
@@ -174,6 +191,7 @@ export function App() {
       if (partial.content !== undefined) {
         updated.links = extractWikiLinks(partial.content);
       }
+      saveNoteToSql(updated).catch(e => console.warn('[SQLite] save error:', e));
       return updated;
     }));
   };
@@ -190,6 +208,7 @@ export function App() {
       updatedAt: Date.now()
     };
     setNotes(prev => [newPage, ...prev]);
+    saveNoteToSql(newPage).catch(e => console.warn('[SQLite] save error:', e));
     setActiveNoteId(newPage.id);
     setCurrentMode('notes');
 
@@ -213,6 +232,7 @@ export function App() {
       updatedAt: Date.now()
     };
     setNotes(prev => [newQuickNote, ...prev]);
+    saveNoteToSql(newQuickNote).catch(e => console.warn('[SQLite] save error:', e));
   };
 
   const handlePromoteQuickNote = (qNote: Note) => {
@@ -226,6 +246,7 @@ export function App() {
 
   const handleDeleteQuickNote = (id: string) => {
     setNotes(prev => prev.filter(n => n.id !== id));
+    deleteNoteFromSql(id).catch(e => console.warn('[SQLite] delete error:', e));
   };
 
   const handleRefreshAISummary = async (id: string) => {
@@ -241,8 +262,13 @@ export function App() {
     }
   };
 
-  const handleResetSeedData = () => {
-    setNotes(HARRY_POTTER_SEED_NOTES);
+  const handleResetSeedData = async () => {
+    try {
+      const freshNotes = await resetSqliteToSeed();
+      setNotes(freshNotes);
+    } catch {
+      setNotes(HARRY_POTTER_SEED_NOTES);
+    }
     setActiveNoteId('wiki-harry-potter');
     setHistory(['wiki-harry-potter']);
     setHistoryIndex(0);
