@@ -103,11 +103,12 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
   - [x] Implemented Mobile Bottom Navigation bar + Floating Action Button (FAB) for instant capture on phone (`0.0.0.0:3000`).
   - [x] Reserved Right Pane empty per design specification.
   - [x] Seeded rich Harry Potter test knowledge vault.
-  - [x] Built native Android APK (`LatticeLedger.apk`, 4.54MB) via Capacitor v8 & Gradle 8.14 (Java 17).
-  - [x] Created Central Local Sync & APK Distribution Server (`server/server.mjs`) on `0.0.0.0:3000` with API Key authentication (`x-api-key`).
-  - [x] Added Server Connection & Sync UI in Settings with 1-click APK download (`/download` & `/lattice-ledger.apk`).
+  - [x] Built native 100% Standalone Android APK (`LatticeLedger.apk`, 4.94MB) via Capacitor v8 & Gradle 8.14 (Java 17).
+  - [x] Zero-Server Architecture: App works completely standalone & offline on Android and desktop, storing all notes locally on device.
+  - [x] Google Drive Shared Vault Architecture: Implemented 1-click Vault Export & Import (`vaultExportImport.ts`), laying the foundation to share the identical note database across Mobile and Desktop via a Google Drive folder.
+  - [x] BYOK Direct AI Connection: Google Gemini API connects directly from the phone using the user's Gemini API key (no intermediate proxy server).
   - [x] 100% automated test suite passing (10 tests across graphBuilder, wikiLinks, and aiService).
   - [x] Pushed commit to `https://github.com/vijay1225/LatticeLedge.git`.
 - [ ] **Next Steps**:
-  - [ ] User installs APK on Android device and tests live connection with API key.
-  - [ ] Firebase cloud sync setup if remote syncing outside local Wi-Fi is requested.
+  - [ ] User installs standalone APK on phone.
+  - [ ] Add direct Google Drive SAF (Storage Access Framework) folder binding for automatic background file sync.

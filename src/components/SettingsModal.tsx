@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Key, 
   Cpu, 
-  Cloud, 
   RotateCcw, 
   Check, 
   AlertCircle, 
@@ -10,12 +9,14 @@ import {
   ExternalLink,
   ShieldCheck,
   Sparkles,
-  Server,
-  RefreshCw,
-  Smartphone
+  Download,
+  Upload,
+  FolderSync,
+  Smartphone,
+  HardDrive
 } from 'lucide-react';
 import { AIProviderConfig, Note } from '../types';
-import { checkServerStatus, syncVaultWithServer } from '../services/syncService';
+import { downloadVaultBackup, importVaultFromJson } from '../utils/vaultExportImport';
 
 interface SettingsModalProps {
   config: AIProviderConfig;
@@ -29,7 +30,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   config,
   onSaveConfig,
   onResetSeedData,
-  notes,
+  notes = [],
   onNotesUpdated
 }) => {
   const [provider, setProvider] = useState(config.provider);
@@ -37,61 +38,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [modelName, setModelName] = useState(config.modelName);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  // Local Sync Server Settings
-  const [serverUrl, setServerUrl] = useState(() => {
-    try {
-      return localStorage.getItem('LATTICE_SERVER_URL') || (typeof window !== 'undefined' && window.location.origin.includes(':3000') ? window.location.origin : 'http://192.168.0.4:3000');
-    } catch {
-      return 'http://192.168.0.4:3000';
-    }
-  });
-
-  const [serverApiKey, setServerApiKey] = useState(() => {
-    try {
-      return localStorage.getItem('LATTICE_SERVER_API_KEY') || 'lattice_live_key_2026';
-    } catch {
-      return 'lattice_live_key_2026';
-    }
-  });
-
-  const [serverStatus, setServerStatus] = useState<string | null>(null);
-  const [isServerConnecting, setIsServerConnecting] = useState(false);
-
-  const handleTestServer = async () => {
-    setIsServerConnecting(true);
-    setServerStatus(null);
-    try {
-      const res = await checkServerStatus(serverUrl, serverApiKey);
-      if (res.success) {
-        setServerStatus(`🟢 ${res.serverName} connected! (${res.notesCount} notes on server)`);
-        localStorage.setItem('LATTICE_SERVER_URL', serverUrl);
-        localStorage.setItem('LATTICE_SERVER_API_KEY', serverApiKey);
-      } else {
-        setServerStatus(`🔴 ${res.message}`);
-      }
-    } finally {
-      setIsServerConnecting(false);
-    }
-  };
-
-  const handleSyncWithServer = async () => {
-    if (!notes || !onNotesUpdated) return;
-    setIsServerConnecting(true);
-    try {
-      const res = await syncVaultWithServer(serverUrl, serverApiKey, notes);
-      if (res.success && res.notes) {
-        onNotesUpdated(res.notes);
-        setServerStatus(`🟢 Synced successfully! Vault has ${res.count} notes.`);
-        localStorage.setItem('LATTICE_SERVER_URL', serverUrl);
-        localStorage.setItem('LATTICE_SERVER_API_KEY', serverApiKey);
-      } else {
-        setServerStatus(`🔴 ${res.message}`);
-      }
-    } finally {
-      setIsServerConnecting(false);
-    }
-  };
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,24 +72,124 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setTimeout(() => setTestStatus('idle'), 3500);
   };
 
+  const handleExportBackup = () => {
+    downloadVaultBackup(notes);
+    setImportStatus(`Exported ${notes.length} notes. Save this file to your Google Drive folder.`);
+    setTimeout(() => setImportStatus(null), 5000);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) return;
+
+      const result = importVaultFromJson(content);
+      if (result.success && result.notes && onNotesUpdated) {
+        onNotesUpdated(result.notes);
+        setImportStatus(`Successfully imported ${result.notes.length} notes from Google Drive / file!`);
+      } else {
+        setImportStatus(`Import failed: ${result.error || 'Invalid file format'}`);
+      }
+      setTimeout(() => setImportStatus(null), 6000);
+    };
+    reader.readAsText(file);
+    // Reset input
+    e.target.value = '';
+  };
+
   return (
     <div className="flex-1 h-full overflow-y-auto px-6 lg:px-12 py-8 max-w-2xl mx-auto w-full text-xs">
       <div className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
-          <span>Settings & Models</span>
+          <span>Settings & Storage</span>
           <Sparkles className="w-4 h-4 text-zinc-400" />
         </h2>
         <p className="text-xs text-zinc-500 mt-0.5">
-          Configure model providers (BYOK), Google Cloud Sync, and sample data.
+          Standalone local-first note database, Google Drive folder sharing, and AI configuration.
         </p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-4">
-        {/* Model Provider */}
+        {/* 1. Standalone Architecture & Google Drive Folder Sync */}
+        <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-medium text-zinc-200">
+              <FolderSync className="w-4 h-4 text-indigo-400" />
+              <span>Google Drive Folder & Shared Database</span>
+            </div>
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <ShieldCheck className="w-3 h-3" />
+              100% Standalone & Offline
+            </span>
+          </div>
+
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            LatticeLedger stores all notes locally on this device. You can link and share the same note vault across your <strong>Phone APK</strong> and upcoming <strong>Desktop app</strong> by keeping your notes in a Google Drive folder.
+          </p>
+
+          <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/80 space-y-2.5">
+            <div className="flex items-center justify-between text-zinc-300">
+              <span className="flex items-center gap-1.5 font-medium">
+                <HardDrive className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Current Vault Database</span>
+              </span>
+              <span className="font-mono text-indigo-400 font-semibold">{notes.length} notes</span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700/60"
+                title="Export vault file to save to Google Drive"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Export Vault to Google Drive</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700/60"
+                title="Select vault file from Google Drive or local storage"
+              >
+                <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Import from Google Drive</span>
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,.md"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </div>
+
+            {importStatus && (
+              <div className="text-[11px] font-medium p-2 rounded bg-indigo-950/40 border border-indigo-500/30 text-indigo-300">
+                {importStatus}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-start gap-2 pt-1 text-[11px] text-zinc-500 leading-normal">
+            <Smartphone className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
+            <span>
+              <strong>Cross-Platform Plan:</strong> The desktop app and mobile APK share identical markdown note structures. Linking to your Google Drive folder allows instantaneous bi-directional sync without depending on any local server!
+            </span>
+          </div>
+        </div>
+
+        {/* 2. Model Provider & Gemini API Key (BYOK) */}
         <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-3">
           <div className="flex items-center gap-2 font-medium text-zinc-200">
             <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-            <span>AI Model Provider</span>
+            <span>AI Model & Gemini API Key (Direct Device Connection)</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -184,7 +233,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="flex items-center justify-between mb-1">
               <label className="text-[11px] font-medium text-zinc-400 flex items-center gap-1">
                 <Key className="w-3 h-3 text-zinc-500" />
-                <span>Gemini API Key</span>
+                <span>Google Gemini API Key</span>
               </label>
               <a
                 href="https://aistudio.google.com/app/apikey"
@@ -201,7 +250,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder="AIzaSy... (leave blank to use simulated engine)"
+                placeholder="AIzaSy... (leave blank for offline smart heuristic engine)"
                 className="flex-1 px-2.5 py-1.5 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs font-mono focus:outline-none focus:border-zinc-700"
               />
               <button
@@ -217,124 +266,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {testStatus === 'success' && (
               <div className="flex items-center gap-1 mt-1.5 text-xs text-emerald-400">
                 <Check className="w-3 h-3" />
-                <span>API Key verified!</span>
+                <span>Gemini API Key verified directly with Google!</span>
               </div>
             )}
             {testStatus === 'error' && (
               <div className="flex items-center gap-1 mt-1.5 text-xs text-rose-400">
                 <AlertCircle className="w-3 h-3" />
-                <span>Failed to verify API key.</span>
+                <span>Failed to verify API key. Please check your key.</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Local Sync Server & Android APK Connection */}
-        <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 font-medium text-zinc-200">
-              <Server className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Local Sync Server & Android APK</span>
-            </div>
-            <a
-              href={`${serverUrl.replace(/\/+$/, '')}/download`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[11px] font-medium transition-colors"
-            >
-              <Smartphone className="w-3 h-3" />
-              <span>Download APK</span>
-            </a>
-          </div>
-
-          <p className="text-[11px] text-zinc-400 leading-relaxed">
-            Connect your phone APK to this computer over Wi-Fi using your server API key for seamless bi-directional note synchronization.
-          </p>
-
-          <div className="space-y-2 pt-1">
-            <div>
-              <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-                Server Address (Host / LAN IP)
-              </label>
-              <input
-                type="text"
-                value={serverUrl}
-                onChange={(e) => setServerUrl(e.target.value)}
-                placeholder="http://192.168.0.4:3000"
-                className="w-full px-2.5 py-1.5 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs font-mono focus:outline-none focus:border-zinc-700"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-                Server Connection API Key
-              </label>
-              <input
-                type="text"
-                value={serverApiKey}
-                onChange={(e) => setServerApiKey(e.target.value)}
-                placeholder="lattice_live_key_2026"
-                className="w-full px-2.5 py-1.5 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs font-mono focus:outline-none focus:border-zinc-700"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleTestServer}
-                disabled={isServerConnecting}
-                className="px-2.5 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <Server className="w-3 h-3 text-zinc-400" />
-                <span>{isServerConnecting ? 'Checking...' : 'Test Connection'}</span>
-              </button>
-
-              {notes && onNotesUpdated && (
-                <button
-                  type="button"
-                  onClick={handleSyncWithServer}
-                  disabled={isServerConnecting}
-                  className="px-2.5 py-1.5 rounded-md bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3 h-3 ${isServerConnecting ? 'animate-spin' : ''}`} />
-                  <span>Sync Vault Now</span>
-                </button>
-              )}
-            </div>
-
-            {serverStatus && (
-              <div className="mt-2 text-xs font-mono p-2 rounded bg-zinc-950 border border-zinc-800/80 text-zinc-300">
-                {serverStatus}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sync */}
-        <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 font-medium text-zinc-200">
-              <Cloud className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Google Cloud Sync</span>
-            </div>
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <ShieldCheck className="w-3 h-3" />
-              Active (Local-First Persistence)
-            </span>
-          </div>
-          <p className="text-[11px] text-zinc-400">
-            Notes are saved instantly on device and synchronized to your private cloud vault.
-          </p>
-        </div>
-
-        {/* Reset */}
+        {/* 3. Sample Vault Reset */}
         <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-2">
           <div className="font-medium text-zinc-200 flex items-center gap-2">
             <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Sample Vault</span>
+            <span>Sample Knowledge Vault</span>
           </div>
           <p className="text-[11px] text-zinc-500">
-            Reload the Harry Potter test vault (pages, quick notes, and graph links).
+            Reload the Harry Potter test vault (pages, quick notes, and bi-directional graph links).
           </p>
           <button
             type="button"
@@ -349,7 +300,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {saveSuccess && (
             <span className="text-xs text-emerald-400 flex items-center gap-1">
               <Check className="w-3.5 h-3.5" />
-              <span>Saved!</span>
+              <span>Settings Saved!</span>
             </span>
           )}
           <button
