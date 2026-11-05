@@ -34,7 +34,8 @@ import {
   Send,
   Sparkles,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Zap
 } from 'lucide-react';
 
 const STORAGE_KEY = 'LATTICE_LEDGER_NOTES_V1';
@@ -75,6 +76,9 @@ export function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [mobileQuickText, setMobileQuickText] = useState('');
+  const [isMobilePagesOpen, setIsMobilePagesOpen] = useState(false);
+  const [newNoteModalType, setNewNoteModalType] = useState<'wiki' | 'quick'>('wiki');
+  const [newPageTitle, setNewPageTitle] = useState('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showPagesList, setShowPagesList] = useState(true);
@@ -213,14 +217,16 @@ export function App() {
     }));
   };
 
-  const handleCreateNewWikiPage = () => {
+  const handleCreateNewWikiPage = (customTitle?: string, customContent?: string) => {
+    const title = customTitle?.trim() || 'Untitled Page';
+    const content = customContent || `# ${title}\n\nStart writing your thoughts here...`;
     const newPage: Note = {
       id: `wiki-${Date.now()}`,
       type: 'wiki',
-      title: 'Untitled Page',
-      content: '# Untitled Page\n\nStart writing your thoughts here...',
+      title,
+      content,
       tags: ['#Draft'],
-      links: [],
+      links: extractWikiLinks(content),
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -228,6 +234,7 @@ export function App() {
     saveNoteToSql(newPage).catch(e => console.warn('[SQLite] save error:', e));
     setActiveNoteId(newPage.id);
     setCurrentMode('notes');
+    setIsMobilePagesOpen(false);
 
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newPage.id);
@@ -348,6 +355,7 @@ export function App() {
               onClick={handleGoBack}
               disabled={historyIndex <= 0}
               className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
+              title="Previous Note"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -355,17 +363,34 @@ export function App() {
               onClick={handleGoForward}
               disabled={historyIndex >= history.length - 1}
               className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
+              title="Next Note"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
-            <span className="font-semibold text-xs text-zinc-200 ml-1">LatticeLedger</span>
+            <button
+              onClick={() => setIsMobilePagesOpen(prev => !prev)}
+              className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[11px] font-medium text-zinc-300 hover:text-white"
+              title="View all Pages"
+            >
+              <FileText className="w-3 h-3 text-indigo-400" />
+              <span>Pages ({wikiNotes.length})</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleCreateNewWikiPage()}
+              className="flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 font-medium text-[11px] active:scale-95 transition-all shadow-sm"
+              title="Create New Page"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Page</span>
+            </button>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Cloud Synced" />
             <button
               onClick={() => setCurrentMode('settings')}
               className="p-1 rounded text-zinc-500 hover:text-zinc-200"
+              title="Settings"
             >
               <SettingsIcon className="w-4 h-4" />
             </button>
@@ -386,7 +411,7 @@ export function App() {
                       </span>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={handleCreateNewWikiPage}
+                          onClick={() => handleCreateNewWikiPage()}
                           className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200"
                           title="New Page"
                         >
@@ -434,12 +459,14 @@ export function App() {
               {/* Expansive Active Note Editor */}
               {activeNote ? (
                 <NoteEditor
+                  key={activeNote.id}
                   note={activeNote}
                   allNotes={notes}
                   onUpdateNote={(partial) => handleUpdateNote(activeNote.id, partial)}
                   onRefreshSummary={() => handleRefreshAISummary(activeNote.id)}
                   isSummaryLoading={isSummaryLoading}
                   onNavigateToNote={navigateToNote}
+                  onNewPage={() => handleCreateNewWikiPage()}
                   onTagClick={() => {
                     setIsSearchOpen(true);
                   }}
@@ -509,18 +536,102 @@ export function App() {
         currentMode={currentMode}
         onSelectMode={setCurrentMode}
         onOpenSearch={() => setIsSearchOpen(true)}
-        onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
+        onOpenQuickCapture={() => {
+          setNewNoteModalType(currentMode === 'quick' ? 'quick' : 'wiki');
+          setIsQuickCaptureOpen(true);
+        }}
       />
 
-      {/* Mobile Quick Capture Bottom Sheet */}
+      {/* Mobile Pages Drawer Modal */}
+      {isMobilePagesOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm pt-14 px-3 pb-20 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-xl bg-zinc-900 border border-zinc-800 shadow-2xl flex flex-col max-h-[75vh] overflow-hidden">
+            <div className="flex items-center justify-between p-3 border-b border-zinc-800 bg-zinc-950/80">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
+                <FileText className="w-4 h-4 text-indigo-400" />
+                <span>Wiki Pages ({wikiNotes.length})</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    handleCreateNewWikiPage();
+                    setIsMobilePagesOpen(false);
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-600/30 text-indigo-300 text-xs font-medium border border-indigo-500/40 active:scale-95 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ New Page</span>
+                </button>
+                <button
+                  onClick={() => setIsMobilePagesOpen(false)}
+                  className="p-1 rounded text-zinc-500 hover:text-zinc-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {wikiNotes.map(n => (
+                <button
+                  key={n.id}
+                  onClick={() => {
+                    navigateToNote(n.id);
+                    setIsMobilePagesOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-xs transition-colors flex items-center justify-between ${
+                    activeNote?.id === n.id
+                      ? 'bg-zinc-800 text-indigo-300 font-medium border border-indigo-500/20'
+                      : 'text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <FileText className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                    <span className="truncate">{n.title}</span>
+                  </div>
+                  {n.links?.length > 0 && (
+                    <span className="text-[10px] text-zinc-600 shrink-0 font-mono">
+                      {n.links.length} 🔗
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Create Bottom Sheet (Wiki Page vs Quick Scratchpad) */}
       {isQuickCaptureOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-t-xl bg-zinc-900 border-t border-zinc-800 p-4 shadow-2xl">
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Instant Quick Capture</span>
-              </span>
+            {/* Header Tabs */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1 bg-zinc-950 p-0.5 rounded-lg border border-zinc-800">
+                <button
+                  onClick={() => setNewNoteModalType('wiki')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                    newNoteModalType === 'wiki'
+                      ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>+ New Page</span>
+                </button>
+                <button
+                  onClick={() => setNewNoteModalType('quick')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                    newNoteModalType === 'quick'
+                      ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Quick Note</span>
+                </button>
+              </div>
+
               <button
                 onClick={() => setIsQuickCaptureOpen(false)}
                 className="p-1 rounded text-zinc-500 hover:text-zinc-300"
@@ -528,25 +639,63 @@ export function App() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <textarea
-              value={mobileQuickText}
-              onChange={(e) => setMobileQuickText(e.target.value)}
-              placeholder="Capture fleeting thought on the go..."
-              className="w-full h-24 p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 text-xs placeholder-zinc-600 focus:outline-none mb-3 resize-none"
-            />
-            <button
-              onClick={() => {
-                if (mobileQuickText.trim()) {
-                  handleAddQuickNote(mobileQuickText);
-                  setMobileQuickText('');
-                  setIsQuickCaptureOpen(false);
-                }
-              }}
-              className="w-full py-2 rounded-lg bg-zinc-100 text-zinc-950 font-semibold text-xs flex items-center justify-center gap-1.5 hover:bg-white"
-            >
-              <span>Save Note</span>
-              <Send className="w-3 h-3" />
-            </button>
+
+            {newNoteModalType === 'wiki' ? (
+              <div className="space-y-2.5">
+                <input
+                  type="text"
+                  value={newPageTitle}
+                  onChange={(e) => setNewPageTitle(e.target.value)}
+                  placeholder="Page Title (e.g. Artificial Intelligence, Hogwarts)..."
+                  className="w-full p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 text-xs placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50"
+                  autoFocus
+                />
+                <textarea
+                  value={mobileQuickText}
+                  onChange={(e) => setMobileQuickText(e.target.value)}
+                  placeholder="Initial page content or thoughts... (supports [[links]])"
+                  className="w-full h-24 p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 text-xs placeholder-zinc-600 focus:outline-none resize-none focus:border-indigo-500/50"
+                />
+                <button
+                  onClick={() => {
+                    handleCreateNewWikiPage(
+                      newPageTitle.trim() || undefined,
+                      mobileQuickText.trim() ? `# ${newPageTitle.trim() || 'Untitled Page'}\n\n${mobileQuickText.trim()}` : undefined
+                    );
+                    setNewPageTitle('');
+                    setMobileQuickText('');
+                    setIsQuickCaptureOpen(false);
+                  }}
+                  className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Create & Open Wiki Page</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                <textarea
+                  value={mobileQuickText}
+                  onChange={(e) => setMobileQuickText(e.target.value)}
+                  placeholder="Capture fleeting thought on the go... (Auto-extracts #tags)"
+                  className="w-full h-24 p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 text-xs placeholder-zinc-600 focus:outline-none resize-none focus:border-amber-500/50"
+                  autoFocus
+                />
+                <button
+                  onClick={() => {
+                    if (mobileQuickText.trim()) {
+                      handleAddQuickNote(mobileQuickText);
+                      setMobileQuickText('');
+                      setIsQuickCaptureOpen(false);
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-lg bg-zinc-100 text-zinc-950 font-semibold text-xs flex items-center justify-center gap-1.5 hover:bg-white transition-colors shadow-sm active:scale-95"
+                >
+                  <span>Save Quick Note</span>
+                  <Send className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -140,9 +140,13 @@ export async function queryKnowledgeBase(
   const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
   const context = relevantNotes.map(n => `--- Note: ${n.title} (${n.type}) ---\n${n.content}\n`).join('\n');
 
-  const prompt = `You are the knowledge synthesis engine for LatticeLedger.
+  const prompt = `You are the knowledge synthesis engine for LatticeLedger personal knowledge base.
 Answer the user's question based strictly on the provided context notes.
-Include mentions of the relevant note titles enclosed in [[Note Title]] citations.
+Format your answer in beautiful, clean Markdown suitable for a rich markdown viewer:
+- Use clear Markdown headings (e.g., ## Overview, ## Details) to organize your thoughts.
+- Use bullet points (- ) with bold terms (**Term**: details) for high readability.
+- Whenever you refer to an entity or note from the context, strictly enclose its title in [[Note Title]] wiki links so the user can click directly into that note.
+- Provide a direct, well-structured synthesis.
 
 User Question: ${question}
 

@@ -10,10 +10,13 @@ import {
   Bot,
   Send,
   Loader2,
-  Key
+  Key,
+  Copy,
+  Check
 } from 'lucide-react';
 import { Note, SearchTab, AIProviderConfig } from '../types';
 import { queryKnowledgeBase, isGeminiKeyConfigured } from '../services/aiService';
+import { MarkdownViewer } from './MarkdownViewer';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -40,6 +43,14 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   const [aiAnswer, setAiAnswer] = useState<string | null>(null);
   const [citations, setCitations] = useState<string[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyAnswer = () => {
+    if (!aiAnswer) return;
+    navigator.clipboard.writeText(aiAnswer);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -299,8 +310,29 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
               {!isAiLoading && aiAnswer && (
                 <div className="space-y-3">
-                  <div className="p-3.5 rounded-lg bg-zinc-950/80 border border-zinc-800/80 text-zinc-200 text-xs leading-relaxed whitespace-pre-wrap">
-                    {aiAnswer}
+                  <div className="rounded-lg bg-zinc-950/90 border border-zinc-800/90 p-4 shadow-inner">
+                    <div className="flex items-center justify-between pb-2 mb-3 border-b border-zinc-800/80 text-[11px] text-zinc-500">
+                      <div className="flex items-center gap-1.5 text-indigo-400 font-medium">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>AI Knowledge Synthesis (Gemini 2.5 Flash)</span>
+                      </div>
+                      <button
+                        onClick={handleCopyAnswer}
+                        className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 flex items-center gap-1 text-[11px] transition-colors"
+                        title="Copy Answer"
+                      >
+                        {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copied ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+
+                    <MarkdownViewer
+                      content={aiAnswer}
+                      onLinkClick={(noteTitle) => {
+                        onSelectNote(noteTitle);
+                        onClose();
+                      }}
+                    />
                   </div>
 
                   {citations.length > 0 && (

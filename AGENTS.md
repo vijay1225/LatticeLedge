@@ -112,7 +112,15 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
     - Completely deleted simulated heuristic fallback (`generateSimulatedSummary`, `generateSimulatedAnswer`).
     - Stripped all hardcoded seed summaries from `harryPotterSeed.ts` so zero pre-baked AI summaries exist.
     - AI summarization and Ask AI strictly require a valid Gemini API key; missing keys cleanly block with explicit guidance to Settings.
-  - [x] 100% automated test suite passing (16 tests across sqliteService, graphBuilder, wikiLinks, and aiService).
+  - [x] Mobile & Desktop "Add Page" and Knowledge Connections Overhaul:
+    - Added prominent "+ Page" action and "Pages (X)" drawer toggle on mobile header.
+    - Added "+ New Page" button in NoteEditor toolbar.
+    - Upgraded mobile FAB bottom sheet to dual tabs: "+ New Wiki Page" and "Quick Note".
+    - Fixed note text overwriting race condition by binding `key={activeNote.id}` to `<NoteEditor>`.
+    - Added bottom padding `pb-28 md:pb-12` preventing long pages from clipping behind mobile bottom bar.
+    - Implemented Comprehensive Linked Pages Hub: Outgoing links bar under title + Outgoing Linked Pages cards & Bi-directional Backlinks cards at the bottom.
+    - Built rich `MarkdownViewer` component for Ask AI: renders headings, lists, bold text, and clickable `[[Wiki Links]]`.
+  - [x] 100% automated test suite passing (19 tests across sqliteService, graphBuilder, wikiLinks, aiService, and markdownViewer).
   - [x] Rebuilt native standalone Android APK (`LatticeLedger.apk`, 4.96MB) with Gradle 8.14 on Java 17.
   - [x] Pushed commit to `https://github.com/vijay1225/LatticeLedge.git`.
 - [ ] **Next Steps**:

@@ -31,6 +31,17 @@
   pointer-events: none;
 }
 
+.tiptap.ProseMirror a {
+  color: #818cf8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.tiptap.ProseMirror a:hover {
+  color: #a5b4fc;
+}
+
 .tiptap.ProseMirror h1 {
   font-size: 1.5rem;
   font-weight: 700;

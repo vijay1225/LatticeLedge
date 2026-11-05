@@ -28,7 +28,7 @@ import { Markdown } from 'tiptap-markdown';
 
 import { Note } from '../types';
 import { AISummaryCard } from './AISummaryCard';
-import { findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
+import { findBacklinks, findRelatedQuickNotes, extractWikiLinks } from '../utils/wikiLinks';
 
 interface NoteEditorProps {
   note: Note;
@@ -37,6 +37,7 @@ interface NoteEditorProps {
   onRefreshSummary: () => void;
   isSummaryLoading: boolean;
   onNavigateToNote: (titleOrId: string) => void;
+  onNewPage?: () => void;
   onTagClick?: (tag: string) => void;
   isFocusMode?: boolean;
   onToggleFocusMode?: () => void;
@@ -52,6 +53,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onRefreshSummary,
   isSummaryLoading,
   onNavigateToNote,
+  onNewPage,
   onTagClick,
   isFocusMode,
   onToggleFocusMode,
@@ -83,6 +85,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   // Compute backlinks (notes that point to this note)
   const backlinks = findBacklinks(note.title, allNotes);
+
+  // Compute outgoing links (notes referenced in this note)
+  const outgoingLinks = note.links && note.links.length > 0 
+    ? note.links 
+    : extractWikiLinks(note.content);
 
   // Compute contextual suggestions (quick notes related to this page)
   const relatedSuggestions = findRelatedQuickNotes(note, allNotes);
@@ -157,7 +164,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   return (
     <div 
-      className={`flex-1 h-full overflow-y-auto flex flex-col select-text transition-all duration-150 ${
+      className={`flex-1 h-full overflow-y-auto flex flex-col select-text transition-all duration-150 pb-28 md:pb-12 ${
         isFullWidth || isFocusMode
           ? 'w-full max-w-none px-4 sm:px-8 lg:px-12 py-5' 
           : 'max-w-4xl mx-auto px-4 sm:px-6 py-5 w-full'
@@ -200,10 +207,50 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               </button>
             )}
           </div>
+
+          {/* Quick Linked Pages Pills Bar */}
+          {outgoingLinks.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider flex items-center gap-1">
+                <Link2 className="w-2.5 h-2.5 text-indigo-400" />
+                <span>Linked Pages:</span>
+              </span>
+              {outgoingLinks.map((linkTitle, idx) => {
+                const exists = allNotes.some(n => n.title.toLowerCase() === linkTitle.toLowerCase());
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => onNavigateToNote(linkTitle)}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                      exists
+                        ? 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30'
+                        : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-400 border border-dashed border-zinc-700'
+                    }`}
+                    title={exists ? `Jump to ${linkTitle}` : `Create page [[${linkTitle}]]`}
+                  >
+                    <span>{linkTitle}</span>
+                    {!exists && <span className="text-[9px] text-amber-400/80 font-normal">(new)</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Header Controls: Full Width & Focus Mode */}
+        {/* Header Controls: New Page, Full Width & Focus Mode */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {onNewPage && (
+            <button
+              onClick={onNewPage}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 transition-colors shadow-sm"
+              title="Create a new Wiki Page"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">New Page</span>
+            </button>
+          )}
+
           <button
             onClick={toggleFullWidth}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
@@ -395,36 +442,88 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         <EditorContent editor={editor} className="flex-1 flex flex-col" />
       </div>
 
-      {/* BI-DIRECTIONAL BACKLINKS - ALWAYS VISIBLE / UNCOLLAPSED */}
-      <div className="mt-8 pt-4 border-t border-zinc-800/80">
-        <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-          <Link2 className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Bi-directional Backlinks ({backlinks.length})</span>
+      {/* KNOWLEDGE CONNECTIONS HUB: OUTGOING LINKS & INCOMING BACKLINKS */}
+      <div className="mt-8 pt-5 border-t border-zinc-800/80 space-y-6">
+        {/* 1. Outgoing Linked Pages (Pages Referenced In This Note) */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              <Link2 className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Linked Pages in this Document ({outgoingLinks.length})</span>
+            </div>
+            <span className="text-[11px] text-zinc-500">Mentions enclosed in [[wiki-links]]</span>
+          </div>
+
+          {outgoingLinks.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {outgoingLinks.map((targetTitle, idx) => {
+                const targetNote = allNotes.find(n => n.title.toLowerCase() === targetTitle.toLowerCase());
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => onNavigateToNote(targetTitle)}
+                    className="text-left p-3 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-indigo-500/40 transition-all group"
+                  >
+                    <div className="flex items-center justify-between text-xs text-zinc-200 group-hover:text-indigo-300 font-medium mb-1">
+                      <span className="truncate">{targetTitle}</span>
+                      <ArrowUpRight className="w-3 h-3 text-zinc-500 group-hover:text-indigo-400 shrink-0" />
+                    </div>
+                    {targetNote ? (
+                      <p className="text-[11px] text-zinc-500 line-clamp-2 leading-relaxed">
+                        {targetNote.content.replace(/[#*`]/g, '').slice(0, 100)}
+                      </p>
+                    ) : (
+                      <span className="text-[11px] text-amber-400/90 font-medium flex items-center gap-1">
+                        + Uncreated page. Click to create.
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-3 rounded-lg bg-zinc-900/30 border border-zinc-800/40 text-xs text-zinc-500">
+              No outgoing links yet. Type <code className="text-zinc-300 font-mono">[[Page Name]]</code> anywhere in the editor to link to another page.
+            </div>
+          )}
         </div>
 
-        {backlinks.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {backlinks.map((bNote) => (
-              <button
-                key={bNote.id}
-                onClick={() => onNavigateToNote(bNote.id)}
-                className="text-left p-3 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-indigo-500/30 transition-all group"
-              >
-                <div className="flex items-center justify-between text-xs text-zinc-200 group-hover:text-indigo-300 font-medium mb-1">
-                  <span className="truncate">{bNote.title}</span>
-                  <ArrowUpRight className="w-3 h-3 text-zinc-500 group-hover:text-indigo-400 shrink-0" />
-                </div>
-                <p className="text-[11px] text-zinc-500 line-clamp-2 leading-relaxed">
-                  {bNote.content.replace(/[#*`]/g, '')}
-                </p>
-              </button>
-            ))}
+        {/* 2. Incoming Bi-directional Backlinks */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              <Link2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Bi-directional Backlinks ({backlinks.length})</span>
+            </div>
+            <span className="text-[11px] text-zinc-500">Other notes that reference this page</span>
           </div>
-        ) : (
-          <div className="p-3 rounded-lg bg-zinc-900/30 border border-zinc-800/40 text-xs text-zinc-500">
-            No other notes link to this page yet. Type <code className="text-zinc-300 font-mono">[[{note.title}]]</code> in any note to link.
-          </div>
-        )}
+
+          {backlinks.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {backlinks.map((bNote) => (
+                <button
+                  key={bNote.id}
+                  type="button"
+                  onClick={() => onNavigateToNote(bNote.id)}
+                  className="text-left p-3 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-emerald-500/40 transition-all group"
+                >
+                  <div className="flex items-center justify-between text-xs text-zinc-200 group-hover:text-emerald-300 font-medium mb-1">
+                    <span className="truncate">{bNote.title}</span>
+                    <ArrowUpRight className="w-3 h-3 text-zinc-500 group-hover:text-emerald-400 shrink-0" />
+                  </div>
+                  <p className="text-[11px] text-zinc-500 line-clamp-2 leading-relaxed">
+                    {bNote.content.replace(/[#*`]/g, '').slice(0, 100)}
+                  </p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="p-3 rounded-lg bg-zinc-900/30 border border-zinc-800/40 text-xs text-zinc-500">
+              No other notes link to this page yet. Type <code className="text-zinc-300 font-mono">[[{note.title}]]</code> in any note to link.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
