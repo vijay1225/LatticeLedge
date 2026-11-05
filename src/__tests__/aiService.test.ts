@@ -1,35 +1,72 @@
-import { describe, it, expect } from 'vitest';
-import { generateNoteSummary, queryKnowledgeBase } from '../services/aiService';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { generateNoteSummary, queryKnowledgeBase, isGeminiKeyConfigured } from '../services/aiService';
 import { HARRY_POTTER_SEED_NOTES } from '../services/harryPotterSeed';
 
-describe('AI Service & Knowledge Synthesis', () => {
-  it('generates a structured summary conforming to AISummary schema', async () => {
-    const note = HARRY_POTTER_SEED_NOTES[0]; // Harry Potter
-    const summary = await generateNoteSummary(note);
+// Mock the GoogleGenAI SDK
+vi.mock('@google/genai', () => {
+  return {
+    GoogleGenAI: vi.fn().mockImplementation(() => ({
+      models: {
+        generateContent: vi.fn().mockResolvedValue({
+          text: JSON.stringify({
+            tldr: [
+              'Harry Potter is an English half-blood wizard.',
+              'Known as the Boy Who Lived after surviving the Killing Curse.'
+            ],
+            actionItems: ['Locate remaining Horcruxes'],
+            tags: ['#Gryffindor', '#ChosenOne'],
+            keyEntities: ['Voldemort', 'Hogwarts']
+          })
+        })
+      }
+    }))
+  };
+});
+
+describe('Strict AI Service (Direct Gemini Only - Zero Simulated Heuristics)', () => {
+  beforeEach(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+    }
+  });
+
+  it('correctly verifies when Gemini API key is configured or missing', () => {
+    expect(isGeminiKeyConfigured()).toBe(false);
+    expect(isGeminiKeyConfigured({ provider: 'gemini', apiKey: '   ', modelName: 'gemini-2.5-flash' })).toBe(false);
+    expect(isGeminiKeyConfigured({ provider: 'gemini', apiKey: 'AIzaSyFakeKey123', modelName: 'gemini-2.5-flash' })).toBe(true);
+  });
+
+  it('guarantees that seed notes contain zero pre-baked AI summaries', () => {
+    for (const note of HARRY_POTTER_SEED_NOTES) {
+      expect(note.summary).toBeUndefined();
+    }
+  });
+
+  it('strictly rejects generateNoteSummary if no Gemini API key is configured', async () => {
+    const note = HARRY_POTTER_SEED_NOTES[0];
+    await expect(generateNoteSummary(note)).rejects.toThrow(/Gemini API key is required/i);
+    await expect(generateNoteSummary(note, { provider: 'gemini', apiKey: '', modelName: 'gemini-2.5-flash' }))
+      .rejects.toThrow(/Gemini API key is required/i);
+  });
+
+  it('strictly rejects queryKnowledgeBase if no Gemini API key is configured', async () => {
+    await expect(queryKnowledgeBase('Who is Voldemort?', HARRY_POTTER_SEED_NOTES))
+      .rejects.toThrow(/Gemini API key is required/i);
+  });
+
+  it('successfully generates structured summary when valid API key is supplied', async () => {
+    const note = HARRY_POTTER_SEED_NOTES[0];
+    const summary = await generateNoteSummary(note, {
+      provider: 'gemini',
+      apiKey: 'valid-gemini-key',
+      modelName: 'gemini-2.5-flash'
+    });
 
     expect(summary).toBeDefined();
-    expect(Array.isArray(summary.tldr)).toBe(true);
-    expect(summary.tldr.length).toBeGreaterThan(0);
-    expect(Array.isArray(summary.actionItems)).toBe(true);
-    expect(Array.isArray(summary.tags)).toBe(true);
+    expect(summary.tldr.length).toBe(2);
+    expect(summary.tldr[0]).toContain('Harry Potter');
+    expect(summary.actionItems).toContain('Locate remaining Horcruxes');
+    expect(summary.model).toBe('gemini-2.5-flash');
     expect(typeof summary.generatedAt).toBe('number');
-  });
-
-  it('answers questions across Harry Potter notes with citations', async () => {
-    const question = 'What are the Horcruxes and who made them?';
-    const result = await queryKnowledgeBase(question, HARRY_POTTER_SEED_NOTES);
-
-    expect(result.answer).toBeDefined();
-    expect(result.answer.length).toBeGreaterThan(20);
-    expect(result.citations.length).toBeGreaterThan(0);
-    expect(result.citations).toContain('Horcruxes');
-  });
-
-  it('handles questions with no matches gracefully', async () => {
-    const question = 'xyznonexistent123';
-    const result = await queryKnowledgeBase(question, HARRY_POTTER_SEED_NOTES);
-
-    expect(result.answer).toContain('could not find');
-    expect(result.citations).toEqual([]);
   });
 });

@@ -33,21 +33,6 @@ export const HARRY_POTTER_SEED_NOTES: Note[] = [
       'Albus Dumbledore',
       'Order of the Phoenix'
     ],
-    summary: {
-      tldr: [
-        'The Boy Who Lived and sole survivor of the Avada Kedavra curse.',
-        'Core protagonist leading the resistance against Voldemort.',
-        'Unwittingly acted as the seventh Horcrux due to the events at Godric\'s Hollow.'
-      ],
-      actionItems: [
-        'Locate and destroy remaining Horcruxes',
-        'Protect fellow students at Hogwarts'
-      ],
-      tags: ['#Gryffindor', '#ChosenOne', '#HorcruxHunt'],
-      keyEntities: ['Voldemort', 'Dumbledore', 'Hogwarts', 'Gryffindor'],
-      generatedAt: Date.now() - 1000 * 60 * 60 * 24,
-      model: 'Gemini 2.5 Flash'
-    },
     createdAt: Date.now() - 1000 * 60 * 60 * 48,
     updatedAt: Date.now() - 1000 * 60 * 60 * 12,
     isPinned: true
@@ -76,21 +61,6 @@ Founded in the Scottish Highlands around the 10th century by four of the greates
       'Lord Voldemort',
       'Horcruxes'
     ],
-    summary: {
-      tldr: [
-        'Ancient premier magical institution founded in the 10th century.',
-        'Contains crucial secret chambers including the Room of Requirement.',
-        'Served as the final battleground in the Second Wizarding War.'
-      ],
-      actionItems: [
-        'Guard castle wards and defensive enchantments',
-        'Investigate hidden relics inside the Room of Requirement'
-      ],
-      tags: ['#Hogwarts', '#AncientMagic', '#Dumbledore'],
-      keyEntities: ['Dumbledore', 'Gryffindor', 'Slytherin', 'Highlands'],
-      generatedAt: Date.now() - 1000 * 60 * 60 * 30,
-      model: 'Gemini 2.5 Flash'
-    },
     createdAt: Date.now() - 1000 * 60 * 60 * 72,
     updatedAt: Date.now() - 1000 * 60 * 60 * 20
   },
@@ -119,20 +89,6 @@ Founded in the Scottish Highlands around the 10th century by four of the greates
       'Albus Dumbledore',
       'Order of the Phoenix'
     ],
-    summary: {
-      tldr: [
-        'Heir of Slytherin and commander of the Death Eaters.',
-        'Sought immortality through the creation of multiple Horcruxes.',
-        'Feared only Albus Dumbledore throughout his reign.'
-      ],
-      actionItems: [
-        'Identify all soul vessels and sever his anchors to life'
-      ],
-      tags: ['#DarkLord', '#Horcrux', '#DeathEaters'],
-      keyEntities: ['Riddle', 'Potter', 'Dumbledore', 'Slytherin'],
-      generatedAt: Date.now() - 1000 * 60 * 60 * 22,
-      model: 'Gemini 2.5 Flash'
-    },
     createdAt: Date.now() - 1000 * 60 * 60 * 96,
     updatedAt: Date.now() - 1000 * 60 * 60 * 18
   },
@@ -166,22 +122,6 @@ A **Horcrux** is an object created using Dark Magic to attain immortality by con
       'Hogwarts School of Witchcraft and Wizardry',
       'Lord Voldemort'
     ],
-    summary: {
-      tldr: [
-        'Seven receptacles containing fragments of Voldemort’s fractured soul.',
-        'Impervious to normal damage; require Basilisk venom or Fiendfyre.',
-        'Systematic destruction is the only pathway to Voldemort\'s mortality.'
-      ],
-      actionItems: [
-        'Extract Helga Hufflepuff\'s Cup from Gringotts',
-        'Search the Room of Requirement for the Diadem',
-        'Kill Nagini to dismantle the final tether'
-      ],
-      tags: ['#Horcrux', '#DarkMagic', '#SoulVessels'],
-      keyEntities: ['Voldemort', 'Basilisk', 'Gryffindor', 'Ravenclaw'],
-      generatedAt: Date.now() - 1000 * 60 * 60 * 15,
-      model: 'Gemini 2.5 Flash'
-    },
     createdAt: Date.now() - 1000 * 60 * 60 * 110,
     updatedAt: Date.now() - 1000 * 60 * 60 * 8
   },
@@ -208,21 +148,6 @@ Headmaster of [[Hogwarts School of Witchcraft and Wizardry]], Supreme Mugwump of
       'Harry Potter',
       'Horcruxes'
     ],
-    summary: {
-      tldr: [
-        'Legendary Headmaster of Hogwarts and founder of the Order of the Phoenix.',
-        'Bearer of the Elder Wand and mastermind behind the plan to defeat Voldemort.',
-        'Understood the magical sacrifice that protected Harry Potter.'
-      ],
-      actionItems: [
-        'Instruct Harry regarding the memory traces in the Pensieve',
-        'Secure the defense of Hogwarts against Death Eater infiltration'
-      ],
-      tags: ['#Headmaster', '#Dumbledore', '#OrderOfThePhoenix'],
-      keyEntities: ['Grindelwald', 'Potter', 'Hogwarts', 'ElderWand'],
-      generatedAt: Date.now() - 1000 * 60 * 60 * 40,
-      model: 'Gemini 2.5 Flash'
-    },
     createdAt: Date.now() - 1000 * 60 * 60 * 120,
     updatedAt: Date.now() - 1000 * 60 * 60 * 35
   },
@@ -248,21 +173,6 @@ The collective name given to the three Gryffindor students who shaped the Second
       'Horcruxes',
       'Hogwarts School of Witchcraft and Wizardry'
     ],
-    summary: {
-      tldr: [
-        'Harry Potter, Hermione Granger, and Ron Weasley.',
-        'Inseparable team responsible for uncovering and destroying soul anchors.',
-        'Demonstrated peerless loyalty and courage throughout the Second Wizarding War.'
-      ],
-      actionItems: [
-        'Maintain Polyjuice potion supplies',
-        'Prepare protective spells around camp: Protego Totalum, Muffliato'
-      ],
-      tags: ['#GoldenTrio', '#Gryffindor', '#Resistance'],
-      keyEntities: ['Harry', 'Hermione', 'Ron', 'Gringotts'],
-      generatedAt: Date.now() - 1000 * 60 * 60 * 25,
-      model: 'Gemini 2.5 Flash'
-    },
     createdAt: Date.now() - 1000 * 60 * 60 * 130,
     updatedAt: Date.now() - 1000 * 60 * 60 * 14
   },
@@ -287,21 +197,6 @@ A secret society founded by [[Albus Dumbledore]] to fight [[Lord Voldemort]] and
       'Harry Potter',
       'Hogwarts School of Witchcraft and Wizardry'
     ],
-    summary: {
-      tldr: [
-        'Clandestine resistance alliance created by Albus Dumbledore.',
-        'Headquartered at 12 Grimmauld Place under the Fidelius Charm.',
-        'Guarded the Department of Mysteries prophecy and opposed Death Eaters.'
-      ],
-      actionItems: [
-        'Maintain guard rotations over the Hall of Prophecy',
-        'Keep communications secure via Patronus messaging'
-      ],
-      tags: ['#OrderOfThePhoenix', '#Resistance', '#GrimmauldPlace'],
-      keyEntities: ['Dumbledore', 'Voldemort', 'Black', 'Moody'],
-      generatedAt: Date.now() - 1000 * 60 * 60 * 16,
-      model: 'Gemini 2.5 Flash'
-    },
     createdAt: Date.now() - 1000 * 60 * 60 * 140,
     updatedAt: Date.now() - 1000 * 60 * 60 * 16
   },

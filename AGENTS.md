@@ -108,7 +108,12 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
   - [x] Google Drive Single-File Vault Architecture: Mobile APK and future Desktop app share the exact same `lattice_vault.db` SQLite database file via a Google Drive folder.
   - [x] Implemented 1-click SQLite Database Export and Import directly in Settings.
   - [x] BYOK Direct AI Connection: Google Gemini API connects directly from the phone using the user's Gemini API key (no intermediate proxy server).
-  - [x] 100% automated test suite passing (14 tests across sqliteService, graphBuilder, wikiLinks, and aiService).
+  - [x] Pure Gemini Direct Integration (Zero Mock/Simulated AI):
+    - Completely deleted simulated heuristic fallback (`generateSimulatedSummary`, `generateSimulatedAnswer`).
+    - Stripped all hardcoded seed summaries from `harryPotterSeed.ts` so zero pre-baked AI summaries exist.
+    - AI summarization and Ask AI strictly require a valid Gemini API key; missing keys cleanly block with explicit guidance to Settings.
+  - [x] 100% automated test suite passing (16 tests across sqliteService, graphBuilder, wikiLinks, and aiService).
+  - [x] Rebuilt native standalone Android APK (`LatticeLedger.apk`, 4.96MB) with Gradle 8.14 on Java 17.
   - [x] Pushed commit to `https://github.com/vijay1225/LatticeLedge.git`.
 - [ ] **Next Steps**:
   - [ ] User installs standalone APK on phone.

@@ -6,7 +6,7 @@ import {
 } from './types';
 import { HARRY_POTTER_SEED_NOTES } from './services/harryPotterSeed';
 import { buildKnowledgeGraph } from './utils/graphBuilder';
-import { generateNoteSummary } from './services/aiService';
+import { generateNoteSummary, isGeminiKeyConfigured } from './services/aiService';
 import { extractWikiLinks } from './utils/wikiLinks';
 import { 
   getAllNotesFromSql, 
@@ -41,16 +41,6 @@ const STORAGE_KEY = 'LATTICE_LEDGER_NOTES_V1';
 const AI_CONFIG_KEY = 'LATTICE_LEDGER_AI_CONFIG';
 
 export function App() {
-  const [notes, setNotes] = useState<Note[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.warn('Failed to read from localStorage:', e);
-    }
-    return HARRY_POTTER_SEED_NOTES;
-  });
-
   const [aiConfig, setAiConfig] = useState<AIProviderConfig>(() => {
     try {
       const saved = localStorage.getItem(AI_CONFIG_KEY);
@@ -58,9 +48,26 @@ export function App() {
     } catch {}
     return {
       provider: 'gemini',
-      apiKey: '',
+      apiKey: (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') || '' : ''),
       modelName: 'gemini-2.5-flash'
     };
+  });
+
+  const [notes, setNotes] = useState<Note[]>(() => {
+    try {
+      const savedKey = typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null;
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // If no key configured, ensure no old fake summaries remain
+          return savedKey ? parsed : parsed.map((n: Note) => ({ ...n, summary: undefined }));
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to read from localStorage:', e);
+    }
+    return HARRY_POTTER_SEED_NOTES;
   });
 
   const [currentMode, setCurrentMode] = useState<ViewMode>('notes');
@@ -69,9 +76,12 @@ export function App() {
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [mobileQuickText, setMobileQuickText] = useState('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showPagesList, setShowPagesList] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
+
+  const hasGeminiKey = isGeminiKeyConfigured(aiConfig);
 
   // Note History Navigation (< and > like Obsidian / Logseq)
   const [history, setHistory] = useState<string[]>(['wiki-harry-potter']);
@@ -81,12 +91,14 @@ export function App() {
   useEffect(() => {
     getAllNotesFromSql().then(sqlNotes => {
       if (sqlNotes && sqlNotes.length > 0) {
-        setNotes(sqlNotes);
+        const hasKey = isGeminiKeyConfigured(aiConfig);
+        const sanitized = hasKey ? sqlNotes : sqlNotes.map(n => ({ ...n, summary: undefined }));
+        setNotes(sanitized);
       }
     }).catch(err => {
       console.warn('[SQLite] Fallback to cache:', err);
     });
-  }, []);
+  }, [hasGeminiKey]);
 
   useEffect(() => {
     try {
@@ -99,6 +111,11 @@ export function App() {
   useEffect(() => {
     try {
       localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(aiConfig));
+      if (aiConfig.apiKey && aiConfig.apiKey.trim()) {
+        localStorage.setItem('LL_GEMINI_API_KEY', aiConfig.apiKey.trim());
+      } else {
+        localStorage.removeItem('LL_GEMINI_API_KEY');
+      }
     } catch {}
   }, [aiConfig]);
 
@@ -253,10 +270,19 @@ export function App() {
     const target = notes.find(n => n.id === id);
     if (!target) return;
 
+    if (!hasGeminiKey) {
+      setSummaryError('Gemini API key is required. Please enter your API key in Settings.');
+      setCurrentMode('settings');
+      return;
+    }
+
     setIsSummaryLoading(true);
+    setSummaryError(null);
     try {
       const summary = await generateNoteSummary(target, aiConfig);
       handleUpdateNote(id, { summary });
+    } catch (err: any) {
+      setSummaryError(err?.message || 'Failed to generate summary with Gemini API.');
     } finally {
       setIsSummaryLoading(false);
     }
@@ -419,6 +445,9 @@ export function App() {
                   }}
                   isFocusMode={isFocusMode}
                   onToggleFocusMode={() => setIsFocusMode(prev => !prev)}
+                  hasApiKey={hasGeminiKey}
+                  onOpenSettings={() => setCurrentMode('settings')}
+                  summaryError={summaryError}
                 />
               ) : (
                 <div className="flex-1 flex items-center justify-center text-zinc-600 text-xs">
@@ -528,6 +557,8 @@ export function App() {
         onClose={() => setIsSearchOpen(false)}
         notes={notes}
         onSelectNote={navigateToNote}
+        aiConfig={aiConfig}
+        onOpenSettings={() => setCurrentMode('settings')}
       />
     </div>
   );

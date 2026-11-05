@@ -9,23 +9,28 @@ import {
   Link2, 
   Bot,
   Send,
-  Loader2
+  Loader2,
+  Key
 } from 'lucide-react';
-import { Note, SearchTab } from '../types';
-import { queryKnowledgeBase } from '../services/aiService';
+import { Note, SearchTab, AIProviderConfig } from '../types';
+import { queryKnowledgeBase, isGeminiKeyConfigured } from '../services/aiService';
 
 interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   notes: Note[];
   onSelectNote: (noteIdOrTitle: string) => void;
+  aiConfig?: AIProviderConfig;
+  onOpenSettings?: () => void;
 }
 
 export const SearchModal: React.FC<SearchModalProps> = ({
   isOpen,
   onClose,
   notes,
-  onSelectNote
+  onSelectNote,
+  aiConfig,
+  onOpenSettings
 }) => {
   const [activeTab, setActiveTab] = useState<SearchTab>('instant');
   const [query, setQuery] = useState('');
@@ -75,18 +80,27 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     );
   });
 
+  const hasKey = isGeminiKeyConfigured(aiConfig);
+
   const handleAskAiSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!aiQuestion.trim() || isAiLoading) return;
 
+    if (!hasKey) {
+      setAiAnswer('Gemini API Key Required: Please configure your Gemini API key in Settings to connect directly to Google Gemini.');
+      setCitations([]);
+      return;
+    }
+
     setIsAiLoading(true);
     setAiAnswer(null);
     try {
-      const result = await queryKnowledgeBase(aiQuestion, notes);
+      const result = await queryKnowledgeBase(aiQuestion, notes, aiConfig);
       setAiAnswer(result.answer);
       setCitations(result.citations);
-    } catch {
-      setAiAnswer('Unable to synthesize notes. Please try again.');
+    } catch (err: any) {
+      setAiAnswer(err?.message || 'Failed to query knowledge base with Gemini API. Please check your API key.');
+      setCitations([]);
     } finally {
       setIsAiLoading(false);
     }
@@ -94,12 +108,25 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
   const handleSampleQuestion = (q: string) => {
     setAiQuestion(q);
+    if (!hasKey) {
+      setAiAnswer('Gemini API Key Required: Please configure your Gemini API key in Settings to connect directly to Google Gemini.');
+      setCitations([]);
+      return;
+    }
     setIsAiLoading(true);
-    queryKnowledgeBase(q, notes).then(res => {
-      setAiAnswer(res.answer);
-      setCitations(res.citations);
-      setIsAiLoading(false);
-    });
+    setAiAnswer(null);
+    queryKnowledgeBase(q, notes, aiConfig)
+      .then(res => {
+        setAiAnswer(res.answer);
+        setCitations(res.citations);
+      })
+      .catch(err => {
+        setAiAnswer(err?.message || 'Failed to query knowledge base with Gemini API.');
+        setCitations([]);
+      })
+      .finally(() => {
+        setIsAiLoading(false);
+      });
   };
 
   return (
@@ -207,6 +234,26 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         {/* TAB 2: ASK AI */}
         {activeTab === 'ask-ai' && (
           <div className="flex flex-col flex-1 overflow-hidden text-xs">
+            {!hasKey && (
+              <div className="mx-3 mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Key className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Gemini API Key required. LatticeLedger connects directly to Google Gemini (no simulated AI).</span>
+                </div>
+                {onOpenSettings && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onOpenSettings();
+                    }}
+                    className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-medium text-[11px] whitespace-nowrap transition-colors"
+                  >
+                    Configure Key
+                  </button>
+                )}
+              </div>
+            )}
+
             <form onSubmit={handleAskAiSubmit} className="p-3 border-b border-zinc-800/80 flex items-center gap-2">
               <Bot className="w-4 h-4 text-indigo-400 shrink-0" />
               <input

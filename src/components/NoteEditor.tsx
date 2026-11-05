@@ -40,6 +40,9 @@ interface NoteEditorProps {
   onTagClick?: (tag: string) => void;
   isFocusMode?: boolean;
   onToggleFocusMode?: () => void;
+  hasApiKey?: boolean;
+  onOpenSettings?: () => void;
+  summaryError?: string | null;
 }
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -51,7 +54,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onNavigateToNote,
   onTagClick,
   isFocusMode,
-  onToggleFocusMode
+  onToggleFocusMode,
+  hasApiKey,
+  onOpenSettings,
+  summaryError
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -239,6 +245,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         onRefresh={onRefreshSummary}
         isLoading={isSummaryLoading}
         onTagClick={onTagClick}
+        hasApiKey={hasApiKey}
+        onOpenSettings={onOpenSettings}
+        errorMessage={summaryError}
       />
 
       {/* AI Contextual Suggestions Tray */}
