@@ -9,26 +9,89 @@ import {
   Save, 
   ExternalLink,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Server,
+  RefreshCw,
+  Smartphone
 } from 'lucide-react';
-import { AIProviderConfig } from '../types';
+import { AIProviderConfig, Note } from '../types';
+import { checkServerStatus, syncVaultWithServer } from '../services/syncService';
 
 interface SettingsModalProps {
   config: AIProviderConfig;
   onSaveConfig: (config: AIProviderConfig) => void;
   onResetSeedData: () => void;
+  notes?: Note[];
+  onNotesUpdated?: (notes: Note[]) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   config,
   onSaveConfig,
-  onResetSeedData
+  onResetSeedData,
+  notes,
+  onNotesUpdated
 }) => {
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.apiKey);
   const [modelName, setModelName] = useState(config.modelName);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Local Sync Server Settings
+  const [serverUrl, setServerUrl] = useState(() => {
+    try {
+      return localStorage.getItem('LATTICE_SERVER_URL') || (typeof window !== 'undefined' && window.location.origin.includes(':3000') ? window.location.origin : 'http://192.168.0.4:3000');
+    } catch {
+      return 'http://192.168.0.4:3000';
+    }
+  });
+
+  const [serverApiKey, setServerApiKey] = useState(() => {
+    try {
+      return localStorage.getItem('LATTICE_SERVER_API_KEY') || 'lattice_live_key_2026';
+    } catch {
+      return 'lattice_live_key_2026';
+    }
+  });
+
+  const [serverStatus, setServerStatus] = useState<string | null>(null);
+  const [isServerConnecting, setIsServerConnecting] = useState(false);
+
+  const handleTestServer = async () => {
+    setIsServerConnecting(true);
+    setServerStatus(null);
+    try {
+      const res = await checkServerStatus(serverUrl, serverApiKey);
+      if (res.success) {
+        setServerStatus(`🟢 ${res.serverName} connected! (${res.notesCount} notes on server)`);
+        localStorage.setItem('LATTICE_SERVER_URL', serverUrl);
+        localStorage.setItem('LATTICE_SERVER_API_KEY', serverApiKey);
+      } else {
+        setServerStatus(`🔴 ${res.message}`);
+      }
+    } finally {
+      setIsServerConnecting(false);
+    }
+  };
+
+  const handleSyncWithServer = async () => {
+    if (!notes || !onNotesUpdated) return;
+    setIsServerConnecting(true);
+    try {
+      const res = await syncVaultWithServer(serverUrl, serverApiKey, notes);
+      if (res.success && res.notes) {
+        onNotesUpdated(res.notes);
+        setServerStatus(`🟢 Synced successfully! Vault has ${res.count} notes.`);
+        localStorage.setItem('LATTICE_SERVER_URL', serverUrl);
+        localStorage.setItem('LATTICE_SERVER_API_KEY', serverApiKey);
+      } else {
+        setServerStatus(`🔴 ${res.message}`);
+      }
+    } finally {
+      setIsServerConnecting(false);
+    }
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,6 +224,87 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="flex items-center gap-1 mt-1.5 text-xs text-rose-400">
                 <AlertCircle className="w-3 h-3" />
                 <span>Failed to verify API key.</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Local Sync Server & Android APK Connection */}
+        <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-medium text-zinc-200">
+              <Server className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Local Sync Server & Android APK</span>
+            </div>
+            <a
+              href={`${serverUrl.replace(/\/+$/, '')}/download`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[11px] font-medium transition-colors"
+            >
+              <Smartphone className="w-3 h-3" />
+              <span>Download APK</span>
+            </a>
+          </div>
+
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            Connect your phone APK to this computer over Wi-Fi using your server API key for seamless bi-directional note synchronization.
+          </p>
+
+          <div className="space-y-2 pt-1">
+            <div>
+              <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+                Server Address (Host / LAN IP)
+              </label>
+              <input
+                type="text"
+                value={serverUrl}
+                onChange={(e) => setServerUrl(e.target.value)}
+                placeholder="http://192.168.0.4:3000"
+                className="w-full px-2.5 py-1.5 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs font-mono focus:outline-none focus:border-zinc-700"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+                Server Connection API Key
+              </label>
+              <input
+                type="text"
+                value={serverApiKey}
+                onChange={(e) => setServerApiKey(e.target.value)}
+                placeholder="lattice_live_key_2026"
+                className="w-full px-2.5 py-1.5 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs font-mono focus:outline-none focus:border-zinc-700"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleTestServer}
+                disabled={isServerConnecting}
+                className="px-2.5 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Server className="w-3 h-3 text-zinc-400" />
+                <span>{isServerConnecting ? 'Checking...' : 'Test Connection'}</span>
+              </button>
+
+              {notes && onNotesUpdated && (
+                <button
+                  type="button"
+                  onClick={handleSyncWithServer}
+                  disabled={isServerConnecting}
+                  className="px-2.5 py-1.5 rounded-md bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isServerConnecting ? 'animate-spin' : ''}`} />
+                  <span>Sync Vault Now</span>
+                </button>
+              )}
+            </div>
+
+            {serverStatus && (
+              <div className="mt-2 text-xs font-mono p-2 rounded bg-zinc-950 border border-zinc-800/80 text-zinc-300">
+                {serverStatus}
               </div>
             )}
           </div>

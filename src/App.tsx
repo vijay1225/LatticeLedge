@@ -424,6 +424,8 @@ export function App() {
               config={aiConfig}
               onSaveConfig={setAiConfig}
               onResetSeedData={handleResetSeedData}
+              notes={notes}
+              onNotesUpdated={setNotes}
             />
           )}
         </div>

@@ -1,0 +1,393 @@
+[
+  {
+    "id": "wiki-harry-potter",
+    "type": "wiki",
+    "title": "Harry Potter",
+    "content": "# Harry Potter\n\n**Harry James Potter** (born 31 July 1980) is an English half-blood wizard, one of the most famous wizards of modern times. He was the only child and son of James and Lily Potter.\n\n## Biography & Legacy\n* Known as the **\"Boy Who Lived\"** after surviving the Killing Curse cast by [[Lord Voldemort]].\n* Member of **Gryffindor** House and the Seeker for the Gryffindor Quidditch team at [[Hogwarts School of Witchcraft and Wizardry]].\n* Along with his closest friends, he formed [[The Golden Trio]].\n* Discovered during the Battle of Hogwarts that he unknowingly served as one of the seven [[Horcruxes]].\n\n## Key Alliances\n- Close mentorship under Headmaster [[Albus Dumbledore]].\n- Active leader of Dumbledore's Army and member of the [[Order of the Phoenix]].\n\n## Action Items & Goals\n- [x] Master the Patronus charm against Dementors\n- [ ] Locate and destroy remaining [[Horcruxes]]\n- [ ] Protect fellow students during the siege at [[Hogwarts School of Witchcraft and Wizardry]]\n",
+    "tags": [
+      "#Gryffindor",
+      "#ChosenOne",
+      "#DefenseAgainstTheDarkArts",
+      "#Hogwarts"
+    ],
+    "links": [
+      "Lord Voldemort",
+      "Hogwarts School of Witchcraft and Wizardry",
+      "The Golden Trio",
+      "Horcruxes",
+      "Albus Dumbledore",
+      "Order of the Phoenix"
+    ],
+    "summary": {
+      "tldr": [
+        "The Boy Who Lived and sole survivor of the Avada Kedavra curse.",
+        "Core protagonist leading the resistance against Voldemort.",
+        "Unwittingly acted as the seventh Horcrux due to the events at Godric's Hollow."
+      ],
+      "actionItems": [
+        "Locate and destroy remaining Horcruxes",
+        "Protect fellow students at Hogwarts"
+      ],
+      "tags": [
+        "#Gryffindor",
+        "#ChosenOne",
+        "#HorcruxHunt"
+      ],
+      "keyEntities": [
+        "Voldemort",
+        "Dumbledore",
+        "Hogwarts",
+        "Gryffindor"
+      ],
+      "generatedAt": 1793808229484,
+      "model": "Gemini 2.5 Flash"
+    },
+    "createdAt": 1793721829485,
+    "updatedAt": 1793851429485,
+    "isPinned": true
+  },
+  {
+    "id": "wiki-hogwarts",
+    "type": "wiki",
+    "title": "Hogwarts School of Witchcraft and Wizardry",
+    "content": "# Hogwarts School of Witchcraft and Wizardry\n\nFounded in the Scottish Highlands around the 10th century by four of the greatest wizards and witches of the age: **Godric Gryffindor**, **Helga Hufflepuff**, **Rowena Ravenclaw**, and **Salazar Slytherin**.\n\n## Castle Mysteries & Locations\n- **The Great Hall**: Enchanted ceiling mirroring the sky outside.\n- **The Room of Requirement**: Appears only when someone is in real need. Known to house Rowena Ravenclaw's lost Diadem, a suspected [[Horcruxes]].\n- **Chamber of Secrets**: Created by Salazar Slytherin, containing the Basilisk.\n- Guided under the long tenure of Headmaster [[Albus Dumbledore]].\n\n## Notable Students\n- Home to [[Harry Potter]], Hermione Granger, Ron Weasley, and formerly Tom Riddle ([[Lord Voldemort]]).\n",
+    "tags": [
+      "#Hogwarts",
+      "#MagicCastle",
+      "#WizardingEducation"
+    ],
+    "links": [
+      "Albus Dumbledore",
+      "Harry Potter",
+      "Lord Voldemort",
+      "Horcruxes"
+    ],
+    "summary": {
+      "tldr": [
+        "Ancient premier magical institution founded in the 10th century.",
+        "Contains crucial secret chambers including the Room of Requirement.",
+        "Served as the final battleground in the Second Wizarding War."
+      ],
+      "actionItems": [
+        "Guard castle wards and defensive enchantments",
+        "Investigate hidden relics inside the Room of Requirement"
+      ],
+      "tags": [
+        "#Hogwarts",
+        "#AncientMagic",
+        "#Dumbledore"
+      ],
+      "keyEntities": [
+        "Dumbledore",
+        "Gryffindor",
+        "Slytherin",
+        "Highlands"
+      ],
+      "generatedAt": 1793786629485,
+      "model": "Gemini 2.5 Flash"
+    },
+    "createdAt": 1793635429485,
+    "updatedAt": 1793822629485
+  },
+  {
+    "id": "wiki-voldemort",
+    "type": "wiki",
+    "title": "Lord Voldemort",
+    "content": "# Lord Voldemort (Tom Marvolo Riddle)\n\n**Tom Marvolo Riddle**, later known as **Lord Voldemort** or \"He-Who-Must-Not-Be-Named\", was considered the most dangerous Dark Wizard of all time.\n\n## Dark Magic & Immortality\n* Obsessed with blood purity and conquering death.\n* Split his soul into seven fragments using the darkest known magic: [[Horcruxes]].\n* Believed the prophecy foretold that either he or [[Harry Potter]] must die at the hand of the other.\n\n## Key Targets & Nemeses\n- Foiled by [[Harry Potter]] multiple times.\n- Feared only one wizard: [[Albus Dumbledore]].\n- Opposed by the [[Order of the Phoenix]].\n",
+    "tags": [
+      "#DarkLord",
+      "#Slytherin",
+      "#DarkArts",
+      "#DeathEaters"
+    ],
+    "links": [
+      "Horcruxes",
+      "Harry Potter",
+      "Albus Dumbledore",
+      "Order of the Phoenix"
+    ],
+    "summary": {
+      "tldr": [
+        "Heir of Slytherin and commander of the Death Eaters.",
+        "Sought immortality through the creation of multiple Horcruxes.",
+        "Feared only Albus Dumbledore throughout his reign."
+      ],
+      "actionItems": [
+        "Identify all soul vessels and sever his anchors to life"
+      ],
+      "tags": [
+        "#DarkLord",
+        "#Horcrux",
+        "#DeathEaters"
+      ],
+      "keyEntities": [
+        "Riddle",
+        "Potter",
+        "Dumbledore",
+        "Slytherin"
+      ],
+      "generatedAt": 1793815429485,
+      "model": "Gemini 2.5 Flash"
+    },
+    "createdAt": 1793549029485,
+    "updatedAt": 1793829829485
+  },
+  {
+    "id": "wiki-horcruxes",
+    "type": "wiki",
+    "title": "Horcruxes",
+    "content": "# The Seven Horcruxes of Lord Voldemort\n\nA **Horcrux** is an object created using Dark Magic to attain immortality by concealing a fragment of a wizard's soul.\n\n## The Soul Vessels\n1. **Tom Riddle's Diary**: Destroyed with a Basilisk fang by [[Harry Potter]] in the Chamber of Secrets.\n2. **Marvolo Gaunt's Ring**: Cursed ring destroyed by [[Albus Dumbledore]] using Gryffindor's sword.\n3. **Salazar Slytherin's Locket**: Retrieved from the seaside cave and Umbridge; destroyed by Ron Weasley.\n4. **Helga Hufflepuff's Cup**: Kept inside the Lestrange vault at Gringotts.\n5. **Rowena Ravenclaw's Diadem**: Hidden inside [[Hogwarts School of Witchcraft and Wizardry]] in the Room of Requirement.\n6. **Nagini**: Voldemort's giant serpent companion.\n7. **The Unintended Soul Fragment**: Resided within [[Harry Potter]] himself.\n\n## Vulnerabilities & Destruction\n- Can only be destroyed by substances beyond magical repair:\n  - Basilisk venom\n  - Fiendfyre\n  - Godric Gryffindor's Sword (imbibed with basilisk venom)\n",
+    "tags": [
+      "#DarkMagic",
+      "#Horcrux",
+      "#SoulVessels",
+      "#Artifacts"
+    ],
+    "links": [
+      "Harry Potter",
+      "Albus Dumbledore",
+      "Hogwarts School of Witchcraft and Wizardry",
+      "Lord Voldemort"
+    ],
+    "summary": {
+      "tldr": [
+        "Seven receptacles containing fragments of Voldemort’s fractured soul.",
+        "Impervious to normal damage; require Basilisk venom or Fiendfyre.",
+        "Systematic destruction is the only pathway to Voldemort's mortality."
+      ],
+      "actionItems": [
+        "Extract Helga Hufflepuff's Cup from Gringotts",
+        "Search the Room of Requirement for the Diadem",
+        "Kill Nagini to dismantle the final tether"
+      ],
+      "tags": [
+        "#Horcrux",
+        "#DarkMagic",
+        "#SoulVessels"
+      ],
+      "keyEntities": [
+        "Voldemort",
+        "Basilisk",
+        "Gryffindor",
+        "Ravenclaw"
+      ],
+      "generatedAt": 1793840629485,
+      "model": "Gemini 2.5 Flash"
+    },
+    "createdAt": 1793498629485,
+    "updatedAt": 1793865829485
+  },
+  {
+    "id": "wiki-dumbledore",
+    "type": "wiki",
+    "title": "Albus Dumbledore",
+    "content": "# Albus Percival Wulfric Brian Dumbledore\n\nHeadmaster of [[Hogwarts School of Witchcraft and Wizardry]], Supreme Mugwump of the International Confederation of Wizards, and Chief Warlock of the Wizengamot.\n\n## Key Accomplishments\n* Defeated the Dark Wizard Gellert Grindelwald in 1945, winning the allegiance of the Elder Wand.\n* Discovered the twelve uses of dragon's blood.\n* Founded and led the [[Order of the Phoenix]].\n* Mentored [[Harry Potter]] and deduced Voldemort's secret obsession with [[Horcruxes]].\n\n> \"Happiness can be found, even in the darkest of times, if one only remembers to turn on the light.\"\n",
+    "tags": [
+      "#Headmaster",
+      "#OrderOfThePhoenix",
+      "#ElderWand",
+      "#Hogwarts"
+    ],
+    "links": [
+      "Hogwarts School of Witchcraft and Wizardry",
+      "Order of the Phoenix",
+      "Harry Potter",
+      "Horcruxes"
+    ],
+    "summary": {
+      "tldr": [
+        "Legendary Headmaster of Hogwarts and founder of the Order of the Phoenix.",
+        "Bearer of the Elder Wand and mastermind behind the plan to defeat Voldemort.",
+        "Understood the magical sacrifice that protected Harry Potter."
+      ],
+      "actionItems": [
+        "Instruct Harry regarding the memory traces in the Pensieve",
+        "Secure the defense of Hogwarts against Death Eater infiltration"
+      ],
+      "tags": [
+        "#Headmaster",
+        "#Dumbledore",
+        "#OrderOfThePhoenix"
+      ],
+      "keyEntities": [
+        "Grindelwald",
+        "Potter",
+        "Hogwarts",
+        "ElderWand"
+      ],
+      "generatedAt": 1793750629485,
+      "model": "Gemini 2.5 Flash"
+    },
+    "createdAt": 1793462629485,
+    "updatedAt": 1793768629485
+  },
+  {
+    "id": "wiki-golden-trio",
+    "type": "wiki",
+    "title": "The Golden Trio",
+    "content": "# The Golden Trio\n\nThe collective name given to the three Gryffindor students who shaped the Second Wizarding War:\n- **[[Harry Potter]]**: The leader and chosen champion.\n- **Hermione Granger**: The brains, master of charms, logic, and arithmancy.\n- **Ron Weasley**: The loyal strategist, master wizard's chess player, and heart of the group.\n\n## Major Expeditions\n- Infiltrated the Ministry of Magic disguised using Polyjuice Potion.\n- Escaped Gringotts Wizarding Bank on the back of a Ukrainian Ironbelly dragon.\n- Tracked down [[Horcruxes]] across Britain while evading Snatchers.\n",
+    "tags": [
+      "#Gryffindor",
+      "#GoldenTrio",
+      "#Friendship",
+      "#Hogwarts"
+    ],
+    "links": [
+      "Harry Potter",
+      "Horcruxes",
+      "Hogwarts School of Witchcraft and Wizardry"
+    ],
+    "summary": {
+      "tldr": [
+        "Harry Potter, Hermione Granger, and Ron Weasley.",
+        "Inseparable team responsible for uncovering and destroying soul anchors.",
+        "Demonstrated peerless loyalty and courage throughout the Second Wizarding War."
+      ],
+      "actionItems": [
+        "Maintain Polyjuice potion supplies",
+        "Prepare protective spells around camp: Protego Totalum, Muffliato"
+      ],
+      "tags": [
+        "#GoldenTrio",
+        "#Gryffindor",
+        "#Resistance"
+      ],
+      "keyEntities": [
+        "Harry",
+        "Hermione",
+        "Ron",
+        "Gringotts"
+      ],
+      "generatedAt": 1793804629485,
+      "model": "Gemini 2.5 Flash"
+    },
+    "createdAt": 1793426629485,
+    "updatedAt": 1793844229485
+  },
+  {
+    "id": "wiki-order-phoenix",
+    "type": "wiki",
+    "title": "Order of the Phoenix",
+    "content": "# Order of the Phoenix\n\nA secret society founded by [[Albus Dumbledore]] to fight [[Lord Voldemort]] and his Death Eaters during the First and Second Wizarding Wars.\n\n## Headquarters & Operations\n- Base: 12 Grimmauld Place, London (ancestral home of Sirius Black).\n- Protected by the Fidelius Charm with Dumbledore serving as Secret-Keeper.\n- Members include Remus Lupin, Severus Snape, Minerva McGonagall, Alastor Moody, and Kingsley Shacklebolt.\n- Key liaison to [[Harry Potter]] and the student defense network at [[Hogwarts School of Witchcraft and Wizardry]].\n",
+    "tags": [
+      "#OrderOfThePhoenix",
+      "#Resistance",
+      "#Dumbledore",
+      "#GrimmauldPlace"
+    ],
+    "links": [
+      "Albus Dumbledore",
+      "Lord Voldemort",
+      "Harry Potter",
+      "Hogwarts School of Witchcraft and Wizardry"
+    ],
+    "summary": {
+      "tldr": [
+        "Clandestine resistance alliance created by Albus Dumbledore.",
+        "Headquartered at 12 Grimmauld Place under the Fidelius Charm.",
+        "Guarded the Department of Mysteries prophecy and opposed Death Eaters."
+      ],
+      "actionItems": [
+        "Maintain guard rotations over the Hall of Prophecy",
+        "Keep communications secure via Patronus messaging"
+      ],
+      "tags": [
+        "#OrderOfThePhoenix",
+        "#Resistance",
+        "#GrimmauldPlace"
+      ],
+      "keyEntities": [
+        "Dumbledore",
+        "Voldemort",
+        "Black",
+        "Moody"
+      ],
+      "generatedAt": 1793837029485,
+      "model": "Gemini 2.5 Flash"
+    },
+    "createdAt": 1793390629485,
+    "updatedAt": 1793837029485
+  },
+  {
+    "id": "quick-diary-discovery",
+    "type": "quick",
+    "title": "Quick note: Diary in Moaning Myrtle's bathroom",
+    "content": "Found an old black blank diary in the flooded girls' bathroom on the second floor. Name embossed on the cover: \"T.M. Riddle, 1943\". When I dropped ink on the page, the ink soaked straight through and vanished! Then handwriting appeared: \"Hello, Harry Potter. My name is Tom Riddle.\" Could this be a dark magical artifact? #Horcrux #DarkMagic #Hogwarts",
+    "tags": [
+      "#Horcrux",
+      "#DarkMagic",
+      "#Hogwarts"
+    ],
+    "links": [
+      "Horcruxes"
+    ],
+    "createdAt": 1793876629485,
+    "updatedAt": 1793876629485
+  },
+  {
+    "id": "quick-patronus-success",
+    "type": "quick",
+    "title": "Quick note: Patronus charm breakthrough",
+    "content": "Practicing the Patronus Charm with Professor Lupin in the Defense classroom. Need a truly powerful happy memory. Remembering leaving the Dursleys and riding the Hogwarts Express produces silver mist, but thinking of my parents and Sirius made a full silver stag burst from my wand! Incantation: Expecto Patronum. #Spells #DefenseAgainstTheDarkArts #HarryPotter",
+    "tags": [
+      "#Spells",
+      "#DefenseAgainstTheDarkArts",
+      "#HarryPotter"
+    ],
+    "links": [
+      "Harry Potter"
+    ],
+    "createdAt": 1793865829485,
+    "updatedAt": 1793865829485
+  },
+  {
+    "id": "quick-room-of-requirement",
+    "type": "quick",
+    "title": "Quick note: Luna's tip on Ravenclaw's Diadem",
+    "content": "Luna Lovegood says no living person has seen Rowena Ravenclaw's Diadem in centuries, but the ghost of the Grey Lady (Helena Ravenclaw) might know where it was hidden. If Tom Riddle hid it in the castle, the Room of Requirement—specifically the Room of Hidden Things—is packed with thousands of years of forbidden clutter. Must check there! #Horcrux #Hogwarts #Ravenclaw",
+    "tags": [
+      "#Horcrux",
+      "#Hogwarts",
+      "#Ravenclaw"
+    ],
+    "links": [
+      "Horcruxes",
+      "Hogwarts School of Witchcraft and Wizardry"
+    ],
+    "createdAt": 1793883829485,
+    "updatedAt": 1793883829485
+  },
+  {
+    "id": "quick-marauders-map",
+    "type": "quick",
+    "title": "Quick note: Marauder's Map secret passages",
+    "content": "Fred and George gave me parchment showing every corridor in [[Hogwarts School of Witchcraft and Wizardry]]. Tap wand: \"I solemnly swear that I am up to no good.\" The One-Eyed Witch statue leads straight to Honeydukes cellar in Hogsmeade. Wipe clear: \"Mischief managed.\" #Artifacts #Hogwarts #Stealth",
+    "tags": [
+      "#Artifacts",
+      "#Hogwarts",
+      "#Stealth"
+    ],
+    "links": [
+      "Hogwarts School of Witchcraft and Wizardry"
+    ],
+    "createdAt": 1793851429485,
+    "updatedAt": 1793851429485
+  },
+  {
+    "id": "quick-grimmauld-briefing",
+    "type": "quick",
+    "title": "Quick note: Moody's briefing at Grimmauld Place",
+    "content": "Mad-Eye Moody warned the [[Order of the Phoenix]] that the Death Eaters are seeking the Department of Mysteries glass orb prophecy. Guard duties are in effect. Tonks and Lupin are taking tonight's shift under the invisibility cloak. #OrderOfThePhoenix #Voldemort #DefenseAgainstTheDarkArts",
+    "tags": [
+      "#OrderOfThePhoenix",
+      "#Voldemort",
+      "#DefenseAgainstTheDarkArts"
+    ],
+    "links": [
+      "Order of the Phoenix",
+      "Lord Voldemort"
+    ],
+    "createdAt": 1793887429485,
+    "updatedAt": 1793887429485
+  }
+]
