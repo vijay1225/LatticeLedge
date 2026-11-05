@@ -2,6 +2,14 @@ import { GoogleGenAI } from '@google/genai';
 import { Note, AISummary, AIProviderConfig } from '../types';
 
 /**
+ * Strips leading/trailing quotes, backticks, and whitespace from API keys.
+ */
+export function sanitizeApiKey(raw?: string | null): string {
+  if (!raw) return '';
+  return raw.trim().replace(/^["'`]|["'`]$/g, '').trim();
+}
+
+/**
  * Safely parse JSON from LLM output.
  */
 function parseJsonFromText<T>(text: string): T | null {
@@ -33,8 +41,58 @@ function parseJsonFromText<T>(text: string): T | null {
  * Checks whether a valid Gemini API key is configured.
  */
 export function isGeminiKeyConfigured(config?: AIProviderConfig): boolean {
-  const apiKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null);
-  return Boolean(apiKey && apiKey.trim().length > 0);
+  const apiKey = sanitizeApiKey(config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null));
+  return apiKey.length > 0;
+}
+
+/**
+ * Executes a Gemini request with automatic fallback across available Flash models
+ * (e.g., gemini-2.5-flash -> gemini-2.0-flash -> gemini-1.5-flash).
+ */
+async function callGeminiWithFallback(
+  ai: GoogleGenAI,
+  preferredModel: string,
+  params: { contents: any; config?: any }
+): Promise<{ text: string; usedModel: string }> {
+  const candidateModels = Array.from(new Set([
+    preferredModel,
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash'
+  ])).filter(Boolean);
+
+  let lastError: any = null;
+
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: params.contents,
+        config: params.config
+      });
+      return {
+        text: response.text || '',
+        usedModel: model
+      };
+    } catch (err: any) {
+      lastError = err;
+      const msg = (err?.message || '').toLowerCase();
+      // If the error is model not found or unsupported, fallback to next model
+      if (
+        msg.includes('not found') || 
+        msg.includes('404') || 
+        msg.includes('unsupported') || 
+        msg.includes('is not supported')
+      ) {
+        console.warn(`[Gemini API] Model ${model} not available on this key/project, attempting next fallback:`, err.message);
+        continue;
+      }
+      // If error is permission or invalid key, rethrow immediately
+      throw err;
+    }
+  }
+
+  throw lastError || new Error('All candidate Gemini models failed to generate content.');
 }
 
 /**
@@ -45,14 +103,15 @@ export async function generateNoteSummary(
   note: Note,
   config?: AIProviderConfig
 ): Promise<AISummary> {
-  const apiKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null);
+  const rawKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null);
+  const apiKey = sanitizeApiKey(rawKey);
 
-  if (!apiKey || apiKey.trim() === '') {
+  if (!apiKey || apiKey === '') {
     throw new Error('Gemini API key is required. Please configure your Gemini API key in Settings.');
   }
 
   const modelName = config?.modelName || 'gemini-2.5-flash';
-  const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `You are a high-speed knowledge synthesizer for LatticeLedger note-taking application.
 Analyze the following note titled "${note.title}":
@@ -69,15 +128,13 @@ Generate an ultra-concise structured JSON object with the following fields:
 Respond ONLY with valid JSON.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
+    const { text, usedModel } = await callGeminiWithFallback(ai, modelName, {
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
       }
     });
 
-    const text = response.text || '';
     const parsed = parseJsonFromText<{
       tldr?: string[];
       actionItems?: string[];
@@ -95,10 +152,20 @@ Respond ONLY with valid JSON.`;
       tags: (parsed.tags || note.tags).slice(0, 4),
       keyEntities: (parsed.keyEntities || []).slice(0, 4),
       generatedAt: Date.now(),
-      model: modelName
+      model: usedModel
     };
   } catch (err: any) {
     console.error('[Gemini API] Summary generation error:', err);
+    const msg = (err?.message || '').toLowerCase();
+    if (msg.includes('api_key_invalid') || msg.includes('key not valid') || msg.includes('invalid api key')) {
+      throw new Error('Invalid Gemini API Key. Please verify and re-enter your key in Settings.');
+    }
+    if (msg.includes('resource_exhausted') || msg.includes('quota') || msg.includes('rate limit')) {
+      throw new Error('Gemini API quota exceeded or rate limit reached. Please check your Google AI Studio account.');
+    }
+    if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('fetch failed')) {
+      throw new Error('Network error connecting to Gemini API. Please check your internet connection.');
+    }
     throw new Error(err?.message || 'Failed to generate summary with Gemini API. Please check your API key.');
   }
 }
@@ -112,9 +179,10 @@ export async function queryKnowledgeBase(
   notes: Note[],
   config?: AIProviderConfig
 ): Promise<{ answer: string; citations: string[] }> {
-  const apiKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null);
+  const rawKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null);
+  const apiKey = sanitizeApiKey(rawKey);
 
-  if (!apiKey || apiKey.trim() === '') {
+  if (!apiKey || apiKey === '') {
     throw new Error('Gemini API key is required. Please configure your Gemini API key in Settings to use Ask AI.');
   }
 
@@ -137,7 +205,7 @@ export async function queryKnowledgeBase(
   }
 
   const modelName = config?.modelName || 'gemini-2.5-flash';
-  const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+  const ai = new GoogleGenAI({ apiKey });
   const context = relevantNotes.map(n => `--- Note: ${n.title} (${n.type}) ---\n${n.content}\n`).join('\n');
 
   const prompt = `You are the knowledge synthesis engine for LatticeLedger personal knowledge base.
@@ -155,17 +223,26 @@ ${context}
 `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
+    const { text } = await callGeminiWithFallback(ai, modelName, {
+      contents: prompt
     });
 
     return {
-      answer: response.text || 'No answer generated.',
+      answer: text || 'No answer generated.',
       citations
     };
   } catch (err: any) {
     console.error('[Gemini API] Query error:', err);
+    const msg = (err?.message || '').toLowerCase();
+    if (msg.includes('api_key_invalid') || msg.includes('key not valid') || msg.includes('invalid api key')) {
+      throw new Error('Invalid Gemini API Key. Please verify and re-enter your key in Settings.');
+    }
+    if (msg.includes('resource_exhausted') || msg.includes('quota') || msg.includes('rate limit')) {
+      throw new Error('Gemini API quota exceeded or rate limit reached. Please check your Google AI Studio account.');
+    }
+    if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('fetch failed')) {
+      throw new Error('Network error connecting to Gemini API. Please check your internet connection.');
+    }
     throw new Error(err?.message || 'Failed to query knowledge base with Gemini API. Please check your API key.');
   }
 }

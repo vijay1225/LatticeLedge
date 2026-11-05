@@ -120,7 +120,16 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
     - Added bottom padding `pb-28 md:pb-12` preventing long pages from clipping behind mobile bottom bar.
     - Implemented Comprehensive Linked Pages Hub: Outgoing links bar under title + Outgoing Linked Pages cards & Bi-directional Backlinks cards at the bottom.
     - Built rich `MarkdownViewer` component for Ask AI: renders headings, lists, bold text, and clickable `[[Wiki Links]]`.
-  - [x] 100% automated test suite passing (19 tests across sqliteService, graphBuilder, wikiLinks, aiService, and markdownViewer).
+  - [x] Page Save & Overflow Fixes + Streamlined Gemini API Key Flow:
+    - Added explicit **"Save" button** with `Save` and `Check` visual feedback in `NoteEditor.tsx`.
+    - Added **Ctrl+S / Cmd+S** keyboard shortcut to quickly save notes to SQLite.
+    - Fixed flexbox height collapse in `.tiptap.ProseMirror` and editor canvas wrapper; content flows naturally with zero overlapping on bottom bidirectional links and action items.
+    - Promoted **Google Gemini API Key** to the very top section of SettingsModal.
+    - Added **Eye / EyeOff password visibility toggle** and 1-tap clipboard paste.
+    - Implemented **instant auto-save on paste/change** so API keys are never lost when navigating away.
+    - Upgraded **"Test & Verify Key"** to report exact Google API error messages (e.g. `API_KEY_INVALID`, quota limits, or network errors) and auto-save on success.
+    - Added **automatic Flash model fallback** (`gemini-2.5-flash` -> `gemini-2.0-flash` -> `gemini-1.5-flash`) and key sanitization in `aiService.ts`.
+  - [x] 100% automated test suite passing (20 tests across sqliteService, graphBuilder, wikiLinks, aiService, and markdownViewer).
   - [x] Rebuilt native standalone Android APK (`LatticeLedger.apk`, 4.96MB) with Gradle 8.14 on Java 17.
   - [x] Pushed commit to `https://github.com/vijay1225/LatticeLedge.git`.
 - [ ] **Next Steps**:

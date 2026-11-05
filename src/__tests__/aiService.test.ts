@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateNoteSummary, queryKnowledgeBase, isGeminiKeyConfigured } from '../services/aiService';
+import { generateNoteSummary, queryKnowledgeBase, isGeminiKeyConfigured, sanitizeApiKey } from '../services/aiService';
 import { HARRY_POTTER_SEED_NOTES } from '../services/harryPotterSeed';
 
 // Mock the GoogleGenAI SDK
@@ -30,10 +30,20 @@ describe('Strict AI Service (Direct Gemini Only - Zero Simulated Heuristics)', (
     }
   });
 
+  it('sanitizes pasted API keys stripping whitespace, quotes, and backticks', () => {
+    expect(sanitizeApiKey('')).toBe('');
+    expect(sanitizeApiKey(null)).toBe('');
+    expect(sanitizeApiKey('  AIzaSyTestKey  ')).toBe('AIzaSyTestKey');
+    expect(sanitizeApiKey('"AIzaSyTestKey"')).toBe('AIzaSyTestKey');
+    expect(sanitizeApiKey("'AIzaSyTestKey'")).toBe('AIzaSyTestKey');
+    expect(sanitizeApiKey('`AIzaSyTestKey`')).toBe('AIzaSyTestKey');
+  });
+
   it('correctly verifies when Gemini API key is configured or missing', () => {
     expect(isGeminiKeyConfigured()).toBe(false);
     expect(isGeminiKeyConfigured({ provider: 'gemini', apiKey: '   ', modelName: 'gemini-2.5-flash' })).toBe(false);
     expect(isGeminiKeyConfigured({ provider: 'gemini', apiKey: 'AIzaSyFakeKey123', modelName: 'gemini-2.5-flash' })).toBe(true);
+    expect(isGeminiKeyConfigured({ provider: 'gemini', apiKey: '  "AIzaSyFakeKey123"  ', modelName: 'gemini-2.5-flash' })).toBe(true);
   });
 
   it('guarantees that seed notes contain zero pre-baked AI summaries', () => {

@@ -17,7 +17,9 @@ import {
   Sparkles,
   Expand,
   FoldHorizontal,
-  Maximize2
+  Maximize2,
+  Save,
+  Check
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -62,6 +64,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   summaryError
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
+  const [justSaved, setJustSaved] = useState(false);
 
   // Full-width vs standard reading width toggle (defaults to true for maximum writing space)
   const [isFullWidth, setIsFullWidth] = useState<boolean>(() => {
@@ -128,6 +132,29 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   });
 
+  const handleManualSave = () => {
+    if (!editor) return;
+    setSaveStatus('saving');
+    const markdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
+    onUpdateNote({ content: markdown });
+    setTimeout(() => {
+      setSaveStatus('saved');
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2000);
+    }, 200);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleManualSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editor]);
+
   // Sync editor content when switching between notes
   useEffect(() => {
     if (editor && note) {
@@ -187,6 +214,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               <span>Updated {new Date(note.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(note.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </span>
 
+            <span className="flex items-center gap-1 text-[11px]">
+              {saveStatus === 'saving' ? (
+                <span className="text-amber-400 font-medium animate-pulse">● Saving...</span>
+              ) : (
+                <span className="text-emerald-400/90 font-medium">● Saved to SQLite</span>
+              )}
+            </span>
+
             {note.tags.map((t, idx) => (
               <span
                 key={idx}
@@ -238,8 +273,31 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           )}
         </div>
 
-        {/* Header Controls: New Page, Full Width & Focus Mode */}
+        {/* Header Controls: Save, New Page, Full Width & Focus Mode */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleManualSave}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all shadow-sm ${
+              justSaved
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-200 hover:text-white border-zinc-700/80 active:scale-95'
+            }`}
+            title="Save note to SQLite (Ctrl+S)"
+          >
+            {justSaved ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Saved</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Save</span>
+              </>
+            )}
+          </button>
+
           {onNewPage && (
             <button
               onClick={onNewPage}
@@ -437,13 +495,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       {/* TRUE IN-PLACE WYSIWYG CANVAS: Write directly in formatted text */}
       <div 
         onClick={handleEditorClick}
-        className="flex-1 rounded-lg bg-zinc-900/20 border border-zinc-800/70 hover:border-zinc-700/80 transition-colors cursor-text min-h-[520px] flex flex-col shadow-sm"
+        className="w-full rounded-lg bg-zinc-900/20 border border-zinc-800/70 hover:border-zinc-700/80 transition-colors cursor-text min-h-[280px] shadow-sm mb-12 overflow-visible"
       >
-        <EditorContent editor={editor} className="flex-1 flex flex-col" />
+        <EditorContent editor={editor} className="w-full" />
       </div>
 
       {/* KNOWLEDGE CONNECTIONS HUB: OUTGOING LINKS & INCOMING BACKLINKS */}
-      <div className="mt-8 pt-5 border-t border-zinc-800/80 space-y-6">
+      <div className="mt-12 pt-6 border-t-2 border-zinc-800/90 space-y-6">
         {/* 1. Outgoing Linked Pages (Pages Referenced In This Note) */}
         <div>
           <div className="flex items-center justify-between mb-3">
