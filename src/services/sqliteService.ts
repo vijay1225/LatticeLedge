@@ -311,8 +311,11 @@ export async function downloadSqliteDatabaseFile(): Promise<void> {
  * Import a raw SQLite database file (.db or .sqlite) from Google Drive.
  */
 export async function importSqliteDatabaseFile(fileOrBuffer: ArrayBuffer | Uint8Array): Promise<Note[]> {
+  await getSqliteDatabase();
   if (!sqlModule) {
-    sqlModule = await initSqlJs({ locateFile: (file) => `/${file}` });
+    sqlModule = await initSqlJs({
+      locateFile: (file) => (typeof window === 'undefined' ? `./node_modules/sql.js/dist/${file}` : `/${file}`)
+    });
   }
 
   const bytes = fileOrBuffer instanceof Uint8Array ? fileOrBuffer : new Uint8Array(fileOrBuffer);
