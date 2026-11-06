@@ -14,6 +14,7 @@ import {
   deleteNoteFromSql, 
   resetSqliteToSeed 
 } from './services/sqliteService';
+import { initVaultSync } from './services/vaultSyncService';
 
 import { Sidebar } from './components/Sidebar';
 import { NoteEditor } from './components/NoteEditor';
@@ -110,6 +111,14 @@ export function App() {
       console.warn('[SQLite] Fallback to cache:', err);
     });
   }, [hasGeminiKey]);
+
+  // Initialize unified Vault Folder Sync (Google Drive / local directory)
+  useEffect(() => {
+    initVaultSync((externalNotes) => {
+      console.log('[App] Vault updated externally from folder/Drive, reloading notes...');
+      setNotes(externalNotes);
+    });
+  }, []);
 
   useEffect(() => {
     try {

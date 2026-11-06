@@ -1,6 +1,7 @@
 import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import { Note } from '../types';
 import { HARRY_POTTER_SEED_NOTES } from './harryPotterSeed';
+import { saveVaultDbToFolder, loadVaultDbFromFolder } from './vaultSyncService';
 
 const DB_INDEXEDDB_NAME = 'LatticeLedgerSqliteDB';
 const DB_STORE_NAME = 'sqlite_file_store';
@@ -85,8 +86,15 @@ export async function getSqliteDatabase(): Promise<Database> {
     }
   }
 
-  // 1. Try to load existing binary database from device storage (IndexedDB)
-  const savedBytes = await loadBytesFromIndexedDb();
+  // 1. Try to load existing binary database from folder or IndexedDB
+  let savedBytes: Uint8Array | null = null;
+  try {
+    savedBytes = await loadVaultDbFromFolder();
+  } catch {}
+
+  if (!savedBytes || savedBytes.length === 0) {
+    savedBytes = await loadBytesFromIndexedDb();
+  }
 
   if (savedBytes && savedBytes.length > 0) {
     try {
@@ -158,12 +166,17 @@ function insertNotesBatch(db: Database, notes: Note[]) {
 }
 
 /**
- * Persist in-memory SQLite state to persistent device storage.
+ * Persist in-memory SQLite state to persistent device storage & bound vault folder.
  */
 export async function persistDatabase(): Promise<void> {
   if (!activeDb) return;
   const binary = activeDb.export();
   await saveBytesToIndexedDb(binary);
+  try {
+    await saveVaultDbToFolder(binary);
+  } catch (err) {
+    console.warn('[SQLite] Vault folder sync warning:', err);
+  }
 }
 
 /**

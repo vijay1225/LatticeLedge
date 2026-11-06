@@ -143,9 +143,22 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
     - Added `h-auto block clear-both` on canvas wrapper and `EditorContent` with `overflow-wrap: break-word` and `word-break: break-word` preventing text spillover.
     - Added clear boundary margin and top padding (`mt-12 pt-8 border-t-2`) on Knowledge Connections Hub so cards strictly render below full-height note content.
     - Extended bottom padding to `pb-36 md:pb-16` preventing any overlap with mobile bottom navigation bar.
-  - [x] 100% automated test suite passing (22 tests across sqliteService, graphBuilder, wikiLinks, aiService, and markdownViewer).
-  - [x] Rebuilt native standalone Android APK (`LatticeLedger.apk`, 4.96MB) with Gradle 8.14 on Java 17.
-  - [x] Pushed commit to `https://github.com/vijay1225/LatticeLedge.git`.
+  - [x] **Desktop Application & Unified Google Drive Folder Synchronization Engine**:
+    - **Native Windows Desktop Application**: Packaged via Electron and `electron-builder` with dark titlebar, modern layout, and high-performance native IPC (`electron/main.cjs` & `electron/preload.cjs`).
+    - Generated standalone executable `LatticeLedger-Desktop.exe` (124.5MB) and unpacked executable in `release/win-unpacked/LatticeLedger.exe`.
+    - **Unified Cross-Platform Vault Synchronization (`vaultSyncService.ts`)**:
+      - Supports binding to any Google Drive folder (e.g. `G:\My Drive\LatticeLedger` on Desktop or `Documents/LatticeLedger` on Mobile).
+      - **Bi-directional Real-Time Sync**: Automatically saves `lattice_vault.db` to the bound folder upon any note create/edit/delete; watches and detects external cloud updates (e.g., changes made on the other device) and hot-reloads SQLite with zero data loss.
+      - **Desktop (Electron)**: Native OS directory picker dialog, atomic file read/write, and filesystem watcher (`fs.watch`).
+      - **Desktop/Browser (Web)**: HTML5 File System Access API (`showDirectoryPicker`) with persistent directory handle in IndexedDB.
+      - **Mobile (Android APK)**: Capacitor Filesystem (`@capacitor/filesystem`) storing `lattice_vault.db` in `Documents/LatticeLedger`, paired with direct file picker import/export.
+    - **Settings UI Overhaul**:
+      - Prominent **"Choose Vault Folder (Google Drive / Local)"** button.
+      - Real-time bound folder status card showing path, platform badge, sync state (🟢 In Sync), last sync timestamp, "Sync Now", and "Disconnect".
+      - Maintained manual export/import SQLite `.db` buttons for quick ad-hoc transfers.
+  - [x] 100% automated test suite passing (26 tests across vaultSyncService, sqliteService, graphBuilder, wikiLinks, aiService, and markdownViewer).
+  - [x] Rebuilt native standalone Android APK (`LatticeLedger.apk`, 7.84MB) with Capacitor Filesystem and Gradle 8.14 on Java 17.
+  - [x] Built Windows Desktop Application (`LatticeLedger-Desktop.exe`, 124.5MB).
 - [ ] **Next Steps**:
-  - [ ] User installs standalone APK on phone.
-  - [ ] Add direct Google Drive SAF (Storage Access Framework) folder binding for automatic background file sync.
+  - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
+  - [ ] Select identical Google Drive folder on both devices to enable automatic cross-platform sync.
