@@ -30,7 +30,7 @@ import { Markdown } from 'tiptap-markdown';
 
 import { Note } from '../types';
 import { AISummaryCard } from './AISummaryCard';
-import { findBacklinks, findRelatedQuickNotes, extractWikiLinks } from '../utils/wikiLinks';
+import { findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
 
 interface NoteEditorProps {
   note: Note;
@@ -89,11 +89,6 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   // Compute backlinks (notes that point to this note)
   const backlinks = findBacklinks(note.title, allNotes);
-
-  // Compute outgoing links (notes referenced in this note)
-  const outgoingLinks = note.links && note.links.length > 0 
-    ? note.links 
-    : extractWikiLinks(note.content);
 
   // Compute contextual suggestions (quick notes related to this page)
   const relatedSuggestions = findRelatedQuickNotes(note, allNotes);
@@ -165,16 +160,50 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   }, [note.id, editor]);
 
-  // Handle clicking [[Wiki Links]] directly inside the formatted editor
+  // Handle clicking [[Wiki Links]] directly inside the formatted editor ONLY when clicking inside the brackets
   const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    const text = target.innerText || target.textContent || '';
-    
-    // Check if clicked text matches [[Wiki Link]] pattern
-    const match = text.match(/\[\[(.*?)\]\]/);
-    if (match) {
+
+    // Direct link click if inside an anchor or explicit link badge
+    const wikiAttr = target.getAttribute('data-wiki-link') || target.closest('[data-wiki-link]')?.getAttribute('data-wiki-link');
+    if (wikiAttr) {
       e.preventDefault();
-      onNavigateToNote(match[1].trim());
+      onNavigateToNote(wikiAttr.trim());
+      return;
+    }
+
+    // Precise hit-testing by checking caret character position
+    let textNode: Node | null = null;
+    let offset = 0;
+
+    if (document.caretRangeFromPoint) {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range) {
+        textNode = range.startContainer;
+        offset = range.startOffset;
+      }
+    } else if ((document as any).caretPositionFromPoint) {
+      const pos = (document as any).caretPositionFromPoint(e.clientX, e.clientY);
+      if (pos) {
+        textNode = pos.offsetNode;
+        offset = pos.offset;
+      }
+    }
+
+    if (textNode && textNode.nodeType === Node.TEXT_NODE && textNode.nodeValue) {
+      const text = textNode.nodeValue;
+      const regex = /\[\[(.*?)\]\]/g;
+      let m: RegExpExecArray | null;
+      while ((m = regex.exec(text)) !== null) {
+        const linkStart = m.index;
+        const linkEnd = m.index + m[0].length;
+        // Strictly only navigate if the click point falls directly inside [[...]]
+        if (offset >= linkStart && offset <= linkEnd) {
+          e.preventDefault();
+          onNavigateToNote(m[1].trim());
+          return;
+        }
+      }
     }
   };
 
@@ -242,35 +271,6 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               </button>
             )}
           </div>
-
-          {/* Quick Linked Pages Pills Bar */}
-          {outgoingLinks.length > 0 && (
-            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-              <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider flex items-center gap-1">
-                <Link2 className="w-2.5 h-2.5 text-indigo-400" />
-                <span>Linked Pages:</span>
-              </span>
-              {outgoingLinks.map((linkTitle, idx) => {
-                const exists = allNotes.some(n => n.title.toLowerCase() === linkTitle.toLowerCase());
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => onNavigateToNote(linkTitle)}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                      exists
-                        ? 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30'
-                        : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-400 border border-dashed border-zinc-700'
-                    }`}
-                    title={exists ? `Jump to ${linkTitle}` : `Create page [[${linkTitle}]]`}
-                  >
-                    <span>{linkTitle}</span>
-                    {!exists && <span className="text-[9px] text-amber-400/80 font-normal">(new)</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
 
         {/* Header Controls: Save, New Page, Full Width & Focus Mode */}
@@ -500,61 +500,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         <EditorContent editor={editor} className="w-full h-auto block" />
       </div>
 
-      {/* KNOWLEDGE CONNECTIONS HUB: OUTGOING LINKS & INCOMING BACKLINKS */}
-      <div className="w-full mt-12 pt-8 border-t-2 border-zinc-800/90 space-y-6 block clear-both">
-        {/* 1. Outgoing Linked Pages (Pages Referenced In This Note) */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-              <Link2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Linked Pages in this Document ({outgoingLinks.length})</span>
-            </div>
-            <span className="text-[11px] text-zinc-500">Mentions enclosed in [[wiki-links]]</span>
-          </div>
-
-          {outgoingLinks.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {outgoingLinks.map((targetTitle, idx) => {
-                const targetNote = allNotes.find(n => n.title.toLowerCase() === targetTitle.toLowerCase());
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => onNavigateToNote(targetTitle)}
-                    className="text-left p-3 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-indigo-500/40 transition-all group"
-                  >
-                    <div className="flex items-center justify-between text-xs text-zinc-200 group-hover:text-indigo-300 font-medium mb-1">
-                      <span className="truncate">{targetTitle}</span>
-                      <ArrowUpRight className="w-3 h-3 text-zinc-500 group-hover:text-indigo-400 shrink-0" />
-                    </div>
-                    {targetNote ? (
-                      <p className="text-[11px] text-zinc-500 line-clamp-2 leading-relaxed">
-                        {targetNote.content.replace(/[#*`]/g, '').slice(0, 100)}
-                      </p>
-                    ) : (
-                      <span className="text-[11px] text-amber-400/90 font-medium flex items-center gap-1">
-                        + Uncreated page. Click to create.
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="p-3 rounded-lg bg-zinc-900/30 border border-zinc-800/40 text-xs text-zinc-500">
-              No outgoing links yet. Type <code className="text-zinc-300 font-mono">[[Page Name]]</code> anywhere in the editor to link to another page.
-            </div>
-          )}
-        </div>
-
-        {/* 2. Incoming Bi-directional Backlinks */}
+      {/* BI-DIRECTIONAL BACKLINKS HUB: Shows parent and referring notes */}
+      <div className="w-full mt-10 pt-6 border-t-2 border-zinc-800/90 space-y-4 block clear-both">
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300 uppercase tracking-wider">
               <Link2 className="w-3.5 h-3.5 text-emerald-400" />
               <span>Bi-directional Backlinks ({backlinks.length})</span>
             </div>
-            <span className="text-[11px] text-zinc-500">Other notes that reference this page</span>
+            <span className="text-[11px] text-zinc-500">Notes that reference this page</span>
           </div>
 
           {backlinks.length > 0 ? (

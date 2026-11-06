@@ -42,7 +42,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiAnswer, setAiAnswer] = useState<string | null>(null);
   const [citations, setCitations] = useState<string[]>([]);
+  const [relevantNoteIds, setRelevantNoteIds] = useState<string[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isDeepLoading, setIsDeepLoading] = useState(false);
+  const [isDeepCompleted, setIsDeepCompleted] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const handleCopyAnswer = () => {
@@ -100,20 +103,39 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     if (!hasKey) {
       setAiAnswer('Gemini API Key Required: Please configure your Gemini API key in Settings to connect directly to Google Gemini.');
       setCitations([]);
+      setRelevantNoteIds([]);
       return;
     }
 
     setIsAiLoading(true);
     setAiAnswer(null);
+    setIsDeepCompleted(false);
     try {
-      const result = await queryKnowledgeBase(aiQuestion, notes, aiConfig);
+      const result = await queryKnowledgeBase(aiQuestion, notes, aiConfig, false);
       setAiAnswer(result.answer);
       setCitations(result.citations);
+      setRelevantNoteIds(result.relevantNoteIds);
     } catch (err: any) {
       setAiAnswer(err?.message || 'Failed to query knowledge base with Gemini API. Please check your API key.');
       setCitations([]);
+      setRelevantNoteIds([]);
     } finally {
       setIsAiLoading(false);
+    }
+  };
+
+  const handleDeepInvestigate = async () => {
+    if (isDeepLoading || relevantNoteIds.length === 0) return;
+    setIsDeepLoading(true);
+    try {
+      const result = await queryKnowledgeBase(aiQuestion, notes, aiConfig, true, relevantNoteIds);
+      setAiAnswer(result.answer);
+      setCitations(result.citations);
+      setIsDeepCompleted(true);
+    } catch (err: any) {
+      setAiAnswer(err?.message || 'Failed deep investigation of notes with Gemini API.');
+    } finally {
+      setIsDeepLoading(false);
     }
   };
 
@@ -122,18 +144,22 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     if (!hasKey) {
       setAiAnswer('Gemini API Key Required: Please configure your Gemini API key in Settings to connect directly to Google Gemini.');
       setCitations([]);
+      setRelevantNoteIds([]);
       return;
     }
     setIsAiLoading(true);
     setAiAnswer(null);
-    queryKnowledgeBase(q, notes, aiConfig)
+    setIsDeepCompleted(false);
+    queryKnowledgeBase(q, notes, aiConfig, false)
       .then(res => {
         setAiAnswer(res.answer);
         setCitations(res.citations);
+        setRelevantNoteIds(res.relevantNoteIds);
       })
       .catch(err => {
         setAiAnswer(err?.message || 'Failed to query knowledge base with Gemini API.');
         setCitations([]);
+        setRelevantNoteIds([]);
       })
       .finally(() => {
         setIsAiLoading(false);
@@ -314,7 +340,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                     <div className="flex items-center justify-between pb-2 mb-3 border-b border-zinc-800/80 text-[11px] text-zinc-500">
                       <div className="flex items-center gap-1.5 text-indigo-400 font-medium">
                         <Sparkles className="w-3.5 h-3.5" />
-                        <span>AI Knowledge Synthesis (Gemini 2.5 Flash)</span>
+                        <span>AI Knowledge Synthesis ({isDeepCompleted ? 'Deep Dive' : 'Fast Summary Mode'})</span>
                       </div>
                       <button
                         onClick={handleCopyAnswer}
@@ -333,6 +359,39 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                         onClose();
                       }}
                     />
+
+                    {/* Stage 2 Option: Drill down into actual full notes */}
+                    {!isDeepCompleted && relevantNoteIds.length > 0 && (
+                      <div className="mt-3 p-3 rounded-lg bg-indigo-950/40 border border-indigo-500/30 flex items-center justify-between gap-3 animate-in fade-in">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <div>
+                            <div className="font-semibold text-zinc-200 text-xs">Investigate Actual Notes?</div>
+                            <div className="text-[11px] text-zinc-400">
+                              Drill into the full uncompressed text of {citations.slice(0, 3).join(', ')}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleDeepInvestigate}
+                          disabled={isDeepLoading}
+                          className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-1.5 shrink-0 transition-colors shadow-sm"
+                        >
+                          {isDeepLoading ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Investigating...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Deep Dive</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {citations.length > 0 && (

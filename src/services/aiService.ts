@@ -250,18 +250,19 @@ export async function generateNoteSummary(
   const modelName = config?.modelName || 'gemini-3.8-flash';
   const ai = new GoogleGenAI({ apiKey });
 
-  const prompt = `You are a high-speed knowledge synthesizer for LatticeLedger note-taking application.
-Analyze the following note titled "${note.title}":
-${note.content}
+  // Streamlined fast prompt capped at strictly 3 bullet points
+  const prompt = `You are a high-speed knowledge synthesizer for LatticeLedger.
+Note Title: "${note.title}"
+Content:
+${note.content.slice(0, 4000)}
 
-Generate an ultra-concise structured JSON object with the following fields:
+Generate an ultra-fast JSON object:
 {
-  "tldr": ["Strictly 2 to 3 bullet points, each 1 brief sentence. The entire summary must NEVER exceed 4 lines."],
-  "actionItems": ["any quests or action items, max 3"],
+  "tldr": ["2 to 3 bullet points, each 1 brief sentence. Strictly <= 3 points."],
+  "actionItems": ["action items or open questions, max 3"],
   "tags": ["relevant tags starting with #, max 4"],
   "keyEntities": ["key people, places, concepts, max 4"]
 }
-
 Respond ONLY with valid JSON.`;
 
   try {
@@ -269,6 +270,8 @@ Respond ONLY with valid JSON.`;
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
+        maxOutputTokens: 250,
+        temperature: 0.2
       }
     });
 
@@ -307,15 +310,26 @@ Respond ONLY with valid JSON.`;
   }
 }
 
+export interface KnowledgeQueryResult {
+  answer: string;
+  citations: string[];
+  relevantNoteIds: string[];
+  isDeepInvestigation?: boolean;
+}
+
 /**
- * Ask Questions across the entire knowledge base using Google Gemini API (Ask AI tab).
- * STRICT: App contains NO simulated AI. Requires a valid Gemini API key.
+ * Ask Questions across knowledge base using Google Gemini API.
+ * TWO-STAGE SYNTHESIS:
+ * Stage 1 (Fast): Searches strictly across note titles, #tags, AI summaries, and quick notes.
+ * Stage 2 (Deep Dive on Demand): Investigates the full content of only the matched notes when requested.
  */
 export async function queryKnowledgeBase(
   question: string,
   notes: Note[],
-  config?: AIProviderConfig
-): Promise<{ answer: string; citations: string[] }> {
+  config?: AIProviderConfig,
+  deepInvestigate: boolean = false,
+  targetNoteIds?: string[]
+): Promise<KnowledgeQueryResult> {
   const rawKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null);
   const apiKey = sanitizeApiKey(rawKey);
 
@@ -324,49 +338,83 @@ export async function queryKnowledgeBase(
   }
 
   const qLower = question.toLowerCase();
+  const queryTokens = qLower.split(/\s+/).filter(t => t.length > 2);
 
-  // Find relevant notes via keyword and tag match
-  const relevantNotes = notes.filter(n => {
-    const text = `${n.title} ${n.content} ${n.tags.join(' ')}`.toLowerCase();
-    const queryTokens = qLower.split(/\s+/).filter(t => t.length > 2);
-    return queryTokens.some(tok => text.includes(tok));
-  }).slice(0, 5);
-
-  const citations = relevantNotes.map(n => n.title);
-
-  if (relevantNotes.length === 0) {
-    return {
-      answer: `No relevant notes found in your knowledge base matching "${question}". Try adjusting your search query or creating notes on this topic.`,
-      citations: []
-    };
+  // If specific target notes requested for deep dive, use them; otherwise match candidates
+  let relevantNotes: Note[] = [];
+  if (targetNoteIds && targetNoteIds.length > 0) {
+    relevantNotes = notes.filter(n => targetNoteIds.includes(n.id));
+  } else {
+    // Fast match on title, tags, and summary text without searching full document bodies
+    relevantNotes = notes.filter(n => {
+      const summaryText = n.summary?.tldr?.join(' ') || '';
+      const tagsText = n.tags.join(' ');
+      const matchIndex = `${n.title} ${tagsText} ${summaryText} ${n.type === 'quick' ? n.content : ''}`.toLowerCase();
+      return queryTokens.length === 0 || queryTokens.some(tok => matchIndex.includes(tok));
+    }).slice(0, 6);
   }
 
+  // Fallback: if no summary matched, include top candidates by title & tags
+  if (relevantNotes.length === 0) {
+    relevantNotes = notes.slice(0, 4);
+  }
+
+  const citations = relevantNotes.map(n => n.title);
+  const relevantNoteIds = relevantNotes.map(n => n.id);
   const modelName = config?.modelName || 'gemini-3.8-flash';
   const ai = new GoogleGenAI({ apiKey });
-  const context = relevantNotes.map(n => `--- Note: ${n.title} (${n.type}) ---\n${n.content}\n`).join('\n');
 
-  const prompt = `You are the knowledge synthesis engine for LatticeLedger personal knowledge base.
-Answer the user's question based strictly on the provided context notes.
-Format your answer in beautiful, clean Markdown suitable for a rich markdown viewer:
-- Use clear Markdown headings (e.g., ## Overview, ## Details) to organize your thoughts.
-- Use bullet points (- ) with bold terms (**Term**: details) for high readability.
-- Whenever you refer to an entity or note from the context, strictly enclose its title in [[Note Title]] wiki links so the user can click directly into that note.
-- Provide a direct, well-structured synthesis.
+  let prompt = '';
+
+  if (deepInvestigate) {
+    // STAGE 2: Deep Investigation of full note text for only the selected notes
+    const fullContext = relevantNotes.map(n => `### [[${n.title}]] (${n.type})\n${n.content}\n`).join('\n');
+    prompt = `You are the deep investigation synthesis engine for LatticeLedger.
+The user wants an in-depth, thorough analysis of their question based on the FULL text of these specific notes:
+
+${fullContext}
 
 User Question: ${question}
 
-Context Notes:
-${context}
-`;
+Instructions:
+- Provide an exhaustive, detailed synthesis in clean Markdown.
+- Use headings (## In-Depth Analysis, ## Specific Findings, ## Conclusions).
+- Reference notes using [[Note Title]] wiki links so the user can jump directly to them.
+- Cite specific details, quotes, or items found in the full text.`;
+  } else {
+    // STAGE 1: Fast Synthesis using ONLY summaries, tags, and quick notes (sub-second speed)
+    const summaryContext = relevantNotes.map(n => {
+      const summaryBullets = n.summary?.tldr?.join('; ') || (n.type === 'quick' ? n.content.slice(0, 160) : 'No summary yet');
+      return `- [[${n.title}]] (Tags: ${n.tags.join(', ')}): ${summaryBullets}`;
+    }).join('\n');
+
+    prompt = `You are the lightning-fast knowledge synthesizer for LatticeLedger.
+Answer the user's question quickly and directly based on the following note summaries and tags:
+
+${summaryContext}
+
+User Question: ${question}
+
+Instructions:
+- Answer directly and concisely in 2 to 4 sentences or a short bulleted list.
+- Use [[Note Title]] wiki links when referencing notes.
+- Format with clean Markdown. Do NOT generate unnecessary filler.`;
+  }
 
   try {
     const { text } = await callGeminiWithFallback(ai, modelName, {
-      contents: prompt
+      contents: prompt,
+      config: {
+        maxOutputTokens: deepInvestigate ? 800 : 400,
+        temperature: 0.2
+      }
     });
 
     return {
       answer: text || 'No answer generated.',
-      citations
+      citations,
+      relevantNoteIds,
+      isDeepInvestigation: deepInvestigate
     };
   } catch (err: any) {
     console.error('[Gemini API] Query error:', err);

@@ -159,13 +159,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="text-[10px] text-zinc-500 font-mono">2D</span>
         </button>
 
-        <div className="pt-3 px-2 pb-1 text-[10px] font-semibold tracking-wider text-zinc-600 uppercase">
-          Actions
-        </div>
-
         <button
           onClick={onNewWikiPage}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-zinc-300 hover:text-zinc-100 hover:bg-zinc-900 border border-zinc-800/60 transition-colors"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 mt-2 rounded-md text-zinc-300 hover:text-zinc-100 hover:bg-zinc-900 border border-zinc-800/60 transition-colors"
         >
           <Plus className="w-3.5 h-3.5 text-zinc-400" />
           <span>New Page</span>

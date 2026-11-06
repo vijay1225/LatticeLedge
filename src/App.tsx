@@ -235,7 +235,7 @@ export function App() {
 
   const handleCreateNewWikiPage = (customTitle?: string, customContent?: string) => {
     const title = customTitle?.trim() || 'Untitled Page';
-    const content = customContent || `# ${title}\n\nStart writing your thoughts here...`;
+    const content = customContent !== undefined ? customContent : '';
     const newPage: Note = {
       id: `wiki-${Date.now()}`,
       type: 'wiki',
@@ -676,7 +676,7 @@ export function App() {
                   onClick={() => {
                     handleCreateNewWikiPage(
                       newPageTitle.trim() || undefined,
-                      mobileQuickText.trim() ? `# ${newPageTitle.trim() || 'Untitled Page'}\n\n${mobileQuickText.trim()}` : undefined
+                      mobileQuickText.trim() ? mobileQuickText.trim() : undefined
                     );
                     setNewPageTitle('');
                     setMobileQuickText('');
