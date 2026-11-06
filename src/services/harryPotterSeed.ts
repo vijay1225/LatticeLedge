@@ -9,11 +9,44 @@ export const HARRY_POTTER_SEED_NOTES: Note[] = [
 
 **Harry James Potter** (born 31 July 1980) is an English half-blood wizard, one of the most famous wizards of modern times. He was the only child and son of James and Lily Potter.
 
+![Harry Potter Portrait](https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80 "Harry James Potter - The Boy Who Lived")
+
+> [!NOTE]
+> "It is our choices, Harry, that show what we truly are, far more than our abilities."
+> — [[Albus Dumbledore]]
+
+---
+
 ## Biography & Legacy
 * Known as the **"Boy Who Lived"** after surviving the Killing Curse cast by [[Lord Voldemort]].
 * Member of **Gryffindor** House and the Seeker for the Gryffindor Quidditch team at [[Hogwarts School of Witchcraft and Wizardry]].
 * Along with his closest friends, he formed [[The Golden Trio]].
 * Discovered during the Battle of Hogwarts that he unknowingly served as one of the seven [[Horcruxes]].
+
+---
+
+## Patronus Conjuration Algorithm
+The Patronus Charm is the most famous and difficult defensive charm. Below is the computational simulation of spell intensity:
+
+\`\`\`python
+# Patronus Charm Conjuration Algorithm
+def expecto_patronum(wizard_name: str, memory_intensity: float) -> str:
+    """Calculates spell efficacy based on happiest memory resonance."""
+    if memory_intensity >= 0.85:
+        return f"{wizard_name}'s wand emits a blinding silver Stag (Full Corporeal Patronus)!"
+    elif memory_intensity >= 0.50:
+        return f"{wizard_name}'s wand forms a dense shield of shimmering silver vapor."
+    return "A fleeting spark of silver smoke dissipated."
+
+# Test execution
+result = expecto_patronum("Harry Potter", memory_intensity=0.98)
+print(result)
+\`\`\`
+
+> [!TIP]
+> A corporeal Patronus is the only known defense capable of repelling Dementors and Lethifolds.
+
+---
 
 ## Key Alliances
 - Close mentorship under Headmaster [[Albus Dumbledore]].
@@ -44,6 +77,43 @@ export const HARRY_POTTER_SEED_NOTES: Note[] = [
     content: `# Hogwarts School of Witchcraft and Wizardry
 
 Founded in the Scottish Highlands around the 10th century by four of the greatest wizards and witches of the age: **Godric Gryffindor**, **Helga Hufflepuff**, **Rowena Ravenclaw**, and **Salazar Slytherin**.
+
+![Hogwarts Castle](https://images.unsplash.com/photo-1547756536-cde3673fa2e5?auto=format&fit=crop&w=1200&q=80 "Hogwarts Castle in the Scottish Highlands")
+
+<iframe src="https://www.youtube.com/embed/26p_7q7k5n8" allowfullscreen></iframe>
+
+> [!TIP]
+> Password to Gryffindor Tower changes every fortnight. Current password: *"Caput Draconis"*.
+
+---
+
+## The Sorting Hat Decision Engine
+Below is the logic executed by the Sorting Hat during the opening banquet:
+
+\`\`\`typescript
+interface WizardCandidate {
+  name: string;
+  bravery: number;
+  wisdom: number;
+  loyalty: number;
+  ambition: number;
+}
+
+type HogwartsHouse = 'Gryffindor' | 'Ravenclaw' | 'Hufflepuff' | 'Slytherin';
+
+function sortStudent(student: WizardCandidate): HogwartsHouse {
+  const scores = [
+    { house: 'Gryffindor' as const, value: student.bravery },
+    { house: 'Ravenclaw' as const, value: student.wisdom },
+    { house: 'Hufflepuff' as const, value: student.loyalty },
+    { house: 'Slytherin' as const, value: student.ambition },
+  ];
+  scores.sort((a, b) => b.value - a.value);
+  return scores[0].house;
+}
+\`\`\`
+
+---
 
 ## Castle Mysteries & Locations
 - **The Great Hall**: Enchanted ceiling mirroring the sky outside.
@@ -199,6 +269,82 @@ A secret society founded by [[Albus Dumbledore]] to fight [[Lord Voldemort]] and
     ],
     createdAt: Date.now() - 1000 * 60 * 60 * 140,
     updatedAt: Date.now() - 1000 * 60 * 60 * 16
+  },
+  {
+    id: 'wiki-magical-algorithms',
+    type: 'wiki',
+    title: 'Magical Algorithms & Formulas',
+    content: `# Magical Algorithms & Formulas
+
+Arithmancy and computational charms represent the synthesis of ancient spellcraft and modern algorithmic thinking.
+
+![Marauder's Magical Map](https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80 "Magical Parchment and Ancient Cartography")
+
+> [!NOTE]
+> Computational spell design was first pioneered by Arithmancer Bridget Wenlock in the 13th century, who uncovered the magical properties of the number seven.
+
+---
+
+## 1. Wand Core Resonance Query (SQL)
+Below is the standard Ministry of Magic database query for matching wizard resonance frequencies:
+
+\`\`\`sql
+-- Query: Find high-affinity wands in Ollivanders Vault
+SELECT 
+    w.wand_id,
+    w.wood_type,
+    w.core_material,
+    w.length_inches,
+    w.flexibility
+FROM ollivanders_inventory w
+JOIN core_resonance r ON w.core_id = r.core_id
+WHERE r.magic_frequency >= 94.5 
+  AND w.status = 'unclaimed'
+ORDER BY r.harmonic_stability DESC
+LIMIT 5;
+\`\`\`
+
+---
+
+## 2. Invisibility Cloak Wavelength Phase Cancellation (Python)
+The Cloak of Death uses a continuous optical phase cancellation algorithm:
+
+\`\`\`python
+import math
+
+def phase_cancellation(visible_wavelength_nm: float) -> dict:
+    """Calculates optical distortion index for Deathly Hallows cloak."""
+    refractive_index = 1.0 - math.sin(visible_wavelength_nm / 100.0)
+    stealth_rating = 100.0 if refractive_index <= 0.05 else 75.0
+    return {
+        "wavelength_nm": visible_wavelength_nm,
+        "refraction": round(refractive_index, 4),
+        "stealth_rating": f"{stealth_rating}%"
+    }
+
+# Simulation for human visible spectrum (550nm green light)
+cloak_status = phase_cancellation(550.0)
+print(f"Cloak Status: {cloak_status}")
+\`\`\`
+
+> [!WARNING]
+> Standard disillusionment charms degrade over decades, but true Hallows garments exhibit zero decay rate across centuries.
+
+---
+
+## Connections
+- Studied under [[Albus Dumbledore]] and utilized by [[The Golden Trio]].
+- Discovered during investigations into [[Horcruxes]] and ancient artifacts at [[Hogwarts School of Witchcraft and Wizardry]].
+`,
+    tags: ['#Arithmancy', '#Spells', '#Algorithms', '#MagicFormulas', '#Hogwarts'],
+    links: [
+      'Albus Dumbledore',
+      'The Golden Trio',
+      'Horcruxes',
+      'Hogwarts School of Witchcraft and Wizardry'
+    ],
+    createdAt: Date.now() - 1000 * 60 * 60 * 60,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 4
   },
 
   // ----------------------------------------------------

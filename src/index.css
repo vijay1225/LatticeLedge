@@ -156,6 +156,30 @@
   margin: 1rem 0;
 }
 
+.tiptap.ProseMirror hr {
+  border: none;
+  border-top: 1px solid rgba(63, 63, 70, 0.5);
+  margin: 2rem 0;
+}
+
+.tiptap.ProseMirror img {
+  border-radius: 0.75rem;
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1.5rem auto;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(63, 63, 70, 0.4);
+}
+
+.tiptap.ProseMirror video, .tiptap.ProseMirror iframe {
+  border-radius: 0.75rem;
+  max-width: 100%;
+  margin: 1.5rem auto;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(63, 63, 70, 0.4);
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;

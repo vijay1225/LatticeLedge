@@ -257,6 +257,44 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 32/32 automated unit tests passing across all suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
       - Fresh native Android APK: `LatticeLedger.apk`.
+  - [x] **Markdown Media Embeds, Conventional `assets/` Folder, Code Blocks & Authentic PKM Reading View**:
+    - **Conventional `assets/` Folder Architecture (`assetService.ts`)**:
+      - Media files are saved to the standard vault `assets/` directory (`assets/<timestamp>-<filename>`) as adopted by Obsidian, Logseq, and Foam.
+      - Integrated cross-platform asset resolution:
+        - Desktop: Electron native `fs` writes to `<vaultFolder>/assets/` and reads via IPC.
+        - Mobile: Capacitor native Filesystem writes and reads from `<vaultFolder>/assets/`.
+        - Web & Offline: IndexedDB fallback (`lattice_assets` object store) and Blob URL caching.
+      - Updated `electron/main.cjs` to recursively create subdirectories for `vault:write-file`.
+    - **Rich Media Embeds in WYSIWYG & Markdown**:
+      - **Images (`CustomImageNode` & `ImageNodeView`)**:
+        - Supports local `assets/` paths, web URLs, and data URIs.
+        - Drag-and-drop & Ctrl+V clipboard paste: drop an image or paste from clipboard anywhere in the editor to instantly save it into `assets/` and insert markdown `![alt](assets/...)`.
+        - Interactive lightbox: click any image in note or reading mode for high-resolution fullscreen modal preview with zoom and pan.
+        - Editable caption input directly beneath the image in the live editor.
+      - **Videos & Responsive Embeds (`CustomVideoNode` & `VideoNodeView`)**:
+        - Supports local MP4/WebM videos saved in `assets/`.
+        - Supports YouTube (`youtube.com/watch?v=...`, `youtu.be/...`, `youtube.com/embed/...`) and Vimeo URLs.
+        - Automatically renders responsive 16:9 embedded player with controls.
+      - **Insert Media Modal (`InsertMediaModal.tsx`)**:
+        - Dual-tab modal: "Upload File to Assets" vs. "YouTube / Web URL".
+        - Instant preview and caption fields before insertion.
+    - **Authentic PKM Reading & Document Aesthetics**:
+      - **Syntax-Styled Code Blocks (`CustomCodeBlockNode` & `CodeBlockComponent.tsx`)**:
+        - TipTap code block with language dropdown selector (Python, TypeScript, JavaScript, SQL, Rust, Go, HTML, CSS, Bash, JSON, Markdown).
+        - 1-click "Copy Code" button with visual "Copied!" checkmark feedback.
+      - **GitHub / Obsidian Callouts**:
+        - Styled callout blocks with colored accent bars, icons, and titles (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`, `> [!IMPORTANT]`, `> [!CAUTION]`).
+        - Toolbar 1-click insertion dropdown menu.
+      - **Horizontal Rule Dividers**:
+        - Added `---` divider button in toolbar with clean divider styling.
+      - **Enhanced `MarkdownViewer.tsx`**:
+        - Full parity between live TipTap editor and static markdown viewer (used in Ask AI, summaries, and previews), rendering images with lightbox zoom, video embeds, code blocks with copy buttons, and callout boxes.
+    - **Rich Test Examples in Sample Vault**:
+      - Seeded Harry Potter notes with high-resolution portraits, incantation YouTube video embed, Python algorithm, TypeScript sorting hat engine, and a dedicated note "Magical Algorithms & Formulas" with SQL query and phase cancellation equations.
+    - **Verified & Built**:
+      - 37/37 automated unit tests passing across all suites (`assetService`, `vaultSyncService`, `sqliteService`, `graphBuilder`, `wikiLinks`, `aiService`, `markdownViewer`).
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.8MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Use 1-tap quick sync or automatic SQLite vault folder synchronization across devices.

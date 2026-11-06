@@ -1,5 +1,16 @@
-import React from 'react';
-import { Link2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  Link2, 
+  Copy, 
+  Check, 
+  Info, 
+  Lightbulb, 
+  AlertTriangle, 
+  AlertCircle, 
+  Terminal,
+  X
+} from 'lucide-react';
+import { isVideoEmbedUrl, getYoutubeEmbedUrl } from '../services/assetService';
 
 interface MarkdownViewerProps {
   content: string;
@@ -18,11 +29,6 @@ function renderInlineContent(
   text: string,
   onLinkClick?: (noteTitle: string) => void
 ): React.ReactNode[] {
-  // Regex pattern matching:
-  // 1. [[Wiki Links]]
-  // 2. `code`
-  // 3. **bold**
-  // 4. *italic*
   const tokenRegex = /(\[\[.*?\]\]|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
   const parts = text.split(tokenRegex);
 
@@ -83,11 +89,47 @@ function renderInlineContent(
   });
 }
 
+const CodeBlockItem: React.FC<{ code: string; lang: string }> = ({ code, lang }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="my-3 rounded-xl bg-zinc-950 border border-zinc-800 overflow-hidden text-xs shadow-md">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-b border-zinc-800/80 text-[10px] text-zinc-400 font-mono">
+        <div className="flex items-center gap-1.5 uppercase font-medium tracking-wider">
+          <Terminal className="w-3 h-3 text-indigo-400" />
+          <span>{lang || 'code'}</span>
+        </div>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+        >
+          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          <span>{copied ? 'Copied' : 'Copy'}</span>
+        </button>
+      </div>
+      <pre className="p-3.5 m-0 overflow-x-auto text-zinc-200 font-mono text-xs leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
 export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   content,
   onLinkClick,
   className = ''
 }) => {
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
   if (!content) return null;
 
   const lines = content.split('\n');
@@ -99,25 +141,20 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Handle code block fences
+    // 1. Handle Code Block Fences
     if (line.trim().startsWith('```')) {
       if (inCodeBlock) {
-        // End code block
         elements.push(
-          <div key={`code-${i}`} className="my-2.5 rounded-lg bg-zinc-950 border border-zinc-800 p-3 overflow-x-auto text-xs font-mono text-zinc-300">
-            {codeBlockLang && (
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 font-sans">
-                {codeBlockLang}
-              </div>
-            )}
-            <pre className="m-0 leading-relaxed">{codeBlockLines.join('\n')}</pre>
-          </div>
+          <CodeBlockItem 
+            key={`code-${i}`} 
+            code={codeBlockLines.join('\n')} 
+            lang={codeBlockLang} 
+          />
         );
         inCodeBlock = false;
         codeBlockLines = [];
         codeBlockLang = '';
       } else {
-        // Start code block
         inCodeBlock = true;
         codeBlockLang = line.trim().replace(/^```/, '');
         codeBlockLines = [];
@@ -132,53 +169,172 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
 
     const trimmed = line.trim();
 
-    // Empty line -> spacing
+    // 2. Empty Line
     if (!trimmed) {
       elements.push(<div key={`sp-${i}`} className="h-2" />);
       continue;
     }
 
-    // Heading 1 (# ...)
+    // 3. Horizontal Rule (--- or ***)
+    if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+      elements.push(<hr key={`hr-${i}`} className="my-4 border-t border-zinc-800/80" />);
+      continue;
+    }
+
+    // 4. Image Markdown: ![alt](src "title") or ![alt](src)
+    const imgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)(?:\s+"(.*?)")?\)$/);
+    if (imgMatch) {
+      const alt = imgMatch[1];
+      const src = imgMatch[2];
+      const title = imgMatch[3];
+
+      elements.push(
+        <div key={`img-${i}`} className="my-4 text-center">
+          <img
+            src={src}
+            alt={alt}
+            title={title || alt}
+            onClick={() => setZoomedImage(src)}
+            className="rounded-xl border border-zinc-800/80 shadow-md max-h-[460px] max-w-full mx-auto object-contain cursor-zoom-in hover:brightness-105 transition-all"
+            loading="lazy"
+          />
+          {title && (
+            <p className="text-[11px] text-zinc-500 mt-1.5 italic text-center">
+              {title}
+            </p>
+          )}
+        </div>
+      );
+      continue;
+    }
+
+    // 5. HTML Video Tag: <video src="..." ...></video>
+    if (trimmed.startsWith('<video') && trimmed.includes('src=')) {
+      const srcMatch = trimmed.match(/src=["'](.*?)["']/);
+      if (srcMatch) {
+        elements.push(
+          <div key={`vid-${i}`} className="my-4 rounded-xl border border-zinc-800 bg-black overflow-hidden shadow-lg text-center">
+            <video controls src={srcMatch[1]} className="max-h-[460px] w-full object-contain bg-black">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        );
+        continue;
+      }
+    }
+
+    // 6. HTML Iframe / YouTube embed: <iframe src="..." ...></iframe>
+    if (trimmed.startsWith('<iframe') && trimmed.includes('src=')) {
+      const srcMatch = trimmed.match(/src=["'](.*?)["']/);
+      if (srcMatch) {
+        const embedUrl = isVideoEmbedUrl(srcMatch[1]) ? getYoutubeEmbedUrl(srcMatch[1]) : srcMatch[1];
+        elements.push(
+          <div key={`iframe-${i}`} className="my-4 rounded-xl border border-zinc-800 bg-black overflow-hidden shadow-lg aspect-video w-full">
+            <iframe
+              src={embedUrl}
+              className="w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        );
+        continue;
+      }
+    }
+
+    // 7. Headings
     if (trimmed.startsWith('# ')) {
       elements.push(
-        <h2 key={`h1-${i}`} className="text-base font-bold text-zinc-100 mt-3 mb-1.5 pb-1 border-b border-zinc-800 flex items-center gap-1.5">
+        <h2 key={`h1-${i}`} className="text-base font-bold text-zinc-100 mt-4 mb-2 pb-1 border-b border-zinc-800 flex items-center gap-1.5">
           {renderInlineContent(trimmed.replace(/^#\s+/, ''), onLinkClick)}
         </h2>
       );
       continue;
     }
-
-    // Heading 2 (## ...)
     if (trimmed.startsWith('## ')) {
       elements.push(
-        <h3 key={`h2-${i}`} className="text-sm font-semibold text-zinc-200 mt-2.5 mb-1 pb-0.5 border-b border-zinc-800/60">
+        <h3 key={`h2-${i}`} className="text-sm font-semibold text-zinc-200 mt-3 mb-1.5 pb-0.5 border-b border-zinc-800/60">
           {renderInlineContent(trimmed.replace(/^##\s+/, ''), onLinkClick)}
         </h3>
       );
       continue;
     }
-
-    // Heading 3 (### ...)
     if (trimmed.startsWith('### ')) {
       elements.push(
-        <h4 key={`h3-${i}`} className="text-xs font-semibold text-zinc-300 mt-2 mb-1">
+        <h4 key={`h3-${i}`} className="text-xs font-semibold text-zinc-300 mt-2.5 mb-1">
           {renderInlineContent(trimmed.replace(/^###\s+/, ''), onLinkClick)}
         </h4>
       );
       continue;
     }
 
-    // Blockquote (> ...)
+    // 8. Authentic Note App Callouts: > [!NOTE], > [!TIP], > [!WARNING], > [!IMPORTANT]
     if (trimmed.startsWith('>')) {
+      const rawText = trimmed.replace(/^>\s*/, '');
+      let calloutType: 'note' | 'tip' | 'warning' | 'important' | null = null;
+      let calloutBody = rawText;
+
+      if (rawText.startsWith('[!NOTE]')) {
+        calloutType = 'note';
+        calloutBody = rawText.replace(/^\[!NOTE\]\s*/, '');
+      } else if (rawText.startsWith('[!TIP]')) {
+        calloutType = 'tip';
+        calloutBody = rawText.replace(/^\[!TIP\]\s*/, '');
+      } else if (rawText.startsWith('[!WARNING]')) {
+        calloutType = 'warning';
+        calloutBody = rawText.replace(/^\[!WARNING\]\s*/, '');
+      } else if (rawText.startsWith('[!IMPORTANT]') || rawText.startsWith('[!CAUTION]')) {
+        calloutType = 'important';
+        calloutBody = rawText.replace(/^\[!(IMPORTANT|CAUTION)\]\s*/, '');
+      }
+
+      if (calloutType === 'note') {
+        elements.push(
+          <div key={`co-${i}`} className="my-2.5 p-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-xs text-indigo-200 flex items-start gap-2.5 shadow-sm">
+            <Info className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
+            <div className="flex-1 leading-relaxed">{renderInlineContent(calloutBody, onLinkClick)}</div>
+          </div>
+        );
+        continue;
+      }
+      if (calloutType === 'tip') {
+        elements.push(
+          <div key={`co-${i}`} className="my-2.5 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-200 flex items-start gap-2.5 shadow-sm">
+            <Lightbulb className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+            <div className="flex-1 leading-relaxed">{renderInlineContent(calloutBody, onLinkClick)}</div>
+          </div>
+        );
+        continue;
+      }
+      if (calloutType === 'warning') {
+        elements.push(
+          <div key={`co-${i}`} className="my-2.5 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200 flex items-start gap-2.5 shadow-sm">
+            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+            <div className="flex-1 leading-relaxed">{renderInlineContent(calloutBody, onLinkClick)}</div>
+          </div>
+        );
+        continue;
+      }
+      if (calloutType === 'important') {
+        elements.push(
+          <div key={`co-${i}`} className="my-2.5 p-3 rounded-xl border border-purple-500/30 bg-purple-500/10 text-xs text-purple-200 flex items-start gap-2.5 shadow-sm">
+            <AlertCircle className="w-4 h-4 text-purple-400 mt-0.5 shrink-0" />
+            <div className="flex-1 leading-relaxed">{renderInlineContent(calloutBody, onLinkClick)}</div>
+          </div>
+        );
+        continue;
+      }
+
+      // Standard Blockquote
       elements.push(
-        <blockquote key={`bq-${i}`} className="my-2 pl-3 py-1 border-l-2 border-indigo-500/70 bg-zinc-950/40 rounded-r text-zinc-300 italic text-xs leading-relaxed">
-          {renderInlineContent(trimmed.replace(/^>\s*/, ''), onLinkClick)}
+        <blockquote key={`bq-${i}`} className="my-2 pl-3 py-1.5 border-l-2 border-indigo-500/70 bg-zinc-950/40 rounded-r text-zinc-300 italic text-xs leading-relaxed">
+          {renderInlineContent(rawText, onLinkClick)}
         </blockquote>
       );
       continue;
     }
 
-    // Bullet List Item (- or * ...)
+    // 9. Bullet List Item (- or * ...)
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       elements.push(
         <div key={`li-${i}`} className="flex items-start gap-2 my-1 text-xs text-zinc-300 leading-relaxed pl-1">
@@ -189,7 +345,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
       continue;
     }
 
-    // Numbered list item (1. ...)
+    // 10. Numbered list item (1. ...)
     const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
     if (numMatch) {
       elements.push(
@@ -201,7 +357,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
       continue;
     }
 
-    // Regular paragraph
+    // 11. Regular paragraph
     elements.push(
       <p key={`p-${i}`} className="text-xs text-zinc-300 leading-relaxed my-1">
         {renderInlineContent(line, onLinkClick)}
@@ -212,6 +368,27 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   return (
     <div className={`space-y-1 ${className}`}>
       {elements}
+
+      {/* Lightbox / Zoom Modal */}
+      {zoomedImage && (
+        <div 
+          onClick={() => setZoomedImage(null)}
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out animate-in fade-in duration-150"
+        >
+          <button
+            type="button"
+            onClick={() => setZoomedImage(null)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={zoomedImage}
+            alt="Fullscreen view"
+            className="max-h-[92vh] max-w-[92vw] rounded-xl shadow-2xl object-contain border border-zinc-800"
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -89,10 +89,11 @@ ipcMain.handle('vault:read-file', async (_event, { folderPath, fileName = 'latti
 
 ipcMain.handle('vault:write-file', async (_event, { folderPath, data, fileName = 'lattice_vault.db' }) => {
   if (!folderPath) throw new Error('No vault folder path provided');
-  if (!fs.existsSync(folderPath)) {
-    await fs.promises.mkdir(folderPath, { recursive: true });
-  }
   const fullPath = path.join(folderPath, fileName);
+  const parentDir = path.dirname(fullPath);
+  if (!fs.existsSync(parentDir)) {
+    await fs.promises.mkdir(parentDir, { recursive: true });
+  }
   
   // Mark self write timestamp to ignore echo from fs.watch
   lastSelfWriteTimestamp = Date.now();

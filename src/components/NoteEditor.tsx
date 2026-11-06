@@ -24,7 +24,12 @@ import {
   Trash2,
   AlertTriangle,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Image as ImageIcon,
+  Film,
+  Terminal,
+  Minus,
+  Info
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -36,6 +41,9 @@ import { Markdown } from 'tiptap-markdown';
 import { Note } from '../types';
 import { AISummaryCard } from './AISummaryCard';
 import { findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
+import { CustomCodeBlockNode, CustomImageNode, CustomVideoNode } from './editor/editorExtensions';
+import { InsertMediaModal } from './editor/InsertMediaModal';
+import { saveAsset, getYoutubeEmbedUrl } from '../services/assetService';
 
 interface NoteEditorProps {
   note: Note;
@@ -76,6 +84,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [mediaModal, setMediaModal] = useState<{ isOpen: boolean; type: 'image' | 'video' }>({
+    isOpen: false,
+    type: 'image'
+  });
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [justSaved, setJustSaved] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string>('');
@@ -191,10 +203,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
+        codeBlock: false, // Replaced by CustomCodeBlockNode
         heading: {
           levels: [1, 2, 3]
         }
       }),
+      CustomCodeBlockNode,
+      CustomImageNode,
+      CustomVideoNode,
       TaskList,
       TaskItem.configure({
         nested: true
@@ -203,7 +219,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         placeholder: 'Write directly on this page... Type # for headings, - [ ] for checklists, > for quotes, or [[ to link...'
       }),
       Markdown.configure({
-        html: false,
+        html: true,
         tightLists: true,
         bulletListMarker: '-'
       })
@@ -212,6 +228,59 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     editorProps: {
       attributes: {
         class: 'tiptap ProseMirror px-5 py-4 focus:outline-none'
+      },
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items;
+        if (items) {
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.startsWith('image/')) {
+              const file = items[i].getAsFile();
+              if (file) {
+                event.preventDefault();
+                saveAsset(file).then(({ assetPath }) => {
+                  if (view.state.schema.nodes.image) {
+                    const tr = view.state.tr.replaceSelectionWith(
+                      view.state.schema.nodes.image.create({
+                        src: assetPath,
+                        alt: file.name,
+                        title: file.name
+                      })
+                    );
+                    view.dispatch(tr);
+                  }
+                });
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      },
+      handleDrop: (view, event) => {
+        const files = event.dataTransfer?.files;
+        if (files && files.length > 0) {
+          const file = files[0];
+          if (file.type.startsWith('image/')) {
+            event.preventDefault();
+            const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+            saveAsset(file).then(({ assetPath }) => {
+              if (view.state.schema.nodes.image) {
+                const pos = coordinates ? coordinates.pos : view.state.selection.from;
+                const tr = view.state.tr.insert(
+                  pos,
+                  view.state.schema.nodes.image.create({
+                    src: assetPath,
+                    alt: file.name,
+                    title: file.name
+                  })
+                );
+                view.dispatch(tr);
+              }
+            });
+            return true;
+          }
+        }
+        return false;
       }
     },
     onUpdate: ({ editor }) => {
@@ -298,6 +367,32 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     if (!editor) return;
     const quote = `\n> Reference: "${qNote.content.slice(0, 80)}..."\n`;
     editor.chain().focus().insertContent(quote).run();
+  };
+
+  const handleInsertImage = (src: string, alt?: string, title?: string) => {
+    if (!editor) return;
+    editor.chain().focus().insertContent(`\n![${alt || 'Image'}](${src}${title ? ` "${title}"` : ''})\n`).run();
+  };
+
+  const handleInsertVideo = (src: string, isEmbed?: boolean) => {
+    if (!editor) return;
+    if (isEmbed) {
+      const embedUrl = getYoutubeEmbedUrl(src);
+      editor.chain().focus().insertContent(`\n<iframe src="${embedUrl}" allowfullscreen></iframe>\n`).run();
+    } else {
+      editor.chain().focus().insertContent(`\n<video src="${src}" controls></video>\n`).run();
+    }
+  };
+
+  const handleInsertCallout = (type: 'note' | 'tip' | 'warning') => {
+    if (!editor) return;
+    let snippet = '\n> [!NOTE]\n> Key takeaway or important context...\n';
+    if (type === 'tip') {
+      snippet = '\n> [!TIP]\n> Pro-tip: helpful recommendation or trick...\n';
+    } else if (type === 'warning') {
+      snippet = '\n> [!WARNING]\n> Critical note or warning to remember...\n';
+    }
+    editor.chain().focus().insertContent(snippet).run();
   };
 
   return (
@@ -626,9 +721,16 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           <button
             onClick={() => editor.chain().focus().toggleCode().run()}
             className={`p-1.5 rounded transition-colors ${editor.isActive('code') ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
-            title="Code (`code`)"
+            title="Inline Code (`code`)"
           >
             <Code className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+            className={`p-1.5 rounded transition-colors ${editor.isActive('codeBlock') ? 'bg-zinc-800 text-indigo-400 font-bold' : 'hover:bg-zinc-800 hover:text-zinc-200'}`}
+            title="Code Block (```)"
+          >
+            <Terminal className="w-3.5 h-3.5 text-indigo-400" />
           </button>
 
           <div className="w-px h-3.5 bg-zinc-800 mx-1" />
@@ -654,6 +756,73 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           >
             <Quote className="w-3.5 h-3.5" />
           </button>
+
+          <div className="w-px h-3.5 bg-zinc-800 mx-1" />
+
+          {/* Insert Media Actions */}
+          <button
+            type="button"
+            onClick={() => setMediaModal({ isOpen: true, type: 'image' })}
+            className="p-1.5 rounded hover:bg-zinc-800 hover:text-zinc-200 text-zinc-400 transition-colors flex items-center gap-1"
+            title="Insert Image (Upload to assets/ or URL)"
+          >
+            <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden sm:inline text-[11px]">Image</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMediaModal({ isOpen: true, type: 'video' })}
+            className="p-1.5 rounded hover:bg-zinc-800 hover:text-zinc-200 text-zinc-400 transition-colors flex items-center gap-1"
+            title="Embed Video (assets/ or YouTube)"
+          >
+            <Film className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline text-[11px]">Video</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().setHorizontalRule().run()}
+            className="p-1.5 rounded hover:bg-zinc-800 hover:text-zinc-200 text-zinc-400 transition-colors"
+            title="Horizontal Divider (---)"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Callout Box Template Dropdown */}
+          <div className="relative group">
+            <button
+              type="button"
+              className="p-1.5 rounded hover:bg-zinc-800 hover:text-zinc-200 text-zinc-400 transition-colors flex items-center gap-1"
+              title="Insert Authentic Callout Box"
+            >
+              <Info className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline text-[11px]">Callout</span>
+            </button>
+            <div className="absolute left-0 top-full mt-1 hidden group-hover:flex flex-col bg-zinc-900 border border-zinc-800 rounded-lg p-1 shadow-2xl z-30 min-w-[130px]">
+              <button
+                type="button"
+                onClick={() => handleInsertCallout('note')}
+                className="px-2.5 py-1 text-left rounded hover:bg-zinc-800 text-[11px] text-indigo-300 transition-colors"
+              >
+                [!NOTE] Info
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInsertCallout('tip')}
+                className="px-2.5 py-1 text-left rounded hover:bg-zinc-800 text-[11px] text-emerald-300 transition-colors"
+              >
+                [!TIP] Pro-Tip
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInsertCallout('warning')}
+                className="px-2.5 py-1 text-left rounded hover:bg-zinc-800 text-[11px] text-amber-300 transition-colors"
+              >
+                [!WARNING] Caution
+              </button>
+            </div>
+          </div>
 
           <div className="w-px h-3.5 bg-zinc-800 mx-1" />
 
@@ -713,6 +882,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           )}
         </div>
       </div>
+
+      {/* Insert Media Modal */}
+      <InsertMediaModal
+        isOpen={mediaModal.isOpen}
+        mediaType={mediaModal.type}
+        onClose={() => setMediaModal(prev => ({ ...prev, isOpen: false }))}
+        onInsertImage={handleInsertImage}
+        onInsertVideo={handleInsertVideo}
+      />
     </div>
   );
 };

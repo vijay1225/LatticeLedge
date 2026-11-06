@@ -10,7 +10,7 @@ describe('Knowledge Graph Construction', () => {
     const quickNodes = graph.nodes.filter(n => n.type === 'quick');
     const tagNodes = graph.nodes.filter(n => n.type === 'tag');
 
-    expect(wikiNodes.length).toBe(7); // 7 Harry Potter Wiki Pages
+    expect(wikiNodes.length).toBe(8); // 8 Harry Potter Wiki Pages
     expect(quickNodes.length).toBe(5); // 5 Harry Potter Quick Notes
     expect(tagNodes.length).toBeGreaterThan(5); // e.g. #Horcrux, #Hogwarts, #Spells
   });
