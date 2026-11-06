@@ -329,11 +329,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       const res = await chooseVaultFolder();
       if (res.success) {
-        if (res.loadedNotes && onNotesUpdated) {
+        if (res.isFresh) {
+          if (onNotesUpdated) {
+            onNotesUpdated([]);
+          }
+          setImportStatus(`Bound to empty folder "${res.folderName || res.folderPath}"! Created fresh empty vault (0 notes). Ready for new notes.`);
+        } else if (res.loadedNotes && onNotesUpdated) {
           onNotesUpdated(res.loadedNotes);
-          setImportStatus(`Bound to folder: "${res.folderName || res.folderPath}"! Loaded ${res.loadedNotes.length} notes from existing lattice_vault.db.`);
+          setImportStatus(`Bound to folder: "${res.folderName || res.folderPath}"! Resumed from existing vault (${res.loadedNotes.length} notes loaded).`);
         } else {
-          setImportStatus(`Bound to folder: "${res.folderName || res.folderPath}"! Created and saved lattice_vault.db with all active notes.`);
+          setImportStatus(`Bound to folder: "${res.folderName || res.folderPath}"!`);
         }
       } else if (res.error && res.error !== 'Folder selection canceled') {
         setImportStatus(`Folder selection notice: ${res.error}`);
@@ -353,11 +358,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       const res = await setMobileVaultFolder(pathToUse);
       if (res.success) {
-        if (res.loadedNotes && onNotesUpdated) {
+        if (res.isFresh) {
+          if (onNotesUpdated) {
+            onNotesUpdated([]);
+          }
+          setImportStatus(`Bound to empty folder "${res.folderPath}"! Created fresh empty vault (0 notes). Ready for new notes.`);
+        } else if (res.loadedNotes && onNotesUpdated) {
           onNotesUpdated(res.loadedNotes);
-          setImportStatus(`Bound to "${res.folderPath}"! Loaded ${res.loadedNotes.length} notes from existing lattice_vault.db.`);
+          setImportStatus(`Bound to "${res.folderPath}"! Resumed from existing vault (${res.loadedNotes.length} notes loaded).`);
         } else {
-          setImportStatus(`Bound to "${res.folderPath}"! Created and saved lattice_vault.db with all active notes.`);
+          setImportStatus(`Bound to "${res.folderPath}"!`);
         }
         setIsEditingMobilePath(false);
       } else {

@@ -161,6 +161,16 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
             )}
           </div>
         ))}
+
+        {filteredNotes.length === 0 && (
+          <div className="py-12 text-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 p-6 space-y-2">
+            <Zap className="w-6 h-6 text-zinc-600 mx-auto" />
+            <div className="text-zinc-400 text-xs font-medium">No quick notes yet</div>
+            <p className="text-[11px] text-zinc-600 max-w-xs mx-auto">
+              Capture quick thoughts, ideas, and snippets using the input box above. AI will extract tags automatically.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

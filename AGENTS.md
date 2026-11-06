@@ -242,6 +242,21 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 31/31 automated unit tests passing.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
       - Fresh native Android APK: `LatticeLedger.apk`.
+  - [x] **Smart Empty Vault Creation & Resume Engine (Clean Slate vs. Resume)**:
+    - **When Selected Folder is Empty**:
+      - Strictly does NOT copy or push existing / old notes into the folder.
+      - Creates a fresh, empty SQLite vault (`createEmptySqliteVault()`) with 0 notes and writes a clean `lattice_vault.db` binary into the folder.
+      - Updates UI notes state to `[]`, clearing old pages and scratchpads, providing a completely blank canvas ready for new notes.
+    - **When Selected Folder Already Contains `lattice_vault.db`**:
+      - Automatically reads `lattice_vault.db` and loads existing notes into the SQLite engine and UI.
+      - Resumes working seamlessly from the existing vault state.
+    - **Empty State Polish**:
+      - Added empty placeholders with actionable creation buttons in `PagesView` and `QuickNotesFeed`.
+      - Added clean "Knowledge graph is empty" hint in `KnowledgeGraphView` when 0 nodes exist.
+    - **Verified & Built**:
+      - 32/32 automated unit tests passing across all suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
+      - Fresh native Android APK: `LatticeLedger.apk`.
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Use 1-tap quick sync or automatic SQLite vault folder synchronization across devices.

@@ -1,7 +1,7 @@
 import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import { Note } from '../types';
 import { HARRY_POTTER_SEED_NOTES } from './harryPotterSeed';
-import { saveVaultDbToFolder, loadVaultDbFromFolder } from './vaultSyncService';
+import { saveVaultDbToFolder, loadVaultDbFromFolder, getVaultSyncState } from './vaultSyncService';
 
 const DB_INDEXEDDB_NAME = 'LatticeLedgerSqliteDB';
 const DB_STORE_NAME = 'sqlite_file_store';
@@ -106,11 +106,20 @@ export async function getSqliteDatabase(): Promise<Database> {
     }
   }
 
-  // 2. Initialize fresh SQLite database and seed notes
+  // 2. Initialize fresh SQLite database
   activeDb = new sqlModule.Database();
   createSchemaIfMissing(activeDb);
 
-  // Seed default notes
+  // If a vault folder is already configured, start with empty vault (do not reseed sample data)
+  try {
+    const syncState = getVaultSyncState();
+    if (syncState && syncState.isConfigured) {
+      await persistDatabase();
+      return activeDb;
+    }
+  } catch {}
+
+  // Seed default notes for first-time onboarding without configured folder
   insertNotesBatch(activeDb, HARRY_POTTER_SEED_NOTES);
   await persistDatabase();
 
@@ -244,6 +253,16 @@ export async function resetSqliteToSeed(): Promise<Note[]> {
   insertNotesBatch(db, HARRY_POTTER_SEED_NOTES);
   await persistDatabase();
   return getAllNotesFromSql();
+}
+
+/**
+ * Create a fresh, empty SQLite vault (clears all notes and returns an empty note list).
+ */
+export async function createEmptySqliteVault(): Promise<Note[]> {
+  const db = await getSqliteDatabase();
+  db.run('DELETE FROM notes');
+  await persistDatabase();
+  return [];
 }
 
 /**

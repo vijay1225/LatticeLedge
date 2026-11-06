@@ -6,7 +6,8 @@ import {
   exportSqliteDatabaseBlob, 
   downloadSqliteDatabaseFile,
   getSqliteDatabaseBinary,
-  getAllNotesFromSql
+  getAllNotesFromSql,
+  createEmptySqliteVault
 } from './sqliteService';
 
 export interface VaultSyncState {
@@ -26,6 +27,7 @@ export interface VaultFolderResult {
   folderPath?: string;
   folderName?: string;
   loadedNotes?: Note[];
+  isFresh?: boolean;
   error?: string;
 }
 
@@ -123,16 +125,22 @@ async function clearDirHandleFromIdb(): Promise<void> {
 // ----------------------------------------------------
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64');
+  }
   let binary = '';
   const chunkSize = 8192;
   for (let i = 0; i < bytes.length; i += chunkSize) {
     const chunk = bytes.subarray(i, i + chunkSize);
     binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
   }
-  return btoa(binary);
+  return typeof btoa !== 'undefined' ? btoa(binary) : '';
 }
 
 function base64ToUint8Array(base64: string): Uint8Array {
+  if (typeof Buffer !== 'undefined') {
+    return new Uint8Array(Buffer.from(base64, 'base64'));
+  }
   const binaryString = atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
@@ -325,24 +333,28 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
       // Check if lattice_vault.db already exists in this chosen folder
       const info = await (window as any).electronAPI.checkVaultFileInfo(selected, DEFAULT_VAULT_FILE);
       let loadedNotes: Note[] | undefined = undefined;
+      let isFresh = false;
 
       if (info && info.exists) {
-        // Load existing notes from the folder!
+        // Folder already contains db file: Resume from there!
         const fileBuffer = await (window as any).electronAPI.readVaultFile(selected, DEFAULT_VAULT_FILE);
         if (fileBuffer) {
           loadedNotes = await importSqliteDatabaseFile(fileBuffer);
           lastSyncTimestamp = info.mtime || Date.now();
         }
       } else {
-        // File does not exist in the selected folder: CREATE and WRITE it immediately!
+        // Folder is empty / no db file:
+        // Do NOT copy old notes! Create fresh empty repo like a clean slate!
         try {
-          const currentBinary = await getSqliteDatabaseBinary();
-          const writeRes = await (window as any).electronAPI.writeVaultFile(selected, currentBinary, DEFAULT_VAULT_FILE);
+          loadedNotes = await createEmptySqliteVault();
+          isFresh = true;
+          const emptyBinary = await getSqliteDatabaseBinary();
+          const writeRes = await (window as any).electronAPI.writeVaultFile(selected, emptyBinary, DEFAULT_VAULT_FILE);
           if (writeRes && writeRes.mtime) {
             lastSyncTimestamp = writeRes.mtime;
           }
         } catch (writeErr) {
-          console.warn('[VaultSync] Could not write initial vault file on folder binding:', writeErr);
+          console.warn('[VaultSync] Could not write fresh vault file on folder binding:', writeErr);
         }
       }
 
@@ -354,7 +366,8 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
         success: true,
         folderPath: selected,
         folderName,
-        loadedNotes
+        loadedNotes,
+        isFresh
       };
     }
 
@@ -375,6 +388,7 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
       setStoredItem(VAULT_FOLDER_NAME_KEY, dirHandle.name);
 
       let loadedNotes: Note[] | undefined = undefined;
+      let isFresh = false;
 
       // Check if lattice_vault.db exists
       try {
@@ -384,17 +398,19 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
         loadedNotes = await importSqliteDatabaseFile(buffer);
         lastSyncTimestamp = file.lastModified;
       } catch {
-        // File doesn't exist yet: write current active database into it now!
+        // File doesn't exist yet: Create empty repo like fresh (do not copy old notes)!
         try {
-          const currentBinary = await getSqliteDatabaseBinary();
+          loadedNotes = await createEmptySqliteVault();
+          isFresh = true;
+          const emptyBinary = await getSqliteDatabaseBinary();
           const fileHandle = await dirHandle.getFileHandle(DEFAULT_VAULT_FILE, { create: true });
           const writable = await fileHandle.createWritable();
-          await writable.write(currentBinary);
+          await writable.write(emptyBinary);
           await writable.close();
           const file = await fileHandle.getFile();
           lastSyncTimestamp = file.lastModified;
         } catch (writeErr) {
-          console.warn('[VaultSync] Could not write initial file to browser directory:', writeErr);
+          console.warn('[VaultSync] Could not write fresh file to browser directory:', writeErr);
         }
       }
 
@@ -403,7 +419,8 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
         success: true,
         folderPath: dirHandle.name,
         folderName: dirHandle.name,
-        loadedNotes
+        loadedNotes,
+        isFresh
       };
     }
 
@@ -432,41 +449,40 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
   setStoredItem(VAULT_FOLDER_NAME_KEY, cleanPath.split(/[/\\]/).pop() || cleanPath);
 
   let loadedNotes: Note[] | undefined = undefined;
+  let isFresh = false;
 
-  if (typeof window !== 'undefined') {
-    try {
-      const stat = await Filesystem.stat({
+  try {
+    const stat = await Filesystem.stat({
+      path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
+      directory: Directory.Documents
+    });
+    if (stat) {
+      const res = await Filesystem.readFile({
         path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
         directory: Directory.Documents
       });
-      if (stat) {
-        const res = await Filesystem.readFile({
-          path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
-          directory: Directory.Documents
-        });
-        if (res.data) {
-          const raw = typeof res.data === 'string' ? base64ToUint8Array(res.data) : (res.data as any);
-          loadedNotes = await importSqliteDatabaseFile(raw);
-          lastSyncTimestamp = Date.now();
-        }
-      }
-    } catch {
-      // If lattice_vault.db doesn't exist yet in that folder, save current active DB into it!
-      try {
-        const blob = await exportSqliteDatabaseBlob();
-        const arrayBuffer = await blob.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        const base64Data = uint8ArrayToBase64(bytes);
-        await Filesystem.writeFile({
-          path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
-          data: base64Data,
-          directory: Directory.Documents,
-          recursive: true
-        });
+      if (res.data) {
+        const raw = typeof res.data === 'string' ? base64ToUint8Array(res.data) : (res.data as any);
+        loadedNotes = await importSqliteDatabaseFile(raw);
         lastSyncTimestamp = Date.now();
-      } catch (writeErr) {
-        console.warn('[VaultSync] Could not write initial file to new mobile folder:', writeErr);
       }
+    }
+  } catch {
+    // File doesn't exist in folder: Create fresh empty repo (do not copy old notes)!
+    try {
+      loadedNotes = await createEmptySqliteVault();
+      isFresh = true;
+      const emptyBinary = await getSqliteDatabaseBinary();
+      const base64Data = uint8ArrayToBase64(emptyBinary);
+      await Filesystem.writeFile({
+        path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true
+      });
+      lastSyncTimestamp = Date.now();
+    } catch (writeErr: any) {
+      console.warn('[VaultSync] Could not write fresh file to new mobile folder:', writeErr?.message || writeErr);
     }
   }
 
@@ -475,7 +491,8 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
     success: true,
     folderPath: cleanPath,
     folderName: cleanPath,
-    loadedNotes
+    loadedNotes,
+    isFresh
   };
 }
 
@@ -655,7 +672,6 @@ export async function pushVaultDbToFolder(): Promise<{ success: boolean; message
 
 /**
  * Explicitly pull / reload all notes from lattice_vault.db in the bound folder into SQLite & UI.
- * If lattice_vault.db is missing in the folder, automatically pushes current notes to create it!
  */
 export async function pullVaultDbFromFolder(): Promise<{ success: boolean; message: string; notes?: Note[] }> {
   const state = getVaultSyncState();
@@ -666,14 +682,6 @@ export async function pullVaultDbFromFolder(): Promise<{ success: boolean; messa
   try {
     const bytes = await loadVaultDbFromFolder();
     if (!bytes || bytes.length === 0) {
-      // File does not exist yet in folder: write current notes to create it!
-      const pushRes = await pushVaultDbToFolder();
-      if (pushRes.success) {
-        return {
-          success: true,
-          message: `lattice_vault.db was missing in folder. Created and saved ${pushRes.noteCount || 0} notes into "${state.folderName}"!`
-        };
-      }
       return { success: false, message: `lattice_vault.db was not found in folder "${state.folderName}".` };
     }
 

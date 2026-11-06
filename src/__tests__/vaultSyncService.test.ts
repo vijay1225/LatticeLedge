@@ -48,10 +48,12 @@ describe('Vault Sync Service', () => {
     expect(state.folderPath).toBe('');
   });
 
-  it('allows binding mobile vault folder path', async () => {
+  it('allows binding mobile vault folder path and creates fresh empty vault when no db exists', async () => {
     const res = await setMobileVaultFolder('Documents/CustomVault');
     expect(res.success).toBe(true);
     expect(res.folderPath).toBe('Documents/CustomVault');
+    expect(res.isFresh).toBe(true);
+    expect(res.loadedNotes).toEqual([]);
     const state = getVaultSyncState();
     expect(state.folderPath).toBe('Documents/CustomVault');
   });

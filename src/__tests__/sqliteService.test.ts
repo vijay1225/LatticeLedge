@@ -6,7 +6,8 @@ import {
   exportSqliteDatabaseBlob, 
   getSqliteDatabaseBinary,
   replaceAllNotesInSql,
-  resetSqliteToSeed 
+  resetSqliteToSeed,
+  createEmptySqliteVault
 } from '../services/sqliteService';
 import { Note } from '../types';
 
@@ -91,5 +92,17 @@ describe('SQLite Database Service', () => {
     expect(result.length).toBe(1);
     expect(result[0].id).toBe('wiki-replaced-1');
     expect(result[0].title).toBe('Replaced Page 1');
+  });
+
+  it('creates a fresh empty SQLite vault with zero notes', async () => {
+    const emptyNotes = await createEmptySqliteVault();
+    expect(emptyNotes).toEqual([]);
+
+    const notesInDb = await getAllNotesFromSql();
+    expect(notesInDb).toHaveLength(0);
+
+    const binary = await getSqliteDatabaseBinary();
+    expect(binary).toBeInstanceOf(Uint8Array);
+    expect(binary.length).toBeGreaterThan(0);
   });
 });

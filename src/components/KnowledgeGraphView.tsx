@@ -913,6 +913,15 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
         </div>
       )}
 
+      {/* Empty Graph State */}
+      {graphData.nodes.length === 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 pointer-events-none gap-2 select-none">
+          <Compass className="w-8 h-8 text-zinc-600 animate-pulse" />
+          <p className="text-xs text-zinc-400 font-medium">Knowledge graph is empty</p>
+          <p className="text-[11px] text-zinc-600">Create wiki pages and quick notes to see connections appear here.</p>
+        </div>
+      )}
+
       {/* Footer Instructions */}
       <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-3 px-3 py-1.5 rounded-md bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400 backdrop-blur-md">
         <div className="flex items-center gap-3 flex-wrap">

@@ -78,7 +78,7 @@ export function App() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return savedKey ? parsed : parsed.map((n: Note) => ({ ...n, summary: undefined }));
         }
       }
@@ -106,13 +106,27 @@ export function App() {
   const [history, setHistory] = useState<string[]>(['wiki-harry-potter']);
   const [historyIndex, setHistoryIndex] = useState(0);
 
+  const handleNotesUpdated = (updatedNotes: Note[]) => {
+    setNotes(updatedNotes);
+    if (updatedNotes.length === 0) {
+      setActiveNoteId('');
+      setHistory([]);
+      setHistoryIndex(0);
+      setCurrentMode('pages');
+    } else {
+      if (!updatedNotes.some(n => n.id === activeNoteId)) {
+        setActiveNoteId(updatedNotes[0].id);
+      }
+    }
+  };
+
   // Load notes directly from SQLite database on mount
   useEffect(() => {
     getAllNotesFromSql().then(sqlNotes => {
-      if (sqlNotes && sqlNotes.length > 0) {
+      if (sqlNotes && Array.isArray(sqlNotes)) {
         const hasKey = isGeminiKeyConfigured(aiConfig);
         const sanitized = hasKey ? sqlNotes : sqlNotes.map(n => ({ ...n, summary: undefined }));
-        setNotes(sanitized);
+        handleNotesUpdated(sanitized);
       }
     }).catch(err => {
       console.warn('[SQLite] Fallback to cache:', err);
@@ -174,7 +188,7 @@ export function App() {
   useEffect(() => {
     initVaultSync((externalNotes) => {
       console.log('[App] Vault updated externally from folder/Drive, reloading notes...');
-      setNotes(externalNotes);
+      handleNotesUpdated(externalNotes);
     });
     return subscribeVaultSyncState(setVaultSyncState);
   }, []);
@@ -357,7 +371,7 @@ export function App() {
 
     setHistory(prev => {
       const filtered = prev.filter(hId => hId !== id);
-      return filtered.length > 0 ? filtered : ['wiki-harry-potter'];
+      return filtered;
     });
     setHistoryIndex(prev => Math.max(0, prev - 1));
 
@@ -365,6 +379,8 @@ export function App() {
       const remainingPages = notes.filter(n => n.type === 'wiki' && n.id !== id);
       if (remainingPages.length > 0) {
         setActiveNoteId(remainingPages[0].id);
+      } else {
+        setActiveNoteId('');
       }
       setCurrentMode('pages');
     }
@@ -666,7 +682,7 @@ export function App() {
               onSaveConfig={setAiConfig}
               onResetSeedData={handleResetSeedData}
               notes={notes}
-              onNotesUpdated={setNotes}
+              onNotesUpdated={handleNotesUpdated}
             />
           )}
         </div>
