@@ -20,6 +20,7 @@ interface PagesViewProps {
   onNewPage: () => void;
   onDeletePage?: (pageId: string) => void;
   onTagClick?: (tag: string) => void;
+  onLoadDemoPages?: () => void;
 }
 
 export const PagesView: React.FC<PagesViewProps> = ({
@@ -27,7 +28,8 @@ export const PagesView: React.FC<PagesViewProps> = ({
   onSelectPage,
   onNewPage,
   onDeletePage,
-  onTagClick
+  onTagClick,
+  onLoadDemoPages
 }) => {
   const [filterQuery, setFilterQuery] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -85,6 +87,18 @@ export const PagesView: React.FC<PagesViewProps> = ({
               </button>
             )}
           </div>
+
+          {/* Demo Pages Quick Action */}
+          {onLoadDemoPages && (
+            <button
+              onClick={onLoadDemoPages}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-xs font-medium transition-all active:scale-95 shrink-0"
+              title="Load interactive demo pages with code blocks, images, and video embeds"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Demo Pages</span>
+            </button>
+          )}
 
           {/* New Page Action */}
           <button
@@ -241,15 +255,26 @@ export const PagesView: React.FC<PagesViewProps> = ({
               {filterQuery ? `No pages matching "${filterQuery}"` : 'No wiki pages in vault yet.'}
             </div>
             <p className="text-xs text-zinc-600 max-w-sm mx-auto">
-              Create your first evergreen wiki page or adjust your search filter.
+              Create your first evergreen wiki page or load the interactive code & media demo pages.
             </p>
-            <button
-              onClick={onNewPage}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs shadow-sm transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create New Page</span>
-            </button>
+            <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+              <button
+                onClick={onNewPage}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs shadow-sm transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create New Page</span>
+              </button>
+              {onLoadDemoPages && (
+                <button
+                  onClick={onLoadDemoPages}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 font-medium text-xs shadow-sm transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Load Demo Pages</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

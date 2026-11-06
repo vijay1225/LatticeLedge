@@ -205,7 +205,11 @@ describe('SQLite Database Service', () => {
         actionItems: [
           'Verify with Ravenclaw archives',
           'Calculate Planck-Hermione constant'
-        ]
+        ],
+        tags: ['#QuantumSpell', '#Transfiguration'],
+        keyEntities: ['Planck-Hermione Constant', 'Ravenclaw Archives'],
+        generatedAt: Date.now(),
+        model: 'gemini-3.8-flash'
       },
       createdAt: Date.now(),
       updatedAt: Date.now()

@@ -12,7 +12,8 @@ import {
   getAllNotesFromSql, 
   saveNoteToSql, 
   deleteNoteFromSql, 
-  resetSqliteToSeed 
+  resetSqliteToSeed,
+  loadDemoShowcaseNotes 
 } from './services/sqliteService';
 import { 
   initVaultSync, 
@@ -415,10 +416,23 @@ export function App() {
     } catch {
       setNotes(HARRY_POTTER_SEED_NOTES);
     }
-    setActiveNoteId('wiki-harry-potter');
-    setHistory(['wiki-harry-potter']);
+    setActiveNoteId('wiki-code-showcase');
+    setHistory(['wiki-code-showcase']);
     setHistoryIndex(0);
     setCurrentMode('pages');
+  };
+
+  const handleLoadDemoNotes = async () => {
+    try {
+      const updatedNotes = await loadDemoShowcaseNotes();
+      handleNotesUpdated(updatedNotes);
+      setActiveNoteId('wiki-code-showcase');
+      setHistory(prev => [...prev, 'wiki-code-showcase']);
+      setHistoryIndex(prev => prev + 1);
+      setCurrentMode('notes');
+    } catch (err) {
+      console.warn('[DemoNotes] Error loading demo showcase:', err);
+    }
   };
 
   const wikiNotes = notes.filter(n => n.type === 'wiki');
@@ -601,6 +615,7 @@ export function App() {
               onSelectPage={navigateToNote}
               onNewPage={() => handleCreateNewWikiPage()}
               onDeletePage={handleDeleteWikiPage}
+              onLoadDemoPages={handleLoadDemoNotes}
               onTagClick={() => {
                 setCurrentMode('search');
               }}

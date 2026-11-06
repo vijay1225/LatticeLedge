@@ -100,6 +100,26 @@ export async function getSqliteDatabase(): Promise<Database> {
     try {
       activeDb = new sqlModule.Database(savedBytes);
       createSchemaIfMissing(activeDb);
+
+      // If the database has notes but lacks the demo showcase notes, auto-merge them
+      try {
+        const res = activeDb.exec("SELECT COUNT(*) FROM notes WHERE id IN ('wiki-code-showcase', 'wiki-media-gallery', 'wiki-markdown-callouts')");
+        const demoCount = (res && res[0] && res[0].values[0] && res[0].values[0][0]) as number || 0;
+        
+        const totalRes = activeDb.exec("SELECT COUNT(*) FROM notes");
+        const totalCount = (totalRes && totalRes[0] && totalRes[0].values[0] && totalRes[0].values[0][0]) as number || 0;
+
+        if (demoCount < 3 && totalCount > 0) {
+          const demoNotes = HARRY_POTTER_SEED_NOTES.filter(n =>
+            ['wiki-code-showcase', 'wiki-media-gallery', 'wiki-markdown-callouts'].includes(n.id)
+          );
+          insertNotesBatch(activeDb, demoNotes);
+          await persistDatabase();
+        }
+      } catch (mergeErr) {
+        console.warn('[SQLite] Demo notes check/merge error:', mergeErr);
+      }
+
       return activeDb;
     } catch (e) {
       console.warn('[SQLite] Corrupted database bytes, reinitializing:', e);
@@ -251,6 +271,19 @@ export async function resetSqliteToSeed(): Promise<Note[]> {
   const db = await getSqliteDatabase();
   db.run('DELETE FROM notes');
   insertNotesBatch(db, HARRY_POTTER_SEED_NOTES);
+  await persistDatabase();
+  return getAllNotesFromSql();
+}
+
+/**
+ * Load or re-insert the interactive Code, Media, and Markdown demo showcase notes.
+ */
+export async function loadDemoShowcaseNotes(): Promise<Note[]> {
+  const db = await getSqliteDatabase();
+  const demoNotes = HARRY_POTTER_SEED_NOTES.filter(n =>
+    ['wiki-code-showcase', 'wiki-media-gallery', 'wiki-markdown-callouts'].includes(n.id)
+  );
+  insertNotesBatch(db, demoNotes);
   await persistDatabase();
   return getAllNotesFromSql();
 }
