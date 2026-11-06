@@ -6,6 +6,8 @@ import {
   disconnectVaultFolder,
   setMobileVaultFolder,
   shareVaultDatabaseFile,
+  pushVaultDbToFolder,
+  pullVaultDbFromFolder,
   isElectron
 } from '../services/vaultSyncService';
 
@@ -56,5 +58,16 @@ describe('Vault Sync Service', () => {
 
   it('provides shareVaultDatabaseFile helper function', () => {
     expect(typeof shareVaultDatabaseFile).toBe('function');
+  });
+
+  it('handles pushVaultDbToFolder and pullVaultDbFromFolder when unconfigured', async () => {
+    await disconnectVaultFolder();
+    const pushRes = await pushVaultDbToFolder();
+    expect(pushRes.success).toBe(false);
+    expect(pushRes.message).toContain('No vault folder bound');
+
+    const pullRes = await pullVaultDbFromFolder();
+    expect(pullRes.success).toBe(false);
+    expect(pullRes.message).toContain('No vault folder bound');
   });
 });

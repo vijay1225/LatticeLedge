@@ -247,11 +247,29 @@ export async function resetSqliteToSeed(): Promise<Note[]> {
 }
 
 /**
+ * Replace entire vault with a new set of notes (e.g. from JSON or database import).
+ */
+export async function replaceAllNotesInSql(newNotes: Note[]): Promise<Note[]> {
+  const db = await getSqliteDatabase();
+  db.run('DELETE FROM notes');
+  insertNotesBatch(db, newNotes);
+  await persistDatabase();
+  return getAllNotesFromSql();
+}
+
+/**
+ * Export the raw SQLite binary Uint8Array bytes directly.
+ */
+export async function getSqliteDatabaseBinary(): Promise<Uint8Array> {
+  const db = await getSqliteDatabase();
+  return db.export();
+}
+
+/**
  * Export the raw SQLite binary database file (.db) for Google Drive.
  */
 export async function exportSqliteDatabaseBlob(): Promise<Blob> {
-  const db = await getSqliteDatabase();
-  const binary = db.export();
+  const binary = await getSqliteDatabaseBinary();
   return new Blob([new Uint8Array(binary)], { type: 'application/x-sqlite3' });
 }
 

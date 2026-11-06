@@ -212,6 +212,22 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 29/29 automated unit tests passing across all suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.78MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Desktop Vault Auto-Creation on Binding & Complete Vault Import/Push/Pull Engine**:
+    - **Instant Vault DB Auto-Creation on Folder Selection**:
+      - Fixed bug where choosing/changing a folder left it completely empty because `writeVaultFile` was never invoked when `lattice_vault.db` was not yet present.
+      - When binding any folder on Desktop (or Web), if `lattice_vault.db` does not exist in the folder, the active SQLite database is immediately exported and written as `lattice_vault.db` into the selected folder.
+      - If `lattice_vault.db` already exists, it loads the existing notes into the app.
+    - **Explicit Push & Pull Folder Controls**:
+      - **"Save / Push Notes to Folder"**: writes/overwrites `lattice_vault.db` in the folder with all current notes.
+      - **"Reload / Pull from Folder"**: reads `lattice_vault.db` from the folder and updates the entire app vault. If the file is missing in the folder, it automatically creates and writes it.
+    - **Load Entire Notes using File Import (Vault Replacement Hub)**:
+      - **"Import SQLite DB (.db, .sqlite)"**: loads binary database, replaces entire vault in SQLite and UI, and syncs to bound folder.
+      - **"Import JSON Backup (.json)"**: loads JSON backup, runs `replaceAllNotesInSql` to persist to SQLite, updates UI, and writes to bound folder.
+      - Clear user feedback banners showing exact note counts loaded/saved.
+    - **Verified & Built**:
+      - 31/31 automated unit tests passing across all suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.78MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Use 1-tap "Import from Google Drive" / "Save / Share to Google Drive" or bind synced folders to share the same `lattice_vault.db`.

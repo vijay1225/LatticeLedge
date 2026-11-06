@@ -4,6 +4,8 @@ import {
   saveNoteToSql, 
   deleteNoteFromSql, 
   exportSqliteDatabaseBlob, 
+  getSqliteDatabaseBinary,
+  replaceAllNotesInSql,
   resetSqliteToSeed 
 } from '../services/sqliteService';
 import { Note } from '../types';
@@ -61,9 +63,33 @@ describe('SQLite Database Service', () => {
     expect(notesAfter.find(n => n.id === 'wiki-harry-potter')).toBeUndefined();
   });
 
-  it('exports SQLite database as valid binary blob', async () => {
+  it('exports SQLite database as valid binary blob and Uint8Array', async () => {
     const blob = await exportSqliteDatabaseBlob();
     expect(blob).toBeInstanceOf(Blob);
     expect(blob.size).toBeGreaterThan(10000); // SQLite minimum size is 12KB+
+
+    const binary = await getSqliteDatabaseBinary();
+    expect(binary).toBeInstanceOf(Uint8Array);
+    expect(binary.length).toBeGreaterThan(10000);
+  });
+
+  it('replaces entire vault notes cleanly in SQLite', async () => {
+    const customNotes: Note[] = [
+      {
+        id: 'wiki-replaced-1',
+        type: 'wiki',
+        title: 'Replaced Page 1',
+        content: 'Brand new page content',
+        tags: ['#New'],
+        links: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    ];
+
+    const result = await replaceAllNotesInSql(customNotes);
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe('wiki-replaced-1');
+    expect(result[0].title).toBe('Replaced Page 1');
   });
 });

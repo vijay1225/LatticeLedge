@@ -1,7 +1,13 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Note } from '../types';
-import { importSqliteDatabaseFile, exportSqliteDatabaseBlob, downloadSqliteDatabaseFile } from './sqliteService';
+import { 
+  importSqliteDatabaseFile, 
+  exportSqliteDatabaseBlob, 
+  downloadSqliteDatabaseFile,
+  getSqliteDatabaseBinary,
+  getAllNotesFromSql
+} from './sqliteService';
 
 export interface VaultSyncState {
   isConfigured: boolean;
@@ -327,6 +333,17 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
           loadedNotes = await importSqliteDatabaseFile(fileBuffer);
           lastSyncTimestamp = info.mtime || Date.now();
         }
+      } else {
+        // File does not exist in the selected folder: CREATE and WRITE it immediately!
+        try {
+          const currentBinary = await getSqliteDatabaseBinary();
+          const writeRes = await (window as any).electronAPI.writeVaultFile(selected, currentBinary, DEFAULT_VAULT_FILE);
+          if (writeRes && writeRes.mtime) {
+            lastSyncTimestamp = writeRes.mtime;
+          }
+        } catch (writeErr) {
+          console.warn('[VaultSync] Could not write initial vault file on folder binding:', writeErr);
+        }
       }
 
       // Start watching this folder
@@ -367,7 +384,18 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
         loadedNotes = await importSqliteDatabaseFile(buffer);
         lastSyncTimestamp = file.lastModified;
       } catch {
-        // File doesn't exist yet, which is normal for a fresh folder
+        // File doesn't exist yet: write current active database into it now!
+        try {
+          const currentBinary = await getSqliteDatabaseBinary();
+          const fileHandle = await dirHandle.getFileHandle(DEFAULT_VAULT_FILE, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(currentBinary);
+          await writable.close();
+          const file = await fileHandle.getFile();
+          lastSyncTimestamp = file.lastModified;
+        } catch (writeErr) {
+          console.warn('[VaultSync] Could not write initial file to browser directory:', writeErr);
+        }
       }
 
       notifyStateChanged();
@@ -596,6 +624,71 @@ export async function loadVaultDbFromFolder(): Promise<Uint8Array | null> {
   } catch (err) {
     console.warn('[VaultSync] Could not load vault DB from folder:', err);
     return null;
+  }
+}
+
+/**
+ * Explicitly save / push all current SQLite notes to lattice_vault.db in the bound folder.
+ */
+export async function pushVaultDbToFolder(): Promise<{ success: boolean; message: string; noteCount?: number }> {
+  const state = getVaultSyncState();
+  if (!state.isConfigured || !state.folderPath) {
+    return { success: false, message: 'No vault folder bound. Please connect a folder first.' };
+  }
+
+  try {
+    const binary = await getSqliteDatabaseBinary();
+    const success = await saveVaultDbToFolder(binary);
+    if (success) {
+      const allNotes = await getAllNotesFromSql();
+      return {
+        success: true,
+        message: `Saved ${allNotes.length} notes into lattice_vault.db in "${state.folderName}"!`,
+        noteCount: allNotes.length
+      };
+    }
+    return { success: false, message: 'Failed to write lattice_vault.db to folder.' };
+  } catch (err: any) {
+    return { success: false, message: `Push failed: ${err.message}` };
+  }
+}
+
+/**
+ * Explicitly pull / reload all notes from lattice_vault.db in the bound folder into SQLite & UI.
+ * If lattice_vault.db is missing in the folder, automatically pushes current notes to create it!
+ */
+export async function pullVaultDbFromFolder(): Promise<{ success: boolean; message: string; notes?: Note[] }> {
+  const state = getVaultSyncState();
+  if (!state.isConfigured || !state.folderPath) {
+    return { success: false, message: 'No vault folder bound. Please connect a folder first.' };
+  }
+
+  try {
+    const bytes = await loadVaultDbFromFolder();
+    if (!bytes || bytes.length === 0) {
+      // File does not exist yet in folder: write current notes to create it!
+      const pushRes = await pushVaultDbToFolder();
+      if (pushRes.success) {
+        return {
+          success: true,
+          message: `lattice_vault.db was missing in folder. Created and saved ${pushRes.noteCount || 0} notes into "${state.folderName}"!`
+        };
+      }
+      return { success: false, message: `lattice_vault.db was not found in folder "${state.folderName}".` };
+    }
+
+    const notes = await importSqliteDatabaseFile(bytes);
+    externalUpdateListeners.forEach(listener => {
+      try { listener(notes); } catch {}
+    });
+
+    return {
+      success: true,
+      message: `Loaded ${notes.length} notes from lattice_vault.db in "${state.folderName}"!`,
+      notes
+    };
+  } catch (err: any) {
+    return { success: false, message: `Failed to load from folder: ${err.message}` };
   }
 }
 
