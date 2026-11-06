@@ -158,7 +158,14 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - Maintained manual export/import SQLite `.db` buttons for quick ad-hoc transfers.
   - [x] 100% automated test suite passing (26 tests across vaultSyncService, sqliteService, graphBuilder, wikiLinks, aiService, and markdownViewer).
   - [x] Rebuilt native standalone Android APK (`LatticeLedger.apk`, 7.84MB) with Capacitor Filesystem and Gradle 8.14 on Java 17.
-  - [x] Built Windows Desktop Application (`LatticeLedger-Desktop.exe`, 124.5MB).
+  - [x] Built Windows Desktop Application (`LatticeLedger-Desktop.exe`, 124.7MB).
+  - [x] **Refined Single-Pane Layout & Sidebar Menu Overhaul**:
+    - Embedded the full list of Pages directly under the **Pages** menu option inside the left sidebar pane.
+    - Embedded the Quick Notes list directly under the **Quick Notes** menu option in the left sidebar pane.
+    - Integrated **Search / Ask AI** directly as a primary menu item with `Ctrl+K` trigger.
+    - Completely removed the redundant middle/secondary pane (`showPagesList` column), giving maximum distraction-free writing space across the screen.
+    - Removed the redundant "New Page" button from the sidebar (since "+ New Page" is already prominently available in the editor toolbar).
+    - Deleted temporary updated files and cleanly generated fresh `LatticeLedger-Desktop.exe` and `LatticeLedger.apk`.
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Select identical Google Drive folder on both devices to enable automatic cross-platform sync.
