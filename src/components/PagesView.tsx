@@ -8,7 +8,9 @@ import {
   Link2, 
   ArrowRight,
   X,
-  Tag
+  Tag,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { Note } from '../types';
 
@@ -16,6 +18,7 @@ interface PagesViewProps {
   pages: Note[];
   onSelectPage: (pageId: string) => void;
   onNewPage: () => void;
+  onDeletePage?: (pageId: string) => void;
   onTagClick?: (tag: string) => void;
 }
 
@@ -23,9 +26,11 @@ export const PagesView: React.FC<PagesViewProps> = ({
   pages,
   onSelectPage,
   onNewPage,
+  onDeletePage,
   onTagClick
 }) => {
   const [filterQuery, setFilterQuery] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const filteredPages = pages.filter(p => {
     if (!filterQuery.trim()) return true;
@@ -128,9 +133,56 @@ export const PagesView: React.FC<PagesViewProps> = ({
                     <Clock className="w-3 h-3 text-zinc-600" />
                     <span>{new Date(page.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                   </span>
+
+                  {onDeletePage && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDeleteId(confirmDeleteId === page.id ? null : page.id);
+                      }}
+                      className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      title="Delete Page"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
                   <ArrowRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-zinc-200 group-hover:translate-x-0.5 transition-all" />
                 </div>
               </div>
+
+              {/* Inline Delete Confirmation to prevent accidental loss */}
+              {confirmDeleteId === page.id && (
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  className="my-2.5 p-3 rounded-lg bg-rose-950/40 border border-rose-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs animate-in fade-in"
+                >
+                  <div className="flex items-center gap-2 text-rose-200">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>Delete <strong>"{page.title}"</strong>? This will remove the page and its links.</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDeletePage?.(page.id);
+                        setConfirmDeleteId(null);
+                      }}
+                      className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium text-[11px] shadow-sm active:scale-95 transition-all"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* AI Summary Section: Only rendered if AI summary exists! */}
               {hasSummary && page.summary && (

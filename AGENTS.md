@@ -177,6 +177,23 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
     - **Seamless Return Navigation**: Added "← Pages" breadcrumb button at the top of `NoteEditor` and in `SearchView` to return to the Pages list with 1 click.
     - **Mobile Bottom Navigation & Header Synchronization**: Synchronized mobile navigation to match identical center-view paradigm.
     - **Binaries Verified**: Built fresh standalone `LatticeLedger-Desktop.exe` (124.78MB) and native `LatticeLedger.apk` (7.84MB).
+  - [x] **Page Deletion, Robust Auto-Save Engine, and Mobile Touch & Pinch-to-Zoom Graph**:
+    - **Delete Page Feature**:
+      - Added page deletion in `PagesView.tsx` with an inline confirmation card to prevent accidental data loss.
+      - Added Delete button (`Trash2`) in `NoteEditor.tsx` toolbar with modal confirmation, removing the page from SQLite vault and returning to Pages list.
+      - Cleans up history navigation and automatically updates bidirectional backlinks.
+    - **Auto-Save Engine**:
+      - Real-time debounced auto-save (600ms) persisting both TipTap content edits and page title edits directly to SQLite.
+      - Added **Auto-save Toggle** button (`Auto-save: ON / OFF`) in `NoteEditor` toolbar, persisted in `localStorage`.
+      - Live visual save status badge (`● Auto-saving...`, `● Saved to SQLite (time)`, `● Unsaved changes`).
+      - Bulletproof safety flushes: automatically commits pending changes on component unmount, page switch, and window `beforeunload` to eliminate any accidental data loss.
+      - Kept manual "Save" button and `Ctrl+S` shortcut for instant explicit confirmation.
+    - **Knowledge Graph Mobile Touch & Pinch-to-Zoom**:
+      - Added native non-passive touch event listeners (`touchstart`, `touchmove`, `touchend`, `touchcancel`) with `touch-action: none`.
+      - Supports single-finger node dragging and smooth canvas panning on touchscreen/mobile.
+      - Smooth two-finger pinch-to-zoom scaling centered around the touch midpoint.
+      - Quick tap on nodes opens the Connected Notes inspector card with always-visible link navigation buttons on mobile.
+    - **Rebuilt Binaries**: Fresh standalone `LatticeLedger-Desktop.exe` (124.78MB) and `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Select identical Google Drive folder on both devices to enable automatic cross-platform sync.

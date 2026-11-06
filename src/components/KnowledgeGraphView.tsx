@@ -69,6 +69,15 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   const panStartRef = useRef({ x: 0, y: 0 });
   const hasDraggedRef = useRef(false);
 
+  // Touch & Pinch-to-Zoom refs for mobile phones & tablets
+  const touchStartTimeRef = useRef(0);
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const touchedNodeRef = useRef<D3Node | null>(null);
+  const pinchStartDistRef = useRef(0);
+  const pinchStartScaleRef = useRef(1);
+  const pinchStartTransformRef = useRef({ x: 0, y: 0, k: 1 });
+  const pinchMidpointRef = useRef({ x: 0, y: 0 });
+
   // Initialize D3 Force Simulation
   useEffect(() => {
     // Filter out quick notes or tags if user has toggled them off
@@ -524,6 +533,159 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
     setTimeout(() => setCopiedLink(false), 1500);
   };
 
+  // Native non-passive touch event listeners for phone & tablet pinch-to-zoom and touch dragging
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      hasDraggedRef.current = false;
+      const rect = canvas.getBoundingClientRect();
+
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        touchStartTimeRef.current = Date.now();
+        touchStartPosRef.current = { x: t.clientX, y: t.clientY };
+
+        const touchX = (t.clientX - rect.left - transform.x) / transform.k;
+        const touchY = (t.clientY - rect.top - transform.y) / transform.k;
+
+        let found: D3Node | null = null;
+        for (const node of nodesRef.current) {
+          if (node.x === undefined || node.y === undefined) continue;
+          const dist = Math.sqrt((touchX - node.x) ** 2 + (touchY - node.y) ** 2);
+          if (dist <= node.radius + 12) {
+            found = node;
+            break;
+          }
+        }
+
+        touchedNodeRef.current = found;
+        if (found) {
+          isDraggingNodeRef.current = found;
+          found.fx = found.x;
+          found.fy = found.y;
+          if (simulationRef.current) {
+            simulationRef.current.alphaTarget(0.2).restart();
+          }
+        } else {
+          isPanningRef.current = true;
+          panStartRef.current = { x: t.clientX - transform.x, y: t.clientY - transform.y };
+        }
+      } else if (e.touches.length === 2) {
+        if (isDraggingNodeRef.current) {
+          isDraggingNodeRef.current.fx = null;
+          isDraggingNodeRef.current.fy = null;
+          isDraggingNodeRef.current = null;
+          if (simulationRef.current) simulationRef.current.alphaTarget(0);
+        }
+        isPanningRef.current = false;
+        touchedNodeRef.current = null;
+
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        pinchStartDistRef.current = dist;
+        pinchStartScaleRef.current = transform.k;
+        pinchStartTransformRef.current = { ...transform };
+
+        const midX = (t1.clientX + t2.clientX) / 2 - rect.left;
+        const midY = (t1.clientY + t2.clientY) / 2 - rect.top;
+        pinchMidpointRef.current = { x: midX, y: midY };
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+
+      if (e.touches.length === 1 && pinchStartDistRef.current === 0) {
+        const t = e.touches[0];
+        const moveDist = Math.hypot(t.clientX - touchStartPosRef.current.x, t.clientY - touchStartPosRef.current.y);
+        if (moveDist > 6) {
+          hasDraggedRef.current = true;
+        }
+
+        if (isDraggingNodeRef.current) {
+          const touchX = (t.clientX - rect.left - transform.x) / transform.k;
+          const touchY = (t.clientY - rect.top - transform.y) / transform.k;
+          isDraggingNodeRef.current.fx = touchX;
+          isDraggingNodeRef.current.fy = touchY;
+          renderCanvas();
+        } else if (isPanningRef.current) {
+          setTransform(prev => ({
+            ...prev,
+            x: t.clientX - panStartRef.current.x,
+            y: t.clientY - panStartRef.current.y
+          }));
+        }
+      } else if (e.touches.length === 2 && pinchStartDistRef.current > 0) {
+        hasDraggedRef.current = true;
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        const zoomRatio = currentDist / pinchStartDistRef.current;
+        const newK = Math.max(0.25, Math.min(pinchStartScaleRef.current * zoomRatio, 4.0));
+
+        const currentMidX = (t1.clientX + t2.clientX) / 2 - rect.left;
+        const currentMidY = (t1.clientY + t2.clientY) / 2 - rect.top;
+        const origMidX = pinchMidpointRef.current.x;
+        const origMidY = pinchMidpointRef.current.y;
+        const startK = pinchStartTransformRef.current.k;
+
+        const newX = currentMidX - (origMidX - pinchStartTransformRef.current.x) * (newK / startK);
+        const newY = currentMidY - (origMidY - pinchStartTransformRef.current.y) * (newK / startK);
+
+        setTransform({ x: newX, y: newY, k: newK });
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      if (isDraggingNodeRef.current) {
+        isDraggingNodeRef.current.fx = null;
+        isDraggingNodeRef.current.fy = null;
+        isDraggingNodeRef.current = null;
+        if (simulationRef.current) {
+          simulationRef.current.alphaTarget(0);
+        }
+      }
+      isPanningRef.current = false;
+
+      if (e.touches.length === 0) {
+        pinchStartDistRef.current = 0;
+        const duration = Date.now() - touchStartTimeRef.current;
+        if (!hasDraggedRef.current && duration < 350) {
+          if (touchedNodeRef.current) {
+            setSelectedNode(touchedNodeRef.current);
+          } else {
+            setSelectedNode(null);
+            setContextMenu(null);
+          }
+        }
+        touchedNodeRef.current = null;
+      } else if (e.touches.length === 1) {
+        pinchStartDistRef.current = 0;
+        const t = e.touches[0];
+        panStartRef.current = { x: t.clientX - transform.x, y: t.clientY - transform.y };
+        isPanningRef.current = true;
+      }
+    };
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [transform, renderCanvas]);
+
   return (
     <div 
       ref={containerRef}
@@ -580,7 +742,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
         </button>
       </div>
 
-      {/* 2D Canvas */}
+      {/* 2D Canvas with Mobile Touch & Pinch-to-Zoom support */}
       <canvas
         ref={canvasRef}
         onWheel={handleWheel}
@@ -589,7 +751,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
         onMouseUp={handleMouseUp}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
-        className="w-full h-full cursor-grab active:cursor-grabbing block"
+        className="w-full h-full cursor-grab active:cursor-grabbing block touch-none"
+        style={{ touchAction: 'none' }}
       />
 
       {/* CONNECTED NOTES INSPECTOR CARD (Shown on Left-Click) */}
@@ -658,7 +821,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                           e.stopPropagation();
                           onSelectNode(item.node.noteId!);
                         }}
-                        className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         title="Open note in editor"
                       >
                         <ExternalLink className="w-3 h-3" />

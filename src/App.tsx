@@ -288,6 +288,25 @@ export function App() {
     deleteNoteFromSql(id).catch(e => console.warn('[SQLite] delete error:', e));
   };
 
+  const handleDeleteWikiPage = (id: string) => {
+    setNotes(prev => prev.filter(n => n.id !== id));
+    deleteNoteFromSql(id).catch(e => console.warn('[SQLite] delete page error:', e));
+
+    setHistory(prev => {
+      const filtered = prev.filter(hId => hId !== id);
+      return filtered.length > 0 ? filtered : ['wiki-harry-potter'];
+    });
+    setHistoryIndex(prev => Math.max(0, prev - 1));
+
+    if (activeNoteId === id) {
+      const remainingPages = notes.filter(n => n.type === 'wiki' && n.id !== id);
+      if (remainingPages.length > 0) {
+        setActiveNoteId(remainingPages[0].id);
+      }
+      setCurrentMode('pages');
+    }
+  };
+
   const handleRefreshAISummary = async (id: string) => {
     const target = notes.find(n => n.id === id);
     if (!target) return;
@@ -422,6 +441,7 @@ export function App() {
               pages={wikiNotes}
               onSelectPage={navigateToNote}
               onNewPage={() => handleCreateNewWikiPage()}
+              onDeletePage={handleDeleteWikiPage}
               onTagClick={() => {
                 setCurrentMode('search');
               }}
@@ -441,6 +461,7 @@ export function App() {
                   isSummaryLoading={isSummaryLoading}
                   onNavigateToNote={navigateToNote}
                   onNewPage={() => handleCreateNewWikiPage()}
+                  onDeletePage={handleDeleteWikiPage}
                   onTagClick={() => setCurrentMode('search')}
                   isFocusMode={isFocusMode}
                   onToggleFocusMode={() => setIsFocusMode(prev => !prev)}

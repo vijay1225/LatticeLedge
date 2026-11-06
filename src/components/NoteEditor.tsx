@@ -20,7 +20,11 @@ import {
   Maximize2,
   Save,
   Check,
-  ChevronLeft
+  ChevronLeft,
+  Trash2,
+  AlertTriangle,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -48,6 +52,7 @@ interface NoteEditorProps {
   onOpenSettings?: () => void;
   summaryError?: string | null;
   onBackToPages?: () => void;
+  onDeletePage?: (id: string) => void;
 }
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -64,11 +69,95 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   hasApiKey,
   onOpenSettings,
   summaryError,
-  onBackToPages
+  onBackToPages,
+  onDeletePage
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [justSaved, setJustSaved] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string>('');
+  const [localTitle, setLocalTitle] = useState(note.title);
+
+  useEffect(() => {
+    setLocalTitle(note.title);
+  }, [note.id]);
+
+  // Auto-Save Toggle (persisted in localStorage, defaults to true)
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('LATTICE_LEDGER_AUTO_SAVE');
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleAutoSave = () => {
+    setIsAutoSaveEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('LATTICE_LEDGER_AUTO_SAVE', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const pendingChangesRef = React.useRef<Partial<Note>>({});
+
+  const flushPendingSave = () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    if (Object.keys(pendingChangesRef.current).length > 0) {
+      onUpdateNote(pendingChangesRef.current);
+      pendingChangesRef.current = {};
+      setSaveStatus('saved');
+      setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }
+  };
+
+  const triggerChange = (partial: Partial<Note>) => {
+    pendingChangesRef.current = { ...pendingChangesRef.current, ...partial };
+
+    if (isAutoSaveEnabled) {
+      setSaveStatus('saving');
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      autoSaveTimerRef.current = setTimeout(() => {
+        flushPendingSave();
+      }, 600);
+    } else {
+      setSaveStatus('unsaved');
+    }
+  };
+
+  // Immediate manual save (Ctrl+S or Save button)
+  const handleManualSave = () => {
+    if (!editor) return;
+    setSaveStatus('saving');
+    const markdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
+    pendingChangesRef.current.content = markdown;
+    pendingChangesRef.current.title = localTitle;
+    flushPendingSave();
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2000);
+  };
+
+  // Safe flush on unmount, note change, or beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      flushPendingSave();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      flushPendingSave();
+    };
+  }, [note.id]);
 
   // Full-width vs standard reading width toggle (defaults to true for maximum writing space)
   const [isFullWidth, setIsFullWidth] = useState<boolean>(() => {
@@ -124,23 +213,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       }
     },
     onUpdate: ({ editor }) => {
-      // Extract clean Markdown directly from the formatted editor
+      // Extract clean Markdown directly from the formatted editor and trigger debounced auto-save
       const markdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
-      onUpdateNote({ content: markdown });
+      triggerChange({ content: markdown });
     }
   });
-
-  const handleManualSave = () => {
-    if (!editor) return;
-    setSaveStatus('saving');
-    const markdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
-    onUpdateNote({ content: markdown });
-    setTimeout(() => {
-      setSaveStatus('saved');
-      setJustSaved(true);
-      setTimeout(() => setJustSaved(false), 2000);
-    }, 200);
-  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -250,8 +327,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         <div className="flex-1 min-w-0">
           <input
             type="text"
-            value={note.title}
-            onChange={(e) => onUpdateNote({ title: e.target.value })}
+            value={localTitle}
+            onChange={(e) => {
+              setLocalTitle(e.target.value);
+              triggerChange({ title: e.target.value });
+            }}
             placeholder="Untitled Page..."
             className="w-full text-2xl lg:text-3xl font-bold bg-transparent text-zinc-100 placeholder-zinc-700 focus:outline-none tracking-tight border-none p-0"
           />
@@ -264,9 +344,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
             <span className="flex items-center gap-1 text-[11px]">
               {saveStatus === 'saving' ? (
-                <span className="text-amber-400 font-medium animate-pulse">● Saving...</span>
+                <span className="text-amber-400 font-medium animate-pulse">● Auto-saving...</span>
+              ) : saveStatus === 'unsaved' ? (
+                <span className="text-amber-400 font-medium">● Unsaved changes</span>
               ) : (
-                <span className="text-emerald-400/90 font-medium">● Saved to SQLite</span>
+                <span className="text-emerald-400/90 font-medium">● Saved to SQLite {lastSavedTime ? `(${lastSavedTime})` : ''}</span>
               )}
             </span>
 
@@ -292,8 +374,24 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
 
-        {/* Header Controls: Save, New Page, Full Width & Focus Mode */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Header Controls: Auto-save, Save, New Page, Delete, Full Width & Focus Mode */}
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+          {/* Auto-Save Toggle */}
+          <button
+            type="button"
+            onClick={toggleAutoSave}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+              isAutoSaveEnabled
+                ? 'bg-zinc-900 border-emerald-500/30 text-emerald-300'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+            }`}
+            title={isAutoSaveEnabled ? "Auto-Save is active (changes automatically save to SQLite)" : "Auto-Save is off (click to enable)"}
+          >
+            {isAutoSaveEnabled ? <ToggleRight className="w-3.5 h-3.5 text-emerald-400" /> : <ToggleLeft className="w-3.5 h-3.5 text-zinc-500" />}
+            <span className="hidden sm:inline">Auto-save: {isAutoSaveEnabled ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {/* Manual Save Button */}
           <button
             type="button"
             onClick={handleManualSave}
@@ -316,6 +414,19 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               </>
             )}
           </button>
+
+          {/* Delete Page Button */}
+          {onDeletePage && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors shadow-sm"
+              title="Delete this page"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span className="hidden sm:inline">Delete</span>
+            </button>
+          )}
 
           {onNewPage && (
             <button
@@ -362,6 +473,40 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 text-rose-400 font-semibold text-sm">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <span>Delete Page</span>
+            </div>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Are you sure you want to delete <strong>"{note.title}"</strong>? This will permanently remove this page from your SQLite vault.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  onDeletePage?.(note.id);
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-sm transition-colors active:scale-95"
+              >
+                Delete Page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ALWAYS EXPANDED AI SUMMARY CARD (Strictly <= 4 lines) */}
       <AISummaryCard
