@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Note } from '../types';
-import { importSqliteDatabaseFile } from './sqliteService';
+import { importSqliteDatabaseFile, exportSqliteDatabaseBlob, downloadSqliteDatabaseFile } from './sqliteService';
 
 export interface VaultSyncState {
   isConfigured: boolean;
@@ -13,6 +13,14 @@ export interface VaultSyncState {
   status: 'idle' | 'syncing' | 'synced' | 'error';
   errorMessage: string | null;
   autoSyncEnabled: boolean;
+}
+
+export interface VaultFolderResult {
+  success: boolean;
+  folderPath?: string;
+  folderName?: string;
+  loadedNotes?: Note[];
+  error?: string;
 }
 
 const VAULT_FOLDER_STORAGE_KEY = 'LL_VAULT_FOLDER_PATH';
@@ -128,29 +136,34 @@ function base64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
+const memoryStore = new Map<string, string>();
+
 function getStoredItem(key: string): string | null {
   try {
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem(key);
+    if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
+      const val = localStorage.getItem(key);
+      if (val !== null) return val;
     }
   } catch {}
-  return null;
+  return memoryStore.get(key) || null;
 }
 
 function setStoredItem(key: string, value: string): void {
   try {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
       localStorage.setItem(key, value);
     }
   } catch {}
+  memoryStore.set(key, value);
 }
 
 function removeStoredItem(key: string): void {
   try {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') {
       localStorage.removeItem(key);
     }
   } catch {}
+  memoryStore.delete(key);
 }
 
 // ----------------------------------------------------
@@ -173,7 +186,7 @@ export function getVaultSyncState(): VaultSyncState {
     isConfigured,
     platform,
     folderName: folderName || (folderPath ? folderPath.split(/[/\\]/).pop() || folderPath : 'Not Configured'),
-    folderPath: folderPath || (platform === 'capacitor' ? 'Documents/LatticeLedger' : ''),
+    folderPath: folderPath || '',
     fileName: DEFAULT_VAULT_FILE,
     lastSyncedAt: lastSyncTimestamp,
     status: isSyncing ? 'syncing' : (isConfigured ? 'synced' : 'idle'),
@@ -243,9 +256,10 @@ export async function initVaultSync(onExternalChange?: (notes: Note[]) => void):
 
   // 2. Android Capacitor Setup
   else if (platform === 'capacitor') {
-    const savedPath = getStoredItem(VAULT_FOLDER_STORAGE_KEY) || 'Documents/LatticeLedger';
-    setStoredItem(VAULT_FOLDER_STORAGE_KEY, savedPath);
-    setStoredItem(VAULT_FOLDER_NAME_KEY, 'LatticeLedger');
+    const savedPath = getStoredItem(VAULT_FOLDER_STORAGE_KEY);
+    if (savedPath) {
+      setStoredItem(VAULT_FOLDER_NAME_KEY, savedPath.split(/[/\\]/).pop() || savedPath);
+    }
   }
 
   // 3. Browser File System Access API Setup
@@ -287,13 +301,7 @@ export async function initVaultSync(onExternalChange?: (notes: Note[]) => void):
 // Folder Selection & Binding Actions
 // ----------------------------------------------------
 
-export async function chooseVaultFolder(): Promise<{
-  success: boolean;
-  folderPath?: string;
-  folderName?: string;
-  loadedNotes?: Note[];
-  error?: string;
-}> {
+export async function chooseVaultFolder(customMobilePath?: string): Promise<VaultFolderResult> {
   const platform = getPlatformType();
 
   try {
@@ -373,39 +381,8 @@ export async function chooseVaultFolder(): Promise<{
 
     // C. CAPACITOR ANDROID NATIVE STORAGE
     if (platform === 'capacitor') {
-      const defaultPath = 'Documents/LatticeLedger';
-      setStoredItem(VAULT_FOLDER_STORAGE_KEY, defaultPath);
-      setStoredItem(VAULT_FOLDER_NAME_KEY, 'LatticeLedger');
-
-      let loadedNotes: Note[] | undefined = undefined;
-
-      try {
-        const stat = await Filesystem.stat({
-          path: `${defaultPath}/${DEFAULT_VAULT_FILE}`,
-          directory: Directory.Documents
-        });
-        if (stat) {
-          const res = await Filesystem.readFile({
-            path: `${defaultPath}/${DEFAULT_VAULT_FILE}`,
-            directory: Directory.Documents
-          });
-          if (res.data) {
-            const raw = typeof res.data === 'string' ? base64ToUint8Array(res.data) : (res.data as any);
-            loadedNotes = await importSqliteDatabaseFile(raw);
-            lastSyncTimestamp = Date.now();
-          }
-        }
-      } catch {
-        // File does not exist yet; will be written on first save
-      }
-
-      notifyStateChanged();
-      return {
-        success: true,
-        folderPath: defaultPath,
-        folderName: 'Documents/LatticeLedger',
-        loadedNotes
-      };
+      const targetPath = customMobilePath || getStoredItem(VAULT_FOLDER_STORAGE_KEY) || 'Documents/LatticeLedger';
+      return await setMobileVaultFolder(targetPath);
     }
 
     return {
@@ -416,6 +393,99 @@ export async function chooseVaultFolder(): Promise<{
     console.error('[VaultSync] Error choosing folder:', err);
     return { success: false, error: err.message || 'Failed to select folder' };
   }
+}
+
+/**
+ * Configure and bind a specific folder on Android mobile storage.
+ */
+export async function setMobileVaultFolder(customPath: string): Promise<VaultFolderResult> {
+  const cleanPath = customPath.trim().replace(/^[/\\]+|[/\\]+$/g, '') || 'Documents/LatticeLedger';
+  setStoredItem(VAULT_FOLDER_STORAGE_KEY, cleanPath);
+  setStoredItem(VAULT_FOLDER_NAME_KEY, cleanPath.split(/[/\\]/).pop() || cleanPath);
+
+  let loadedNotes: Note[] | undefined = undefined;
+
+  if (typeof window !== 'undefined') {
+    try {
+      const stat = await Filesystem.stat({
+        path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
+        directory: Directory.Documents
+      });
+      if (stat) {
+        const res = await Filesystem.readFile({
+          path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
+          directory: Directory.Documents
+        });
+        if (res.data) {
+          const raw = typeof res.data === 'string' ? base64ToUint8Array(res.data) : (res.data as any);
+          loadedNotes = await importSqliteDatabaseFile(raw);
+          lastSyncTimestamp = Date.now();
+        }
+      }
+    } catch {
+      // If lattice_vault.db doesn't exist yet in that folder, save current active DB into it!
+      try {
+        const blob = await exportSqliteDatabaseBlob();
+        const arrayBuffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        const base64Data = uint8ArrayToBase64(bytes);
+        await Filesystem.writeFile({
+          path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
+          data: base64Data,
+          directory: Directory.Documents,
+          recursive: true
+        });
+        lastSyncTimestamp = Date.now();
+      } catch (writeErr) {
+        console.warn('[VaultSync] Could not write initial file to new mobile folder:', writeErr);
+      }
+    }
+  }
+
+  notifyStateChanged();
+  return {
+    success: true,
+    folderPath: cleanPath,
+    folderName: cleanPath,
+    loadedNotes
+  };
+}
+
+/**
+ * 1-Tap Google Drive Export & Sharing on Android / Desktop.
+ * On Android, opens the native Share sheet with "Save to Drive" / "Google Drive".
+ * On Desktop / Browser, downloads the file.
+ */
+export async function shareVaultDatabaseFile(): Promise<{ success: boolean; method: 'share' | 'download'; message?: string }> {
+  try {
+    const blob = await exportSqliteDatabaseBlob();
+    const file = new File([blob], DEFAULT_VAULT_FILE, { type: 'application/x-sqlite3' });
+    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        title: DEFAULT_VAULT_FILE,
+        text: 'LatticeLedger SQLite Database Vault for Google Drive',
+        files: [file]
+      });
+      return {
+        success: true,
+        method: 'share',
+        message: 'Share menu opened! Select "Save to Drive" to save lattice_vault.db directly into your Google Drive folder.'
+      };
+    }
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return { success: false, method: 'share', message: 'Share canceled.' };
+    }
+    console.warn('[VaultSync] Web share not available or failed:', err);
+  }
+
+  // Fallback to direct download
+  await downloadSqliteDatabaseFile();
+  return {
+    success: true,
+    method: 'download',
+    message: 'Downloaded lattice_vault.db! Save this file to your Google Drive folder.'
+  };
 }
 
 // ----------------------------------------------------

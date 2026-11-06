@@ -22,7 +22,11 @@ import {
   Sliders,
   Folder,
   FolderOpen,
-  Unlink
+  Unlink,
+  Share2,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { AIProviderConfig, Note, GeminiModelInfo } from '../types';
 import { downloadVaultBackup, importVaultFromJson } from '../utils/vaultExportImport';
@@ -30,11 +34,14 @@ import { downloadSqliteDatabaseFile, importSqliteDatabaseFile } from '../service
 import { sanitizeApiKey, fetchAvailableGeminiModels, DEFAULT_GEMINI_MODELS } from '../services/aiService';
 import {
   chooseVaultFolder,
+  setMobileVaultFolder,
+  shareVaultDatabaseFile,
   subscribeVaultSyncState,
   VaultSyncState,
   reloadVaultFromFolder,
   disconnectVaultFolder,
-  getVaultSyncState
+  getVaultSyncState,
+  saveVaultDbToFolder
 } from '../services/vaultSyncService';
 
 interface SettingsModalProps {
@@ -80,9 +87,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Vault Sync State
   const [syncState, setSyncState] = useState<VaultSyncState>(getVaultSyncState());
   const [isBindingFolder, setIsBindingFolder] = useState(false);
+  const [isEditingMobilePath, setIsEditingMobilePath] = useState(false);
+  const [mobilePathInput, setMobilePathInput] = useState(getVaultSyncState().folderPath || 'Documents/LatticeLedger');
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   useEffect(() => {
-    return subscribeVaultSyncState(setSyncState);
+    return subscribeVaultSyncState((state) => {
+      setSyncState(state);
+      if (state.folderPath) {
+        setMobilePathInput(state.folderPath);
+      }
+    });
   }, []);
 
   const sqliteInputRef = useRef<HTMLInputElement>(null);
@@ -263,6 +278,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  // Share / Export SQLite DB (.db) directly to Google Drive or download
+  const handleShareToGoogleDrive = async () => {
+    try {
+      setImportStatus('Preparing lattice_vault.db for Google Drive...');
+      const res = await shareVaultDatabaseFile();
+      setImportStatus(res.message || 'lattice_vault.db export complete!');
+      setTimeout(() => setImportStatus(null), 5000);
+    } catch (err: any) {
+      setImportStatus(`Export notice: ${err.message}`);
+      setTimeout(() => setImportStatus(null), 5000);
+    }
+  };
+
   // SQLite Database Import (.db or .sqlite)
   const handleSqliteFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -274,7 +302,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const importedNotes = await importSqliteDatabaseFile(buffer);
       if (onNotesUpdated) {
         onNotesUpdated(importedNotes);
-        setImportStatus(`Loaded SQLite database successfully (${importedNotes.length} notes).`);
+        setImportStatus(`Loaded SQLite database successfully (${importedNotes.length} notes from Google Drive)!`);
+      }
+      // Also automatically save to bound folder if one exists
+      if (syncState.isConfigured) {
+        await saveVaultDbToFolder(new Uint8Array(buffer));
       }
     } catch (err: any) {
       setImportStatus(`SQLite import error: ${err.message}`);
@@ -285,6 +317,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Vault Folder Binding (Google Drive / Local Directory)
   const handleChooseFolder = async () => {
+    if (syncState.platform === 'capacitor') {
+      setIsEditingMobilePath(true);
+      return;
+    }
+
     setIsBindingFolder(true);
     setImportStatus('Selecting vault folder (Google Drive / Local)...');
     try {
@@ -304,6 +341,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } finally {
       setIsBindingFolder(false);
       setTimeout(() => setImportStatus(null), 6000);
+    }
+  };
+
+  const handleSaveMobileFolder = async (customPath?: string) => {
+    const pathToUse = (customPath || mobilePathInput || 'Documents/LatticeLedger').trim();
+    setIsBindingFolder(true);
+    setImportStatus(`Configuring mobile vault folder: "${pathToUse}"...`);
+    try {
+      const res = await setMobileVaultFolder(pathToUse);
+      if (res.success) {
+        if (res.loadedNotes && onNotesUpdated) {
+          onNotesUpdated(res.loadedNotes);
+          setImportStatus(`Bound to "${res.folderPath}"! Loaded ${res.loadedNotes.length} notes from existing lattice_vault.db.`);
+        } else {
+          setImportStatus(`Bound to "${res.folderPath}"! lattice_vault.db is active and syncing.`);
+        }
+        setIsEditingMobilePath(false);
+      } else {
+        setImportStatus(`Failed to bind folder: ${res.error}`);
+      }
+    } catch (err: any) {
+      setImportStatus(`Mobile folder error: ${err.message}`);
+    } finally {
+      setIsBindingFolder(false);
+      setTimeout(() => setImportStatus(null), 5000);
     }
   };
 
@@ -606,12 +668,95 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             All notes are saved into an indexed <strong>SQLite database</strong> for instantaneous sub-millisecond loading and saving without loose markdown file overhead. You can share this exact same <code>lattice_vault.db</code> file across <strong>Mobile</strong> and <strong>Desktop</strong> via Google Drive or any synchronized folder.
           </p>
 
+          {/* Google Drive Cross-Device Sync Guide */}
+          <div className="p-3.5 rounded-lg bg-zinc-950/70 border border-zinc-800/90 space-y-2.5">
+            <button
+              type="button"
+              onClick={() => setIsGuideOpen(!isGuideOpen)}
+              className="w-full flex items-center justify-between text-left text-xs font-semibold text-zinc-200 hover:text-indigo-300 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-indigo-400" />
+                <span>How to Sync with Google Drive between Desktop & Phone</span>
+              </div>
+              {isGuideOpen ? <ChevronUp className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />}
+            </button>
+
+            {isGuideOpen && (
+              <div className="pt-2 text-[11px] text-zinc-400 space-y-3 leading-relaxed border-t border-zinc-800/60 animate-in fade-in">
+                <div className="flex gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-500/40 text-indigo-300 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+                  <div>
+                    <strong className="text-zinc-200">On Windows PC Desktop:</strong>
+                    <p className="text-zinc-400 mt-0.5">
+                      In Settings, click <strong>"Choose Vault Folder"</strong> and select your Google Drive folder (e.g. <code>G:\My Drive\LatticeLedger</code>). The desktop app will automatically write and monitor <code>lattice_vault.db</code>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-500/40 text-indigo-300 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">2</span>
+                  <div>
+                    <strong className="text-zinc-200">On Android Phone (1-Tap Google Drive Sync):</strong>
+                    <p className="text-zinc-400 mt-0.5">
+                      Tap <strong className="text-indigo-300">"Import from Google Drive"</strong> below → pick <code>lattice_vault.db</code> directly from the Google Drive app. All notes load instantly!
+                    </p>
+                    <p className="text-zinc-400 mt-1">
+                      To send phone edits back to Google Drive, tap <strong className="text-emerald-300">"Save / Share to Google Drive"</strong> → tap <em>"Save to Drive"</em> in the Android share menu.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-500/40 text-indigo-300 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">3</span>
+                  <div>
+                    <strong className="text-zinc-200">Continuous Auto-Sync (Optional):</strong>
+                    <p className="text-zinc-400 mt-0.5">
+                      If you use Google Drive offline sync or <em>FolderSync</em> on Android to sync a device folder (e.g. <code>Documents/LatticeLedger</code>), configure that path below. LatticeLedger will write all changes directly to that folder in real time!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Primary Google Drive 1-Tap Sync Hub */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => sqliteInputRef.current?.click()}
+              className="p-3 rounded-lg bg-zinc-950 border border-indigo-500/40 hover:border-indigo-400/70 text-left transition-all group shadow-sm active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2 text-indigo-300 font-medium text-xs">
+                <Upload className="w-4 h-4 text-indigo-400 group-hover:-translate-y-0.5 transition-transform" />
+                <span>Import from Google Drive</span>
+              </div>
+              <p className="text-[10px] text-zinc-400 mt-1 leading-normal">
+                Pick <code>lattice_vault.db</code> from Google Drive to load all your notes instantly.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleShareToGoogleDrive}
+              className="p-3 rounded-lg bg-zinc-950 border border-emerald-500/40 hover:border-emerald-400/70 text-left transition-all group shadow-sm active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2 text-emerald-300 font-medium text-xs">
+                <Share2 className="w-4 h-4 text-emerald-400 group-hover:-translate-y-0.5 transition-transform" />
+                <span>Save / Share to Google Drive</span>
+              </div>
+              <p className="text-[10px] text-zinc-400 mt-1 leading-normal">
+                Export and upload <code>lattice_vault.db</code> directly to your Google Drive folder.
+              </p>
+            </button>
+          </div>
+
           {/* Real-time Folder Binding Card */}
           <div className="p-3.5 rounded-lg bg-zinc-950 border border-zinc-800/90 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-medium text-zinc-200 text-xs">
                 <FolderSync className="w-4 h-4 text-indigo-400" />
-                <span>Google Drive / Local Vault Folder Sync</span>
+                <span>Device Synced Folder</span>
               </div>
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
                 syncState.isConfigured
@@ -621,6 +766,61 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {syncState.isConfigured ? '🟢 In Sync' : '⚪ Not Bound'}
               </span>
             </div>
+
+            {/* Mobile Folder Path Editor */}
+            {isEditingMobilePath && (
+              <div className="p-3 rounded-lg bg-zinc-900 border border-indigo-500/40 space-y-2.5 animate-in fade-in">
+                <div className="text-[11px] font-medium text-zinc-200 flex items-center justify-between">
+                  <span>Configure Device Folder Path:</span>
+                  <span className="text-[10px] text-zinc-500 font-normal">Internal Storage / Documents</span>
+                </div>
+                <input
+                  type="text"
+                  value={mobilePathInput}
+                  onChange={(e) => setMobilePathInput(e.target.value)}
+                  placeholder="e.g. Documents/LatticeLedger or Documents/GoogleDrive"
+                  className="w-full px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs font-mono focus:outline-none focus:border-indigo-500"
+                />
+                
+                {/* Preset Chips */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="text-[10px] text-zinc-500">Presets:</span>
+                  {[
+                    'Documents/LatticeLedger',
+                    'Documents/GoogleDrive',
+                    'Download/LatticeLedger'
+                  ].map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setMobilePathInput(preset)}
+                      className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 transition-colors"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveMobileFolder()}
+                    disabled={isBindingFolder}
+                    className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm"
+                  >
+                    {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    <span>Save & Bind Folder</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingMobilePath(false)}
+                    className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {syncState.isConfigured ? (
               <div className="space-y-2.5 p-3 rounded-lg bg-zinc-900/80 border border-indigo-500/30">
@@ -679,25 +879,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  Select your <strong>Google Drive folder</strong> (e.g. <code>G:\My Drive\LatticeLedger</code> on Desktop or <code>Documents/LatticeLedger</code> on Mobile). Both devices will automatically share and edit the exact same <code>lattice_vault.db</code> file.
-                </p>
+              !isEditingMobilePath && (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    Select or configure your <strong>Google Drive / Synced folder</strong> (e.g. <code>G:\My Drive\LatticeLedger</code> on Desktop or <code>Documents/LatticeLedger</code> on Mobile). Both devices will automatically share and edit the exact same <code>lattice_vault.db</code> file.
+                  </p>
 
-                <button
-                  type="button"
-                  onClick={handleChooseFolder}
-                  disabled={isBindingFolder}
-                  className="w-full py-2.5 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-md"
-                >
-                  {isBindingFolder ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  ) : (
-                    <FolderOpen className="w-4 h-4" />
-                  )}
-                  <span>Choose Vault Folder (Google Drive / Local)</span>
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={handleChooseFolder}
+                    disabled={isBindingFolder}
+                    className="w-full py-2.5 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-md"
+                  >
+                    {isBindingFolder ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    ) : (
+                      <FolderOpen className="w-4 h-4" />
+                    )}
+                    <span>{syncState.platform === 'capacitor' ? 'Configure Device Sync Folder' : 'Choose Vault Folder (Google Drive / Local)'}</span>
+                  </button>
+                </div>
+              )
             )}
           </div>
 

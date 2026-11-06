@@ -194,6 +194,24 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - Smooth two-finger pinch-to-zoom scaling centered around the touch midpoint.
       - Quick tap on nodes opens the Connected Notes inspector card with always-visible link navigation buttons on mobile.
     - **Rebuilt Binaries**: Fresh standalone `LatticeLedger-Desktop.exe` (124.78MB) and `LatticeLedger.apk` (7.84MB).
+  - [x] **Mobile Header Redundancy Cleanup & Mobile Google Drive Sync Overhaul**:
+    - **Mobile Header Redundancy Cleanup**:
+      - Completely removed duplicate `Pages (count)` and duplicate `+ Page` buttons from the mobile top header.
+      - In `'notes'` mode: sleek top bar with history navigation (`<` and `>`), `Pages` return button, note title, sync indicator dot, and Settings gear.
+      - In other modes: clean branding header with `LatticeLedger` logo + title, sync indicator dot, and Settings gear.
+      - Completely eliminated all button redundancy with `PagesView` and the mobile bottom navigation bar.
+    - **Mobile Google Drive & Vault Folder Configuration Engine**:
+      - Fixed hardcoded auto-binding bug where Android was stuck displaying "Bound to folder: Documents/LatticeLedger" without allowing changes.
+      - Added interactive **Mobile Folder Path Configuration** panel in Settings: edit custom device folder paths with 1-tap presets (`Documents/LatticeLedger`, `Documents/GoogleDrive`, `Download/LatticeLedger`).
+      - Added **Primary Google Drive 1-Tap Sync Hub**:
+        - **"Import from Google Drive"**: opens Android's document picker directly with Google Drive support, loading the `.db` instantly.
+        - **"Save / Share to Google Drive"**: invokes Android's native Share sheet with file (`lattice_vault.db`), allowing 1-tap saving to Google Drive via "Save to Drive".
+      - Added collapsible **Google Drive Cross-Device Sync Guide** right in Settings with step-by-step instructions for Windows PC and Android phone.
+      - Added clean "Disconnect" allowing users to unbind the folder at will.
+    - **Verified & Built**:
+      - 29/29 automated unit tests passing across all suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.78MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Select identical Google Drive folder on both devices to enable automatic cross-platform sync.
+  - [ ] Use 1-tap "Import from Google Drive" / "Save / Share to Google Drive" or bind synced folders to share the same `lattice_vault.db`.

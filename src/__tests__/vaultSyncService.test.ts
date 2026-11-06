@@ -4,6 +4,8 @@ import {
   getPlatformType,
   subscribeVaultSyncState,
   disconnectVaultFolder,
+  setMobileVaultFolder,
+  shareVaultDatabaseFile,
   isElectron
 } from '../services/vaultSyncService';
 
@@ -35,5 +37,24 @@ describe('Vault Sync Service', () => {
 
   it('correctly reports non-electron environment in standard test runner', () => {
     expect(isElectron()).toBe(false);
+  });
+
+  it('disconnects folder cleanly and updates isConfigured to false', async () => {
+    await disconnectVaultFolder();
+    const state = getVaultSyncState();
+    expect(state.isConfigured).toBe(false);
+    expect(state.folderPath).toBe('');
+  });
+
+  it('allows binding mobile vault folder path', async () => {
+    const res = await setMobileVaultFolder('Documents/CustomVault');
+    expect(res.success).toBe(true);
+    expect(res.folderPath).toBe('Documents/CustomVault');
+    const state = getVaultSyncState();
+    expect(state.folderPath).toBe('Documents/CustomVault');
+  });
+
+  it('provides shareVaultDatabaseFile helper function', () => {
+    expect(typeof shareVaultDatabaseFile).toBe('function');
   });
 });

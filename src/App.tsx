@@ -14,7 +14,7 @@ import {
   deleteNoteFromSql, 
   resetSqliteToSeed 
 } from './services/sqliteService';
-import { initVaultSync } from './services/vaultSyncService';
+import { initVaultSync, subscribeVaultSyncState, VaultSyncState } from './services/vaultSyncService';
 
 import { Sidebar } from './components/Sidebar';
 import { PagesView } from './components/PagesView';
@@ -108,12 +108,15 @@ export function App() {
     });
   }, [hasGeminiKey]);
 
+  const [vaultSyncState, setVaultSyncState] = useState<VaultSyncState | null>(null);
+
   // Initialize unified Vault Folder Sync (Google Drive / local directory)
   useEffect(() => {
     initVaultSync((externalNotes) => {
       console.log('[App] Vault updated externally from folder/Drive, reloading notes...');
       setNotes(externalNotes);
     });
+    return subscribeVaultSyncState(setVaultSyncState);
   }, []);
 
   useEffect(() => {
@@ -381,51 +384,73 @@ export function App() {
       {/* 2. CENTER PANE: Active Workspace (Pages, Notes, Quick, Search, Graph, Settings) */}
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-zinc-950 relative">
         {/* Mobile Header Bar */}
-        <header className="md:hidden flex items-center justify-between px-3 h-12 border-b border-zinc-800 bg-zinc-950 shrink-0">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleGoBack}
-              disabled={historyIndex <= 0}
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
-              title="Previous Note"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleGoForward}
-              disabled={historyIndex >= history.length - 1}
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
-              title="Next Note"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentMode('pages')}
-              className={`flex items-center gap-1 px-2 py-1 rounded border text-[11px] font-medium transition-colors ${
-                currentMode === 'pages'
-                  ? 'bg-zinc-800 border-zinc-700 text-indigo-300'
-                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
-              }`}
-              title="View all Pages"
-            >
-              <FileText className="w-3 h-3 text-indigo-400" />
-              <span>Pages ({wikiNotes.length})</span>
-            </button>
-          </div>
+        <header className="md:hidden flex items-center justify-between px-3.5 h-12 border-b border-zinc-800 bg-zinc-950 shrink-0">
+          {currentMode === 'notes' ? (
+            /* Note Reading / Editing Mode Header */
+            <div className="flex items-center gap-1.5 min-w-0">
+              <button
+                onClick={handleGoBack}
+                disabled={historyIndex <= 0}
+                className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
+                title="Previous Note"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleGoForward}
+                disabled={historyIndex >= history.length - 1}
+                className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
+                title="Next Note"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setCurrentMode('pages')}
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 font-medium transition-colors"
+                title="Back to Pages List"
+              >
+                <FileText className="w-3 h-3 text-indigo-400" />
+                <span>Pages</span>
+              </button>
+              {activeNote && (
+                <span className="text-[11px] text-zinc-500 truncate max-w-[140px] pl-1 font-medium">
+                  {activeNote.title || 'Untitled'}
+                </span>
+              )}
+            </div>
+          ) : (
+            /* Primary Workspace Modes (Pages, Quick, Search, Graph, Settings) */
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-600/10 border border-indigo-500/30 text-indigo-400">
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-xs tracking-tight text-zinc-100">LatticeLedger</span>
+                {currentMode !== 'pages' && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 capitalize">
+                    {currentMode === 'quick' ? 'Quick Notes' : currentMode}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span
+              className={`w-2 h-2 rounded-full transition-colors ${
+                vaultSyncState?.isConfigured
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+                  : 'bg-zinc-600'
+              }`}
+              title={vaultSyncState?.isConfigured ? 'Vault Folder Synced (lattice_vault.db)' : 'Vault Local'}
+            />
             <button
-              onClick={() => handleCreateNewWikiPage()}
-              className="flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 font-medium text-[11px] active:scale-95 transition-all shadow-sm"
-              title="Create New Page"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ Page</span>
-            </button>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Cloud Synced" />
-            <button
-              onClick={() => setCurrentMode('settings')}
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200"
+              onClick={() => setCurrentMode(currentMode === 'settings' ? 'pages' : 'settings')}
+              className={`p-1.5 rounded transition-colors ${
+                currentMode === 'settings'
+                  ? 'text-indigo-400 bg-zinc-900 border border-zinc-800'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
               title="Settings"
             >
               <SettingsIcon className="w-4 h-4" />
