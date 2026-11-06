@@ -191,7 +191,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   return (
     <div 
-      className={`flex-1 h-full overflow-y-auto flex flex-col select-text transition-all duration-150 pb-28 md:pb-12 ${
+      className={`flex-1 h-full min-h-0 overflow-y-auto block select-text transition-all duration-150 pb-36 md:pb-16 ${
         isFullWidth || isFocusMode
           ? 'w-full max-w-none px-4 sm:px-8 lg:px-12 py-5' 
           : 'max-w-4xl mx-auto px-4 sm:px-6 py-5 w-full'
@@ -495,13 +495,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       {/* TRUE IN-PLACE WYSIWYG CANVAS: Write directly in formatted text */}
       <div 
         onClick={handleEditorClick}
-        className="w-full rounded-lg bg-zinc-900/20 border border-zinc-800/70 hover:border-zinc-700/80 transition-colors cursor-text min-h-[280px] shadow-sm mb-12 overflow-visible"
+        className="w-full rounded-lg bg-zinc-900/20 border border-zinc-800/70 hover:border-zinc-700/80 transition-colors cursor-text min-h-[280px] h-auto block shadow-sm mb-12 clear-both"
       >
-        <EditorContent editor={editor} className="w-full" />
+        <EditorContent editor={editor} className="w-full h-auto block" />
       </div>
 
       {/* KNOWLEDGE CONNECTIONS HUB: OUTGOING LINKS & INCOMING BACKLINKS */}
-      <div className="mt-12 pt-6 border-t-2 border-zinc-800/90 space-y-6">
+      <div className="w-full mt-12 pt-8 border-t-2 border-zinc-800/90 space-y-6 block clear-both">
         {/* 1. Outgoing Linked Pages (Pages Referenced In This Note) */}
         <div>
           <div className="flex items-center justify-between mb-3">

@@ -36,7 +36,7 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
     : quickNotes;
 
   return (
-    <div className="flex-1 h-full overflow-y-auto px-6 lg:px-12 py-6 max-w-4xl mx-auto w-full text-xs">
+    <div className="flex-1 h-full overflow-y-auto px-4 sm:px-6 lg:px-12 py-6 pb-28 md:pb-12 max-w-4xl mx-auto w-full text-xs">
       <div className="mb-5">
         <h2 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
           <span>Quick Notes</span>

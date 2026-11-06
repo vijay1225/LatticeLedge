@@ -137,6 +137,12 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
     - Added **Custom Model ID** text input toggle allowing manual model override.
     - Updated `callGeminiWithFallback` in `aiService.ts` to automatically handle JSON-mode failure fallbacks and cycle across account-available models.
     - Auto-migrated deprecated `gemini-2.5-flash` in `localStorage` to `gemini-3.8-flash`.
+  - [x] Complete Root-Cause Elimination of Page Overflow & Text Stacking:
+    - Replaced vertical flex column (`flex flex-col`) on note scroll container with natural document block layout (`block`).
+    - Added `min-h-0 min-w-0` to flex parents in `App.tsx` ensuring browser flex layout calculations never constrict child scroll containers.
+    - Added `h-auto block clear-both` on canvas wrapper and `EditorContent` with `overflow-wrap: break-word` and `word-break: break-word` preventing text spillover.
+    - Added clear boundary margin and top padding (`mt-12 pt-8 border-t-2`) on Knowledge Connections Hub so cards strictly render below full-height note content.
+    - Extended bottom padding to `pb-36 md:pb-16` preventing any overlap with mobile bottom navigation bar.
   - [x] 100% automated test suite passing (22 tests across sqliteService, graphBuilder, wikiLinks, aiService, and markdownViewer).
   - [x] Rebuilt native standalone Android APK (`LatticeLedger.apk`, 4.96MB) with Gradle 8.14 on Java 17.
   - [x] Pushed commit to `https://github.com/vijay1225/LatticeLedge.git`.

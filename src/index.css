@@ -16,8 +16,10 @@
   font-size: 0.95rem;
   line-height: 1.75;
   min-height: 280px;
-  height: auto;
+  height: auto !important;
   box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .tiptap.ProseMirror p {
