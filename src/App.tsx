@@ -34,7 +34,6 @@ import {
   X,
   Send,
   Sparkles,
-  PanelLeftClose,
   PanelLeftOpen,
   Zap
 } from 'lucide-react';
@@ -89,7 +88,6 @@ export function App() {
   const [newPageTitle, setNewPageTitle] = useState('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-  const [showPagesList, setShowPagesList] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
 
@@ -344,10 +342,13 @@ export function App() {
                 onGoBack={handleGoBack}
                 onGoForward={handleGoForward}
                 onOpenSearch={() => setIsSearchOpen(true)}
-                onNewWikiPage={handleCreateNewWikiPage}
                 notesCount={wikiNotes.length}
                 quickNotesCount={quickNotes.length}
                 onToggleCollapse={() => setIsSidebarCollapsed(true)}
+                pages={wikiNotes}
+                quickNotes={quickNotes}
+                activeNoteId={activeNoteId}
+                onSelectNote={navigateToNote}
               />
             </div>
           ) : (
@@ -416,62 +417,7 @@ export function App() {
         {/* Content by Current View Mode */}
         <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
           {currentMode === 'notes' && (
-            <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
-              {/* Collapsible Secondary Pages List */}
-              {!isFocusMode && (
-                showPagesList ? (
-                  <div className="w-56 border-r border-zinc-800/80 bg-zinc-950/60 hidden lg:flex flex-col h-full shrink-0 text-xs">
-                    <div className="h-12 px-3 border-b border-zinc-800/60 flex items-center justify-between text-zinc-500">
-                      <span className="font-medium text-[11px] uppercase tracking-wider">
-                        Pages ({wikiNotes.length})
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleCreateNewWikiPage()}
-                          className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200"
-                          title="New Page"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setShowPagesList(false)}
-                          className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200"
-                          title="Collapse Pages List"
-                        >
-                          <PanelLeftClose className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
-                      {wikiNotes.map(n => (
-                        <button
-                          key={n.id}
-                          onClick={() => navigateToNote(n.id)}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                            activeNote?.id === n.id
-                              ? 'bg-zinc-800 text-zinc-100 font-medium'
-                              : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-3 h-3 text-zinc-500 shrink-0" />
-                            <span className="truncate">{n.title}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowPagesList(true)}
-                    className="hidden lg:flex items-center justify-center w-8 border-r border-zinc-800/80 bg-zinc-950 text-zinc-600 hover:text-zinc-300 transition-colors shrink-0"
-                    title="Show Pages List"
-                  >
-                    <PanelLeftOpen className="w-4 h-4" />
-                  </button>
-                )
-              )}
-
+            <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden w-full h-full">
               {/* Expansive Active Note Editor */}
               {activeNote ? (
                 <NoteEditor
