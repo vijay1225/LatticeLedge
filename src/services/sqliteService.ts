@@ -77,7 +77,8 @@ export async function getSqliteDatabase(): Promise<Database> {
           if (typeof window === 'undefined') {
             return `./node_modules/sql.js/dist/${file}`;
           }
-          return `/${file}`;
+          // Use relative path so it resolves correctly on file:// (Electron/Capacitor) and http://
+          return `./${file}`;
         }
       });
     } catch {
@@ -347,7 +348,7 @@ export async function importSqliteDatabaseFile(fileOrBuffer: ArrayBuffer | Uint8
   await getSqliteDatabase();
   if (!sqlModule) {
     sqlModule = await initSqlJs({
-      locateFile: (file) => (typeof window === 'undefined' ? `./node_modules/sql.js/dist/${file}` : `/${file}`)
+      locateFile: (file) => (typeof window === 'undefined' ? `./node_modules/sql.js/dist/${file}` : `./${file}`)
     });
   }
 

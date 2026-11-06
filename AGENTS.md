@@ -295,6 +295,20 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 37/37 automated unit tests passing across all suites (`assetService`, `vaultSyncService`, `sqliteService`, `graphBuilder`, `wikiLinks`, `aiService`, `markdownViewer`).
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.8MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Desktop Demo Pages Auto-Merging & SQLite WASM Protocol Fix**:
+    - **Diagnosed Root Cause of Missing Demo Pages in Packaged EXE**:
+      - When running packaged Electron apps under `file://` protocol (`file:///.../dist/index.html`), `locateFile: (file) => '/${file}'` in `sqliteService.ts` resolved to `file:///sql-wasm.wasm` (root of drive `C:\`), causing SQLite WASM init to fail.
+      - The app caught this error and fell back to `localStorage` notes cache, which in existing app runs already held the earlier 7 notes without the 3 newly added showcase notes.
+    - **Cross-Protocol SQLite WASM Locator**:
+      - Changed `locateFile` to `./${file}` (relative path) in both `getSqliteDatabase()` and `importSqliteDatabaseFile()`, allowing `sql-wasm.wasm` to resolve seamlessly under `file://` (Electron and Capacitor Android) and `http://`.
+    - **Smart Showcase Notes Auto-Merging**:
+      - Added auto-merging in `App.tsx` and `sqliteService.ts`: checks if existing cached notes contain `wiki-code-showcase`. If missing, it automatically merges the 3 demo showcase notes (`⚡ Code Snippets & Algorithms Demo`, `🖼️ Media & Video Embeds Gallery`, `📋 Markdown & Callouts Guide`) to the top of the vault.
+      - Added **"✨ Demo Pages"** action button in `PagesView.tsx` header for instant 1-click loading at any time.
+      - Added 6 new database test cases in `src/__tests__/sqliteService.test.ts` (12 database tests total).
+    - **Verified & Built**:
+      - 43/43 automated unit tests passing across all suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.79MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Use 1-tap quick sync or automatic SQLite vault folder synchronization across devices.

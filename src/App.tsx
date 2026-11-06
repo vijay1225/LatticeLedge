@@ -79,8 +79,18 @@ export function App() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return savedKey ? parsed : parsed.map((n: Note) => ({ ...n, summary: undefined }));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Check if cached notes are missing the new showcase demo notes, and merge them in
+          const hasShowcase = parsed.some((n: Note) => n.id === 'wiki-code-showcase');
+          let combined = parsed;
+          if (!hasShowcase) {
+            const demoNotes = HARRY_POTTER_SEED_NOTES.filter(n =>
+              ['wiki-code-showcase', 'wiki-media-gallery', 'wiki-markdown-callouts'].includes(n.id)
+            );
+            combined = [...demoNotes, ...parsed];
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(combined)); } catch {}
+          }
+          return savedKey ? combined : combined.map((n: Note) => ({ ...n, summary: undefined }));
         }
       }
     } catch (e) {
@@ -91,7 +101,7 @@ export function App() {
 
   // Default mode starts on 'pages' so user immediately sees all page names with AI summaries
   const [currentMode, setCurrentMode] = useState<ViewMode>('pages');
-  const [activeNoteId, setActiveNoteId] = useState<string>('wiki-harry-potter');
+  const [activeNoteId, setActiveNoteId] = useState<string>('wiki-code-showcase');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [mobileQuickText, setMobileQuickText] = useState('');
   const [newNoteModalType, setNewNoteModalType] = useState<'wiki' | 'quick'>('wiki');
@@ -104,7 +114,7 @@ export function App() {
   const hasGeminiKey = isGeminiKeyConfigured(aiConfig);
 
   // Note History Navigation (< and > like Obsidian / Logseq)
-  const [history, setHistory] = useState<string[]>(['wiki-harry-potter']);
+  const [history, setHistory] = useState<string[]>(['wiki-code-showcase']);
   const [historyIndex, setHistoryIndex] = useState(0);
 
   const handleNotesUpdated = (updatedNotes: Note[]) => {
@@ -125,8 +135,18 @@ export function App() {
   useEffect(() => {
     getAllNotesFromSql().then(sqlNotes => {
       if (sqlNotes && Array.isArray(sqlNotes)) {
+        // Auto-merge demo showcase notes if they are missing
+        const hasShowcase = sqlNotes.some(n => n.id === 'wiki-code-showcase');
+        let finalNotes = sqlNotes;
+        if (!hasShowcase && sqlNotes.length > 0) {
+          const demoNotes = HARRY_POTTER_SEED_NOTES.filter(n =>
+            ['wiki-code-showcase', 'wiki-media-gallery', 'wiki-markdown-callouts'].includes(n.id)
+          );
+          finalNotes = [...demoNotes, ...sqlNotes];
+          loadDemoShowcaseNotes().catch(() => {});
+        }
         const hasKey = isGeminiKeyConfigured(aiConfig);
-        const sanitized = hasKey ? sqlNotes : sqlNotes.map(n => ({ ...n, summary: undefined }));
+        const sanitized = hasKey ? finalNotes : finalNotes.map(n => ({ ...n, summary: undefined }));
         handleNotesUpdated(sanitized);
       }
     }).catch(err => {
