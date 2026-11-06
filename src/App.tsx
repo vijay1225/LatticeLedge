@@ -45,12 +45,19 @@ export function App() {
   const [aiConfig, setAiConfig] = useState<AIProviderConfig>(() => {
     try {
       const saved = localStorage.getItem(AI_CONFIG_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Automatically upgrade deprecated models to modern standard
+        if (parsed.modelName === 'gemini-2.5-flash') {
+          parsed.modelName = 'gemini-3.8-flash';
+        }
+        return parsed;
+      }
     } catch {}
     return {
       provider: 'gemini',
       apiKey: (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') || '' : ''),
-      modelName: 'gemini-flash-latest'
+      modelName: 'gemini-3.8-flash'
     };
   });
 

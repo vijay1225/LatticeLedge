@@ -129,7 +129,15 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
     - Implemented **instant auto-save on paste/change** so API keys are never lost when navigating away.
     - Upgraded **"Test & Verify Key"** to report exact Google API error messages (e.g. `API_KEY_INVALID`, quota limits, or network errors) and auto-save on success.
     - Added **automatic Flash model fallback** (`gemini-2.5-flash` -> `gemini-2.0-flash` -> `gemini-1.5-flash`) and key sanitization in `aiService.ts`.
-  - [x] 100% automated test suite passing (20 tests across sqliteService, graphBuilder, wikiLinks, aiService, and markdownViewer).
+  - [x] Dynamic Gemini Model Discovery & Selection (Resolved Model Availability Issues):
+    - Removed hardcoded model list in favor of dynamic Google API model fetching via `fetchAvailableGeminiModels`.
+    - Added dedicated **"Fetch Available Models"** button in Settings with 1-tap refresh.
+    - Testing an API key automatically queries Google Gemini API and populates the model dropdown with all active, permitted models for that key.
+    - Dropdown groups models into **Recommended for Note Synthesis** (e.g. `gemini-3.8-flash`, `gemini-flash-latest`, `gemini-2.5-flash-lite`, `gemini-3.5-flash`) and **Other Available Models**.
+    - Added **Custom Model ID** text input toggle allowing manual model override.
+    - Updated `callGeminiWithFallback` in `aiService.ts` to automatically handle JSON-mode failure fallbacks and cycle across account-available models.
+    - Auto-migrated deprecated `gemini-2.5-flash` in `localStorage` to `gemini-3.8-flash`.
+  - [x] 100% automated test suite passing (22 tests across sqliteService, graphBuilder, wikiLinks, aiService, and markdownViewer).
   - [x] Rebuilt native standalone Android APK (`LatticeLedger.apk`, 4.96MB) with Gradle 8.14 on Java 17.
   - [x] Pushed commit to `https://github.com/vijay1225/LatticeLedge.git`.
 - [ ] **Next Steps**:

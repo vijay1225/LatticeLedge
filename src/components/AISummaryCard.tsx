@@ -44,7 +44,7 @@ export const AISummaryCard: React.FC<AISummaryCardProps> = ({
             <span>AI Summary</span>
           </div>
           <span className={`text-[10px] ${hasApiKey ? 'text-zinc-500' : 'text-amber-400/80 font-medium'}`}>
-            {summary?.model || (hasApiKey ? 'Gemini 2.5 Flash' : 'Key Required')}
+            {summary?.model || (hasApiKey ? 'Gemini Active' : 'Key Required')}
           </span>
         </div>
 
@@ -86,7 +86,7 @@ export const AISummaryCard: React.FC<AISummaryCardProps> = ({
       {isLoading ? (
         <div className="py-2 text-zinc-400 flex items-center gap-2">
           <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
-          <span>Generating structured summary with Gemini 2.5 Flash...</span>
+          <span>Generating structured summary with Gemini AI...</span>
         </div>
       ) : errorMessage ? (
         <div className="py-1.5 text-amber-300/90 flex items-center justify-between gap-2">

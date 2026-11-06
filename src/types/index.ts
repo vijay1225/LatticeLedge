@@ -51,6 +51,14 @@ export interface AIProviderConfig {
   baseUrl?: string;
 }
 
+export interface GeminiModelInfo {
+  id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  isRecommended?: boolean;
+}
+
 export type ViewMode = 'notes' | 'quick' | 'graph' | 'settings';
 export type SearchTab = 'instant' | 'ask-ai';
 

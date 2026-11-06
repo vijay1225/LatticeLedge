@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Key, 
   Cpu, 
@@ -17,12 +17,14 @@ import {
   Eye,
   EyeOff,
   Clipboard,
-  Loader2
+  Loader2,
+  RefreshCw,
+  Sliders
 } from 'lucide-react';
-import { AIProviderConfig, Note } from '../types';
+import { AIProviderConfig, Note, GeminiModelInfo } from '../types';
 import { downloadVaultBackup, importVaultFromJson } from '../utils/vaultExportImport';
 import { downloadSqliteDatabaseFile, importSqliteDatabaseFile } from '../services/sqliteService';
-import { sanitizeApiKey } from '../services/aiService';
+import { sanitizeApiKey, fetchAvailableGeminiModels, DEFAULT_GEMINI_MODELS } from '../services/aiService';
 
 interface SettingsModalProps {
   config: AIProviderConfig;
@@ -48,8 +50,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
+  // Dynamic models state
+  const [availableModels, setAvailableModels] = useState<GeminiModelInfo[]>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('LL_AVAILABLE_MODELS');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch {}
+    return DEFAULT_GEMINI_MODELS;
+  });
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [isCustomModel, setIsCustomModel] = useState(false);
+
   const sqliteInputRef = useRef<HTMLInputElement>(null);
   const jsonInputRef = useRef<HTMLInputElement>(null);
+
+  // Check if current model exists in availableModels; if not and it's deprecated gemini-2.5-flash, upgrade
+  useEffect(() => {
+    if (modelName === 'gemini-2.5-flash') {
+      const recommended = availableModels.find(m => m.isRecommended) || availableModels[0];
+      if (recommended) {
+        setModelName(recommended.id);
+        onSaveConfig({
+          provider,
+          apiKey: sanitizeApiKey(apiKey),
+          modelName: recommended.id
+        });
+      }
+    }
+  }, [availableModels]);
 
   // Auto-save key directly whenever user modifies the key input
   const handleApiKeyChange = (val: string) => {
@@ -121,6 +154,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  // Fetch available models from Google for this key
+  const handleFetchModels = async (keyOverride?: string) => {
+    const keyToUse = sanitizeApiKey(keyOverride || apiKey);
+    if (!keyToUse) {
+      setTestStatus('error');
+      setTestDetails('Please paste or enter your Gemini API key first to fetch models.');
+      return;
+    }
+
+    setIsFetchingModels(true);
+    setTestDetails('Fetching available models from Google for this key...');
+
+    try {
+      const models = await fetchAvailableGeminiModels(keyToUse);
+      if (models && models.length > 0) {
+        setAvailableModels(models);
+        
+        // If current model is not in available models or is deprecated, select the top recommended model
+        const currentInList = models.some(m => m.id === modelName || m.name === modelName);
+        if (!currentInList || modelName === 'gemini-2.5-flash') {
+          const recommended = models.find(m => m.isRecommended) || models[0];
+          setModelName(recommended.id);
+          onSaveConfig({
+            provider,
+            apiKey: keyToUse,
+            modelName: recommended.id
+          });
+        }
+        setTestStatus('success');
+        setTestDetails(`Successfully fetched ${models.length} active models from Google for your account!`);
+      } else {
+        setTestDetails('No models returned. Using default models list.');
+      }
+    } catch (err: any) {
+      setTestStatus('error');
+      setTestDetails(`Failed to fetch models: ${err?.message || 'Check network connection or API key.'}`);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
   const handleTestKey = async () => {
     const cleanKey = sanitizeApiKey(apiKey);
     if (!cleanKey) {
@@ -144,8 +218,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         if (typeof window !== 'undefined') {
           localStorage.setItem('LL_GEMINI_API_KEY', cleanKey);
         }
-        setTestStatus('success');
-        setTestDetails('Gemini API Key Verified & Saved! Ready for AI Summaries & Search.');
+        
+        // Auto-fetch models right away!
+        await handleFetchModels(cleanKey);
       } else {
         const errorJson = await response.json().catch(() => null);
         const serverMsg = errorJson?.error?.message || response.statusText || 'Verification failed';
@@ -218,6 +293,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     e.target.value = '';
   };
 
+  const recommendedModels = availableModels.filter(m => m.isRecommended);
+  const otherModels = availableModels.filter(m => !m.isRecommended);
+
   return (
     <div className="flex-1 h-full overflow-y-auto px-4 sm:px-6 lg:px-12 py-8 max-w-2xl mx-auto w-full text-xs">
       <div className="mb-6">
@@ -226,7 +304,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <Sparkles className="w-4 h-4 text-indigo-400" />
         </h2>
         <p className="text-xs text-zinc-500 mt-0.5">
-          Manage your Gemini AI Key, high-speed SQLite database engine, and Google Drive vault.
+          Manage your Gemini AI Key, fetch active models, configure SQLite engine, and sync Google Drive vault.
         </p>
       </div>
 
@@ -260,7 +338,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => handleApiKeyChange(e.target.value)}
-                placeholder="Paste AIzaSy... key here"
+                placeholder="Paste AIzaSy... or AQ... key here"
                 className="w-full pl-3 pr-20 py-2.5 rounded-lg bg-zinc-950 border border-zinc-700/80 text-zinc-100 text-xs font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-inner"
               />
               <div className="absolute right-2 flex items-center gap-1">
@@ -283,18 +361,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            {/* Test & Save Key Action Buttons */}
+            {/* Test, Fetch Models & Save Key Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap pt-1">
               <button
                 type="button"
                 onClick={handleTestKey}
-                disabled={testStatus === 'testing'}
+                disabled={testStatus === 'testing' || isFetchingModels}
                 className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 shadow-sm"
               >
                 {testStatus === 'testing' ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Testing Key with Google...</span>
+                    <span>Verifying & Fetching Models...</span>
                   </>
                 ) : (
                   <>
@@ -306,13 +384,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <button
                 type="button"
+                onClick={() => handleFetchModels()}
+                disabled={isFetchingModels || testStatus === 'testing'}
+                className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-indigo-300 text-xs font-medium flex items-center gap-1.5 border border-indigo-500/30 transition-colors shadow-sm disabled:opacity-50"
+                title="Fetch all active models available for your Google Gemini API key"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isFetchingModels ? 'animate-spin' : ''}`} />
+                <span>{isFetchingModels ? 'Fetching Models...' : 'Fetch Available Models'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => handleManualSave()}
-                className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 border border-zinc-700 transition-colors"
+                className="px-3 py-1.5 rounded-md bg-zinc-850 hover:bg-zinc-800 text-zinc-200 text-xs font-medium flex items-center gap-1.5 border border-zinc-700 transition-colors"
               >
                 {saveSuccess ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-300">Key Saved</span>
+                    <span className="text-emerald-300">Saved</span>
                   </>
                 ) : (
                   <>
@@ -323,7 +412,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
-            {/* Verification Status Feedback Banner */}
+            {/* Verification & Fetch Status Feedback Banner */}
             {testDetails && (
               <div className={`p-2.5 rounded-lg text-[11px] leading-relaxed border flex items-start gap-2 animate-in fade-in ${
                 testStatus === 'success' 
@@ -334,31 +423,75 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}>
                 {testStatus === 'success' && <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />}
                 {testStatus === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />}
-                {testStatus === 'testing' && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0 mt-0.5" />}
+                {(testStatus === 'testing' || isFetchingModels) && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0 mt-0.5" />}
                 <div className="flex-1 font-medium">{testDetails}</div>
               </div>
             )}
           </div>
 
-          {/* Model Selection */}
+          {/* Dynamic Model Selection */}
           <div className="pt-2 border-t border-zinc-800/80 space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-[11px] font-medium text-zinc-400 flex items-center gap-1.5">
-                <Cpu className="w-3 h-3 text-indigo-400" />
-                <span>Preferred Gemini Model</span>
+              <label className="text-[11px] font-medium text-zinc-300 flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Selected Gemini Model ({availableModels.length} available)</span>
               </label>
-              <span className="text-[10px] text-zinc-500">Auto-fallback supported</span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModel(!isCustomModel)}
+                  className="text-[10px] text-zinc-400 hover:text-indigo-300 flex items-center gap-1 underline"
+                >
+                  <Sliders className="w-2.5 h-2.5" />
+                  <span>{isCustomModel ? 'Pick from List' : 'Custom Model ID'}</span>
+                </button>
+              </div>
             </div>
-            <select
-              value={modelName}
-              onChange={(e) => handleModelChange(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs focus:outline-none focus:border-zinc-700"
-            >
-              <option value="gemini-flash-latest">gemini-flash-latest (Recommended - Always active & up-to-date)</option>
-              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Ultra fast, lightweight)</option>
-              <option value="gemini-pro-latest">gemini-pro-latest (High reasoning, latest Pro)</option>
-              <option value="gemini-2.5-flash">gemini-2.5-flash (Legacy Flash)</option>
-            </select>
+
+            {isCustomModel ? (
+              <div className="space-y-1">
+                <input
+                  type="text"
+                  value={modelName}
+                  onChange={(e) => handleModelChange(e.target.value)}
+                  placeholder="e.g. gemini-3.8-flash or fine-tuned-model"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-700/80 text-zinc-100 text-xs font-mono focus:outline-none focus:border-indigo-500"
+                />
+                <span className="text-[10px] text-zinc-500 block">
+                  Enter any valid model name supported by your Gemini API key.
+                </span>
+              </div>
+            ) : (
+              <select
+                value={modelName}
+                onChange={(e) => handleModelChange(e.target.value)}
+                className="w-full px-2.5 py-2 rounded-lg bg-zinc-950 border border-zinc-700/80 text-zinc-100 text-xs focus:outline-none focus:border-indigo-500 font-mono shadow-inner"
+              >
+                {recommendedModels.length > 0 && (
+                  <optgroup label="Recommended for Note Synthesis">
+                    {recommendedModels.map(m => (
+                      <option key={m.id} value={m.id}>
+                        ★ {m.displayName}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {otherModels.length > 0 && (
+                  <optgroup label="Other Available Models">
+                    {otherModels.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            )}
+            
+            <p className="text-[10px] text-zinc-500 leading-normal">
+              Tap <strong>Fetch Available Models</strong> to query Google and populate all active models your key has permission to use.
+            </p>
           </div>
 
           {/* Provider Selection */}

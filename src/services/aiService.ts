@@ -1,5 +1,16 @@
 import { GoogleGenAI } from '@google/genai';
-import { Note, AISummary, AIProviderConfig } from '../types';
+import { Note, AISummary, AIProviderConfig, GeminiModelInfo } from '../types';
+
+export type { GeminiModelInfo };
+
+export const DEFAULT_GEMINI_MODELS: GeminiModelInfo[] = [
+  { id: 'gemini-3.8-flash', name: 'models/gemini-3.8-flash', displayName: 'Gemini 3.8 Flash (Current Standard - Recommended)', isRecommended: true },
+  { id: 'gemini-flash-latest', name: 'models/gemini-flash-latest', displayName: 'Gemini Flash Latest (Auto-Updating)', isRecommended: true },
+  { id: 'gemini-2.5-flash-lite', name: 'models/gemini-2.5-flash-lite', displayName: 'Gemini 2.5 Flash-Lite (High Speed)', isRecommended: true },
+  { id: 'gemini-3.5-flash', name: 'models/gemini-3.5-flash', displayName: 'Gemini 3.5 Flash', isRecommended: true },
+  { id: 'gemini-pro-latest', name: 'models/gemini-pro-latest', displayName: 'Gemini Pro Latest (High Reasoning)' },
+  { id: 'gemini-2.5-flash', name: 'models/gemini-2.5-flash', displayName: 'Gemini 2.5 Flash (Legacy Flash)' }
+];
 
 /**
  * Strips leading/trailing quotes, backticks, and whitespace from API keys.
@@ -46,19 +57,120 @@ export function isGeminiKeyConfigured(config?: AIProviderConfig): boolean {
 }
 
 /**
+ * Dynamically queries Google Gemini API to fetch all active models available for the given API key.
+ */
+export async function fetchAvailableGeminiModels(rawKey?: string): Promise<GeminiModelInfo[]> {
+  const apiKey = sanitizeApiKey(rawKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null));
+  if (!apiKey) return DEFAULT_GEMINI_MODELS;
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+    if (!response.ok) {
+      const errorJson = await response.json().catch(() => null);
+      throw new Error(errorJson?.error?.message || `Failed to fetch models (HTTP ${response.status})`);
+    }
+
+    const data = await response.json();
+    if (!data.models || !Array.isArray(data.models)) {
+      return DEFAULT_GEMINI_MODELS;
+    }
+
+    // Filter models that support content generation
+    const candidateModels: GeminiModelInfo[] = data.models
+      .filter((m: any) => {
+        const methods = m.supportedGenerationMethods || [];
+        const hasGen = methods.includes('generateContent');
+        if (!hasGen) return false;
+
+        const name = (m.name || '').toLowerCase();
+        // Exclude specialized non-chat/non-summary models
+        if (
+          name.includes('tts') ||
+          name.includes('embedding') ||
+          name.includes('image') ||
+          name.includes('transcribe') ||
+          name.includes('clip') ||
+          name.includes('lyria') ||
+          name.includes('robotics') ||
+          name.includes('computer-use')
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((m: any) => {
+        const id = m.name.replace(/^models\//, '');
+        const isRecommended = id.includes('3.8-flash') || id.includes('flash-latest') || id.includes('2.5-flash-lite') || id.includes('3.5-flash');
+        return {
+          id,
+          name: m.name,
+          displayName: m.displayName ? `${m.displayName} (${id})` : id,
+          description: m.description,
+          isRecommended
+        };
+      });
+
+    if (candidateModels.length === 0) {
+      return DEFAULT_GEMINI_MODELS;
+    }
+
+    // Sort: recommended first, then alphabetical by displayName
+    candidateModels.sort((a, b) => {
+      if (a.isRecommended && !b.isRecommended) return -1;
+      if (!a.isRecommended && b.isRecommended) return 1;
+      return a.displayName.localeCompare(b.displayName);
+    });
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('LL_AVAILABLE_MODELS', JSON.stringify(candidateModels));
+      } catch {}
+    }
+
+    return candidateModels;
+  } catch (err: any) {
+    console.warn('[Gemini API] Failed to fetch live models from Google, using defaults:', err.message);
+    return DEFAULT_GEMINI_MODELS;
+  }
+}
+
+/**
  * Executes a Gemini request with automatic fallback across available Flash models
- * (e.g., gemini-flash-latest -> gemini-2.5-flash-lite -> gemini-3.8-flash -> gemini-2.5-flash).
+ * (e.g., user selected model -> gemini-3.8-flash -> gemini-flash-latest -> gemini-2.5-flash-lite -> gemini-3.5-flash).
  */
 async function callGeminiWithFallback(
   ai: GoogleGenAI,
   preferredModel: string,
   params: { contents: any; config?: any }
 ): Promise<{ text: string; usedModel: string }> {
+  // Read any saved models from localStorage
+  let savedModels: string[] = [];
+  try {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('LL_AVAILABLE_MODELS');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          savedModels = parsed.map((m: any) => m.id || m.name?.replace(/^models\//, '')).filter(Boolean);
+        }
+      }
+    }
+  } catch {}
+
+  const normalizedPreferred = preferredModel.replace(/^models\//, '');
   const candidateModels = Array.from(new Set([
+    normalizedPreferred,
     preferredModel,
-    'gemini-flash-latest',
-    'gemini-2.5-flash-lite',
     'gemini-3.8-flash',
+    'models/gemini-3.8-flash',
+    'gemini-flash-latest',
+    'models/gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'models/gemini-2.5-flash-lite',
+    'gemini-3.5-flash',
+    'models/gemini-3.5-flash',
+    ...savedModels,
+    'gemini-pro-latest',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash'
@@ -67,6 +179,7 @@ async function callGeminiWithFallback(
   let lastError: any = null;
 
   for (const model of candidateModels) {
+    // 1. Try with requested config (e.g. application/json)
     try {
       const response = await ai.models.generateContent({
         model,
@@ -80,17 +193,37 @@ async function callGeminiWithFallback(
     } catch (err: any) {
       lastError = err;
       const msg = (err?.message || '').toLowerCase();
+
+      // If config (e.g. responseMimeType) failed on this model, retry plain text on same model
+      if (params.config && (msg.includes('mime') || msg.includes('schema') || msg.includes('notsupported') || msg.includes('invalid argument'))) {
+        try {
+          const plainResponse = await ai.models.generateContent({
+            model,
+            contents: params.contents
+          });
+          return {
+            text: plainResponse.text || '',
+            usedModel: model
+          };
+        } catch (innerErr) {
+          lastError = innerErr;
+        }
+      }
+
       // If the error is model not found, deprecated, unsupported, or unavailable to new users, fallback to next model
       if (
         msg.includes('not found') || 
         msg.includes('404') || 
         msg.includes('unsupported') || 
         msg.includes('is not supported') ||
-        msg.includes('no longer available')
+        msg.includes('no longer available') ||
+        msg.includes('not available') ||
+        msg.includes('does not exist')
       ) {
         console.warn(`[Gemini API] Model ${model} not available on this key/project, attempting next fallback:`, err.message);
         continue;
       }
+      
       // If error is permission or invalid key, rethrow immediately
       throw err;
     }
@@ -114,7 +247,7 @@ export async function generateNoteSummary(
     throw new Error('Gemini API key is required. Please configure your Gemini API key in Settings.');
   }
 
-  const modelName = config?.modelName || 'gemini-flash-latest';
+  const modelName = config?.modelName || 'gemini-3.8-flash';
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `You are a high-speed knowledge synthesizer for LatticeLedger note-taking application.
@@ -208,7 +341,7 @@ export async function queryKnowledgeBase(
     };
   }
 
-  const modelName = config?.modelName || 'gemini-flash-latest';
+  const modelName = config?.modelName || 'gemini-3.8-flash';
   const ai = new GoogleGenAI({ apiKey });
   const context = relevantNotes.map(n => `--- Note: ${n.title} (${n.type}) ---\n${n.content}\n`).join('\n');
 
