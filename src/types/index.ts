@@ -59,7 +59,7 @@ export interface GeminiModelInfo {
   isRecommended?: boolean;
 }
 
-export type ViewMode = 'notes' | 'quick' | 'graph' | 'settings';
+export type ViewMode = 'pages' | 'notes' | 'quick' | 'search' | 'graph' | 'settings';
 export type SearchTab = 'instant' | 'ask-ai';
 
 export interface ContextualSuggestion {

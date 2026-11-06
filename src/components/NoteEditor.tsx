@@ -19,7 +19,8 @@ import {
   FoldHorizontal,
   Maximize2,
   Save,
-  Check
+  Check,
+  ChevronLeft
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -46,6 +47,7 @@ interface NoteEditorProps {
   hasApiKey?: boolean;
   onOpenSettings?: () => void;
   summaryError?: string | null;
+  onBackToPages?: () => void;
 }
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -61,7 +63,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onToggleFocusMode,
   hasApiKey,
   onOpenSettings,
-  summaryError
+  summaryError,
+  onBackToPages
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
@@ -226,6 +229,22 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           : 'max-w-4xl mx-auto px-4 sm:px-6 py-5 w-full'
       }`}
     >
+      {/* Back to Pages Breadcrumb */}
+      {onBackToPages && (
+        <div className="mb-2.5 flex items-center gap-1.5 text-xs text-zinc-500">
+          <button
+            onClick={onBackToPages}
+            className="flex items-center gap-1 text-zinc-400 hover:text-indigo-300 font-medium transition-colors"
+            title="Return to Pages list"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Pages</span>
+          </button>
+          <span className="text-zinc-700">/</span>
+          <span className="text-zinc-400 truncate max-w-[260px]">{note.title || 'Untitled'}</span>
+        </div>
+      )}
+
       {/* Title Bar */}
       <div className="mb-3 flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">

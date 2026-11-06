@@ -17,10 +17,11 @@ import {
 import { initVaultSync } from './services/vaultSyncService';
 
 import { Sidebar } from './components/Sidebar';
+import { PagesView } from './components/PagesView';
 import { NoteEditor } from './components/NoteEditor';
 import { QuickNotesFeed } from './components/QuickNotesFeed';
+import { SearchView } from './components/SearchView';
 import { KnowledgeGraphView } from './components/KnowledgeGraphView';
-import { SearchModal } from './components/SearchModal';
 import { SettingsModal } from './components/SettingsModal';
 import { RightPane } from './components/RightPane';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -47,7 +48,6 @@ export function App() {
       const saved = localStorage.getItem(AI_CONFIG_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Automatically upgrade deprecated models to modern standard
         if (parsed.modelName === 'gemini-2.5-flash') {
           parsed.modelName = 'gemini-3.8-flash';
         }
@@ -68,7 +68,6 @@ export function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // If no key configured, ensure no old fake summaries remain
           return savedKey ? parsed : parsed.map((n: Note) => ({ ...n, summary: undefined }));
         }
       }
@@ -78,12 +77,11 @@ export function App() {
     return HARRY_POTTER_SEED_NOTES;
   });
 
-  const [currentMode, setCurrentMode] = useState<ViewMode>('notes');
+  // Default mode starts on 'pages' so user immediately sees all page names with AI summaries
+  const [currentMode, setCurrentMode] = useState<ViewMode>('pages');
   const [activeNoteId, setActiveNoteId] = useState<string>('wiki-harry-potter');
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [mobileQuickText, setMobileQuickText] = useState('');
-  const [isMobilePagesOpen, setIsMobilePagesOpen] = useState(false);
   const [newNoteModalType, setNewNoteModalType] = useState<'wiki' | 'quick'>('wiki');
   const [newPageTitle, setNewPageTitle] = useState('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
@@ -141,7 +139,7 @@ export function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setIsSearchOpen(prev => !prev);
+        setCurrentMode(prev => prev === 'search' ? 'pages' : 'search');
       } else if (e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault();
         handleGoBack();
@@ -151,14 +149,18 @@ export function App() {
       } else if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
         e.preventDefault();
         setIsSidebarCollapsed(prev => !prev);
-      } else if (e.key === 'Escape' && isFocusMode) {
-        setIsFocusMode(false);
+      } else if (e.key === 'Escape') {
+        if (isFocusMode) {
+          setIsFocusMode(false);
+        } else if (currentMode === 'search') {
+          setCurrentMode('pages');
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [historyIndex, history, isFocusMode]);
+  }, [historyIndex, history, isFocusMode, currentMode]);
 
   const navigateToNote = (titleOrId: string) => {
     let target = notes.find(n => n.id === titleOrId);
@@ -248,7 +250,6 @@ export function App() {
     saveNoteToSql(newPage).catch(e => console.warn('[SQLite] save error:', e));
     setActiveNoteId(newPage.id);
     setCurrentMode('notes');
-    setIsMobilePagesOpen(false);
 
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newPage.id);
@@ -319,7 +320,7 @@ export function App() {
     setActiveNoteId('wiki-harry-potter');
     setHistory(['wiki-harry-potter']);
     setHistoryIndex(0);
-    setCurrentMode('notes');
+    setCurrentMode('pages');
   };
 
   const wikiNotes = notes.filter(n => n.type === 'wiki');
@@ -329,7 +330,7 @@ export function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-zinc-800 selection:text-white">
-      {/* 1. LEFT PANE: Master Navigation & Mode Switcher */}
+      {/* 1. LEFT PANE: Master Navigation & Mode Switcher (Fixed menu buttons, no nested expanding lists) */}
       {!isFocusMode && (
         <>
           {!isSidebarCollapsed ? (
@@ -341,14 +342,9 @@ export function App() {
                 canGoForward={historyIndex < history.length - 1}
                 onGoBack={handleGoBack}
                 onGoForward={handleGoForward}
-                onOpenSearch={() => setIsSearchOpen(true)}
                 notesCount={wikiNotes.length}
                 quickNotesCount={quickNotes.length}
                 onToggleCollapse={() => setIsSidebarCollapsed(true)}
-                pages={wikiNotes}
-                quickNotes={quickNotes}
-                activeNoteId={activeNoteId}
-                onSelectNote={navigateToNote}
               />
             </div>
           ) : (
@@ -363,7 +359,7 @@ export function App() {
         </>
       )}
 
-      {/* 2. CENTER PANE: Active Workspace */}
+      {/* 2. CENTER PANE: Active Workspace (Pages, Notes, Quick, Search, Graph, Settings) */}
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-zinc-950 relative">
         {/* Mobile Header Bar */}
         <header className="md:hidden flex items-center justify-between px-3 h-12 border-b border-zinc-800 bg-zinc-950 shrink-0">
@@ -385,8 +381,12 @@ export function App() {
               <ChevronRight className="w-5 h-5" />
             </button>
             <button
-              onClick={() => setIsMobilePagesOpen(prev => !prev)}
-              className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[11px] font-medium text-zinc-300 hover:text-white"
+              onClick={() => setCurrentMode('pages')}
+              className={`flex items-center gap-1 px-2 py-1 rounded border text-[11px] font-medium transition-colors ${
+                currentMode === 'pages'
+                  ? 'bg-zinc-800 border-zinc-700 text-indigo-300'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
+              }`}
               title="View all Pages"
             >
               <FileText className="w-3 h-3 text-indigo-400" />
@@ -416,9 +416,21 @@ export function App() {
 
         {/* Content by Current View Mode */}
         <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
+          {/* 1. PAGES VIEW: Lists all wiki page names with AI summaries (or just names if no summary) */}
+          {currentMode === 'pages' && (
+            <PagesView
+              pages={wikiNotes}
+              onSelectPage={navigateToNote}
+              onNewPage={() => handleCreateNewWikiPage()}
+              onTagClick={() => {
+                setCurrentMode('search');
+              }}
+            />
+          )}
+
+          {/* 2. NOTES VIEW: In-Place Live WYSIWYG Editor for active note */}
           {currentMode === 'notes' && (
             <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden w-full h-full">
-              {/* Expansive Active Note Editor */}
               {activeNote ? (
                 <NoteEditor
                   key={activeNote.id}
@@ -429,33 +441,52 @@ export function App() {
                   isSummaryLoading={isSummaryLoading}
                   onNavigateToNote={navigateToNote}
                   onNewPage={() => handleCreateNewWikiPage()}
-                  onTagClick={() => {
-                    setIsSearchOpen(true);
-                  }}
+                  onTagClick={() => setCurrentMode('search')}
                   isFocusMode={isFocusMode}
                   onToggleFocusMode={() => setIsFocusMode(prev => !prev)}
                   hasApiKey={hasGeminiKey}
                   onOpenSettings={() => setCurrentMode('settings')}
                   summaryError={summaryError}
+                  onBackToPages={() => setCurrentMode('pages')}
                 />
               ) : (
-                <div className="flex-1 flex items-center justify-center text-zinc-600 text-xs">
-                  Select or create a page to begin.
+                <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 text-xs gap-3">
+                  <FileText className="w-8 h-8 text-zinc-700" />
+                  <span>No note selected.</span>
+                  <button
+                    onClick={() => setCurrentMode('pages')}
+                    className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium"
+                  >
+                    View All Pages
+                  </button>
                 </div>
               )}
             </div>
           )}
 
+          {/* 3. QUICK NOTES VIEW: Stream of fleeting scratchpad notes */}
           {currentMode === 'quick' && (
             <QuickNotesFeed
               quickNotes={quickNotes}
               onAddQuickNote={handleAddQuickNote}
               onDeleteQuickNote={handleDeleteQuickNote}
               onPromoteToWiki={handlePromoteQuickNote}
-              onTagClick={() => setIsSearchOpen(true)}
+              onTagClick={() => setCurrentMode('search')}
             />
           )}
 
+          {/* 4. SEARCH VIEW: In-Place Middle Workspace Search & Ask AI (Not a popup modal!) */}
+          {currentMode === 'search' && (
+            <SearchView
+              notes={notes}
+              onSelectNote={navigateToNote}
+              aiConfig={aiConfig}
+              onOpenSettings={() => setCurrentMode('settings')}
+              onBackToPages={() => setCurrentMode('pages')}
+            />
+          )}
+
+          {/* 5. KNOWLEDGE GRAPH VIEW: 2D Interactive Force-Directed Graph */}
           {currentMode === 'graph' && (
             <KnowledgeGraphView
               graphData={graphData}
@@ -463,6 +494,7 @@ export function App() {
             />
           )}
 
+          {/* 6. SETTINGS VIEW: Directly inside middle space */}
           {currentMode === 'settings' && (
             <SettingsModal
               config={aiConfig}
@@ -497,71 +529,11 @@ export function App() {
       <MobileBottomNav
         currentMode={currentMode}
         onSelectMode={setCurrentMode}
-        onOpenSearch={() => setIsSearchOpen(true)}
         onOpenQuickCapture={() => {
           setNewNoteModalType(currentMode === 'quick' ? 'quick' : 'wiki');
           setIsQuickCaptureOpen(true);
         }}
       />
-
-      {/* Mobile Pages Drawer Modal */}
-      {isMobilePagesOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm pt-14 px-3 pb-20 animate-in fade-in duration-150">
-          <div className="w-full max-w-sm rounded-xl bg-zinc-900 border border-zinc-800 shadow-2xl flex flex-col max-h-[75vh] overflow-hidden">
-            <div className="flex items-center justify-between p-3 border-b border-zinc-800 bg-zinc-950/80">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
-                <FileText className="w-4 h-4 text-indigo-400" />
-                <span>Wiki Pages ({wikiNotes.length})</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => {
-                    handleCreateNewWikiPage();
-                    setIsMobilePagesOpen(false);
-                  }}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-600/30 text-indigo-300 text-xs font-medium border border-indigo-500/40 active:scale-95 transition-all"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ New Page</span>
-                </button>
-                <button
-                  onClick={() => setIsMobilePagesOpen(false)}
-                  className="p-1 rounded text-zinc-500 hover:text-zinc-300"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {wikiNotes.map(n => (
-                <button
-                  key={n.id}
-                  onClick={() => {
-                    navigateToNote(n.id);
-                    setIsMobilePagesOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg text-xs transition-colors flex items-center justify-between ${
-                    activeNote?.id === n.id
-                      ? 'bg-zinc-800 text-indigo-300 font-medium border border-indigo-500/20'
-                      : 'text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <FileText className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                    <span className="truncate">{n.title}</span>
-                  </div>
-                  {n.links?.length > 0 && (
-                    <span className="text-[10px] text-zinc-600 shrink-0 font-mono">
-                      {n.links.length} 🔗
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Mobile Create Bottom Sheet (Wiki Page vs Quick Scratchpad) */}
       {isQuickCaptureOpen && (
@@ -661,17 +633,8 @@ export function App() {
           </div>
         </div>
       )}
-
-      {/* Global Search Modal (Dual-Tab: Instant Search vs. Ask AI) */}
-      <SearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        notes={notes}
-        onSelectNote={navigateToNote}
-        aiConfig={aiConfig}
-        onOpenSettings={() => setCurrentMode('settings')}
-      />
     </div>
   );
 }
+
 export default App;
