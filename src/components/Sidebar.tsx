@@ -9,7 +9,9 @@ import {
   Search,
   Sparkles, 
   Layers, 
-  PanelLeftClose
+  PanelLeftClose,
+  CloudOff,
+  RefreshCw
 } from 'lucide-react';
 import { ViewMode } from '../types';
 
@@ -23,6 +25,10 @@ interface SidebarProps {
   notesCount: number;
   quickNotesCount: number;
   onToggleCollapse?: () => void;
+  isOnline?: boolean;
+  isSyncing?: boolean;
+  onQuickSync?: () => void;
+  syncConfigured?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -34,7 +40,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onGoForward,
   notesCount,
   quickNotesCount,
-  onToggleCollapse
+  onToggleCollapse,
+  isOnline = true,
+  isSyncing = false,
+  onQuickSync,
+  syncConfigured = false
 }) => {
   return (
     <aside className="w-56 border-r border-zinc-800/80 bg-zinc-950 flex flex-col h-full shrink-0 select-none text-xs">
@@ -173,13 +183,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Cloud Sync Status & Settings Footer */}
-      <div className="p-2 border-t border-zinc-800/80 space-y-1">
-        <div className="flex items-center justify-between px-2 py-1 text-[11px] text-zinc-500">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-zinc-400 text-[11px]">Vault SQLite</span>
+      <div className="p-2 border-t border-zinc-800/80 space-y-1.5">
+        <div className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] transition-colors ${
+          !isOnline
+            ? 'bg-amber-950/40 border-amber-600/40 text-amber-300'
+            : 'bg-zinc-900 border-zinc-800/80 text-zinc-400'
+        }`}>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {!isOnline ? (
+              <>
+                <CloudOff className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-[10px] font-medium text-amber-400 truncate">File not synced (Offline)</span>
+              </>
+            ) : (
+              <>
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  syncConfigured ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-600'
+                }`} />
+                <span className="text-[10px] text-zinc-300 truncate">
+                  {syncConfigured ? 'Google Drive Synced' : 'Vault Local'}
+                </span>
+              </>
+            )}
           </div>
-          <span className="text-[10px] text-zinc-500">Auto-Sync</span>
+
+          <button
+            type="button"
+            onClick={onQuickSync}
+            disabled={isSyncing}
+            className="p-1 rounded text-zinc-400 hover:text-indigo-300 hover:bg-zinc-800 transition-colors shrink-0"
+            title={!isOnline ? "Offline: cannot sync to cloud" : "Sync Now with Google Drive"}
+          >
+            <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-indigo-400' : ''}`} />
+          </button>
         </div>
 
         {/* Settings */}

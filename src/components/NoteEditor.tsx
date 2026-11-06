@@ -53,6 +53,7 @@ interface NoteEditorProps {
   summaryError?: string | null;
   onBackToPages?: () => void;
   onDeletePage?: (id: string) => void;
+  isOnline?: boolean;
 }
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -70,7 +71,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onOpenSettings,
   summaryError,
   onBackToPages,
-  onDeletePage
+  onDeletePage,
+  isOnline = true
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -351,6 +353,16 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 <span className="text-emerald-400/90 font-medium">● Saved to SQLite {lastSavedTime ? `(${lastSavedTime})` : ''}</span>
               )}
             </span>
+
+            {isOnline === false && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-950/60 border border-amber-600/40 px-2 py-0.5 rounded-full font-medium shadow-sm animate-pulse"
+                title="Internet is offline. Edits are saved to local SQLite, but not synced to Google Drive until connected."
+              >
+                <AlertTriangle className="w-3 h-3 text-amber-400" />
+                <span>File not synced (Offline)</span>
+              </span>
+            )}
 
             {note.tags.map((t, idx) => (
               <span

@@ -228,6 +228,20 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 31/31 automated unit tests passing across all suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.78MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **1-Tap Quick Header Sync & Offline "File Not Synced" Indicators**:
+    - **Header & Sidebar 1-Tap Quick Sync Action**:
+      - Users do not need to open Settings to sync changes.
+      - Desktop: Added 1-click Cloud Sync button & live sync status in the Left Sidebar footer (`Google Drive Synced` / `Sync to Folder` / `RefreshCw`).
+      - Mobile: Added direct 1-tap Cloud Sync button in the top navigation header (`Cloud` / `RefreshCw`), instantly executing cloud sync / drive share in 1 touch.
+    - **Real-Time Offline Awareness (`navigator.onLine` & Event Listeners)**:
+      - Automatically detects network connectivity state via `online` and `offline` window event listeners.
+      - When offline, header and sidebar clearly display: `⚠️ File not synced (Offline)` with amber warning highlight.
+      - Inside `NoteEditor.tsx`, the save status badge explicitly informs the user: `● Saved to SQLite (time) | ⚠️ File not synced (Offline)` so users know their local notes are 100% saved in SQLite while Google Drive sync is queued/paused until internet returns.
+      - Dismissible sync notification banner informing users when sync succeeds or when offline warning is active.
+    - **Verified & Built**:
+      - 31/31 automated unit tests passing.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
+      - Fresh native Android APK: `LatticeLedger.apk`.
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Use 1-tap "Import from Google Drive" / "Save / Share to Google Drive" or bind synced folders to share the same `lattice_vault.db`.
+  - [ ] Use 1-tap quick sync or automatic SQLite vault folder synchronization across devices.
