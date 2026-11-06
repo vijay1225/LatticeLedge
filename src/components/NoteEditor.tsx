@@ -43,7 +43,7 @@ import { AISummaryCard } from './AISummaryCard';
 import { findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
 import { CustomCodeBlockNode, CustomImageNode, CustomVideoNode } from './editor/editorExtensions';
 import { InsertMediaModal } from './editor/InsertMediaModal';
-import { saveAsset, getYoutubeEmbedUrl } from '../services/assetService';
+import { saveAsset, getYoutubeEmbedUrl, isVideoEmbedUrl, isYoutubeShort } from '../services/assetService';
 
 interface NoteEditorProps {
   note: Note;
@@ -233,6 +233,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         const items = event.clipboardData?.items;
         if (items) {
           for (let i = 0; i < items.length; i++) {
+            // 1. Paste Image File
             if (items[i].type.startsWith('image/')) {
               const file = items[i].getAsFile();
               if (file) {
@@ -252,14 +253,56 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 return true;
               }
             }
+
+            // 2. Paste Video File (MP4, WebM, etc.)
+            if (items[i].type.startsWith('video/')) {
+              const file = items[i].getAsFile();
+              if (file) {
+                event.preventDefault();
+                saveAsset(file).then(({ assetPath }) => {
+                  if (view.state.schema.nodes.video) {
+                    const tr = view.state.tr.replaceSelectionWith(
+                      view.state.schema.nodes.video.create({
+                        src: assetPath,
+                        controls: true,
+                        isYoutube: false
+                      })
+                    );
+                    view.dispatch(tr);
+                  }
+                });
+                return true;
+              }
+            }
           }
         }
+
+        // 3. Paste Standalone YouTube, Shorts, or Video Link
+        const text = event.clipboardData?.getData('text/plain')?.trim();
+        if (text && isVideoEmbedUrl(text)) {
+          event.preventDefault();
+          const embedUrl = getYoutubeEmbedUrl(text);
+          const isShort = isYoutubeShort(text);
+          if (view.state.schema.nodes.video) {
+            const tr = view.state.tr.replaceSelectionWith(
+              view.state.schema.nodes.video.create({
+                src: embedUrl,
+                isYoutube: true,
+                isShort
+              })
+            );
+            view.dispatch(tr);
+            return true;
+          }
+        }
+
         return false;
       },
       handleDrop: (view, event) => {
         const files = event.dataTransfer?.files;
         if (files && files.length > 0) {
           const file = files[0];
+          // Drop image
           if (file.type.startsWith('image/')) {
             event.preventDefault();
             const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
@@ -272,6 +315,27 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                     src: assetPath,
                     alt: file.name,
                     title: file.name
+                  })
+                );
+                view.dispatch(tr);
+              }
+            });
+            return true;
+          }
+
+          // Drop video
+          if (file.type.startsWith('video/')) {
+            event.preventDefault();
+            const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+            saveAsset(file).then(({ assetPath }) => {
+              if (view.state.schema.nodes.video) {
+                const pos = coordinates ? coordinates.pos : view.state.selection.from;
+                const tr = view.state.tr.insert(
+                  pos,
+                  view.state.schema.nodes.video.create({
+                    src: assetPath,
+                    controls: true,
+                    isYoutube: false
                   })
                 );
                 view.dispatch(tr);
@@ -378,7 +442,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     if (!editor) return;
     if (isEmbed) {
       const embedUrl = getYoutubeEmbedUrl(src);
-      editor.chain().focus().insertContent(`\n<iframe src="${embedUrl}" allowfullscreen></iframe>\n`).run();
+      const isShort = isYoutubeShort(src);
+      editor.chain().focus().insertContent(`\n<iframe src="${embedUrl}" ${isShort ? 'data-is-short="true"' : ''} allowfullscreen></iframe>\n`).run();
     } else {
       editor.chain().focus().insertContent(`\n<video src="${src}" controls></video>\n`).run();
     }

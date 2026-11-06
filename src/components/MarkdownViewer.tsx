@@ -10,7 +10,7 @@ import {
   Terminal,
   X
 } from 'lucide-react';
-import { isVideoEmbedUrl, getYoutubeEmbedUrl } from '../services/assetService';
+import { isVideoEmbedUrl, getYoutubeEmbedUrl, isYoutubeShort } from '../services/assetService';
 
 interface MarkdownViewerProps {
   content: string;
@@ -188,6 +188,36 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
       const src = imgMatch[2];
       const title = imgMatch[3];
 
+      // Auto-detect if image src is actually a video or video embed URL
+      if (isVideoEmbedUrl(src)) {
+        const embedUrl = getYoutubeEmbedUrl(src);
+        const isShort = isYoutubeShort(src);
+        elements.push(
+          <div key={`embed-${i}`} className={`my-4 rounded-xl border border-zinc-800 bg-black overflow-hidden shadow-lg ${
+            isShort ? 'aspect-[9/16] max-w-[340px] mx-auto w-full' : 'aspect-video w-full'
+          }`}>
+            <iframe
+              src={embedUrl}
+              className="w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        );
+        continue;
+      }
+
+      if (src.endsWith('.mp4') || src.endsWith('.webm') || src.endsWith('.mov')) {
+        elements.push(
+          <div key={`vid-${i}`} className="my-4 rounded-xl border border-zinc-800 bg-black overflow-hidden shadow-lg text-center">
+            <video controls src={src} className="max-h-[460px] w-full object-contain bg-black">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        );
+        continue;
+      }
+
       elements.push(
         <div key={`img-${i}`} className="my-4 text-center">
           <img
@@ -208,7 +238,26 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
       continue;
     }
 
-    // 5. HTML Video Tag: <video src="..." ...></video>
+    // 5. Standalone Video / YouTube URL on its own line
+    if (isVideoEmbedUrl(trimmed)) {
+      const embedUrl = getYoutubeEmbedUrl(trimmed);
+      const isShort = isYoutubeShort(trimmed);
+      elements.push(
+        <div key={`auto-embed-${i}`} className={`my-4 rounded-xl border border-zinc-800 bg-black overflow-hidden shadow-lg ${
+          isShort ? 'aspect-[9/16] max-w-[340px] mx-auto w-full' : 'aspect-video w-full'
+        }`}>
+          <iframe
+            src={embedUrl}
+            className="w-full h-full border-0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      );
+      continue;
+    }
+
+    // 6. HTML Video Tag: <video src="..." ...></video>
     if (trimmed.startsWith('<video') && trimmed.includes('src=')) {
       const srcMatch = trimmed.match(/src=["'](.*?)["']/);
       if (srcMatch) {
@@ -223,13 +272,17 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
       }
     }
 
-    // 6. HTML Iframe / YouTube embed: <iframe src="..." ...></iframe>
+    // 7. HTML Iframe / YouTube embed: <iframe src="..." ...></iframe>
     if (trimmed.startsWith('<iframe') && trimmed.includes('src=')) {
       const srcMatch = trimmed.match(/src=["'](.*?)["']/);
       if (srcMatch) {
-        const embedUrl = isVideoEmbedUrl(srcMatch[1]) ? getYoutubeEmbedUrl(srcMatch[1]) : srcMatch[1];
+        const rawSrc = srcMatch[1];
+        const embedUrl = isVideoEmbedUrl(rawSrc) ? getYoutubeEmbedUrl(rawSrc) : rawSrc;
+        const isShort = isYoutubeShort(rawSrc) || trimmed.includes('data-is-short="true"');
         elements.push(
-          <div key={`iframe-${i}`} className="my-4 rounded-xl border border-zinc-800 bg-black overflow-hidden shadow-lg aspect-video w-full">
+          <div key={`iframe-${i}`} className={`my-4 rounded-xl border border-zinc-800 bg-black overflow-hidden shadow-lg ${
+            isShort ? 'aspect-[9/16] max-w-[340px] mx-auto w-full' : 'aspect-video w-full'
+          }`}>
             <iframe
               src={embedUrl}
               className="w-full h-full border-0"

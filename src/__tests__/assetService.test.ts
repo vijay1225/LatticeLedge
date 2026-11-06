@@ -3,6 +3,10 @@ import {
   sanitizeFileName, 
   isVideoEmbedUrl, 
   getYoutubeEmbedUrl,
+  isYoutubeShort,
+  extractYoutubeVideoId,
+  getYoutubeThumbnailUrl,
+  isVideoUrl,
   saveAsset,
   resolveAssetUrl
 } from '../services/assetService';
@@ -21,8 +25,39 @@ describe('Asset Service', () => {
   it('identifies video embed links accurately', () => {
     expect(isVideoEmbedUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(true);
     expect(isVideoEmbedUrl('https://youtu.be/dQw4w9WgXcQ')).toBe(true);
+    expect(isVideoEmbedUrl('https://www.youtube.com/shorts/vxmv3snAkig')).toBe(true);
     expect(isVideoEmbedUrl('https://vimeo.com/12345678')).toBe(true);
     expect(isVideoEmbedUrl('https://example.com/assets/video.mp4')).toBe(false);
+  });
+
+  it('detects YouTube Shorts specifically', () => {
+    expect(isYoutubeShort('https://www.youtube.com/shorts/vxmv3snAkig')).toBe(true);
+    expect(isYoutubeShort('https://youtube.com/shorts/vxmv3snAkig?feature=share')).toBe(true);
+    expect(isYoutubeShort('https://youtu.be/shorts/vxmv3snAkig')).toBe(true);
+    expect(isYoutubeShort('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(false);
+    expect(isYoutubeShort('https://vimeo.com/123456')).toBe(false);
+  });
+
+  it('extracts YouTube Video IDs across formats including Shorts', () => {
+    expect(extractYoutubeVideoId('https://www.youtube.com/shorts/vxmv3snAkig')).toBe('vxmv3snAkig');
+    expect(extractYoutubeVideoId('https://youtube.com/shorts/vxmv3snAkig?si=123')).toBe('vxmv3snAkig');
+    expect(extractYoutubeVideoId('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(extractYoutubeVideoId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(extractYoutubeVideoId('https://www.youtube.com/embed/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(extractYoutubeVideoId('https://www.youtube.com/live/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+  });
+
+  it('generates YouTube thumbnail URLs', () => {
+    const thumb = getYoutubeThumbnailUrl('https://www.youtube.com/shorts/vxmv3snAkig');
+    expect(thumb).toBe('https://img.youtube.com/vi/vxmv3snAkig/hqdefault.jpg');
+  });
+
+  it('transforms YouTube Shorts into proper embed URLs', () => {
+    const shortsUrl = 'https://www.youtube.com/shorts/vxmv3snAkig';
+    expect(getYoutubeEmbedUrl(shortsUrl)).toBe('https://www.youtube.com/embed/vxmv3snAkig');
+
+    const shortsWithParams = 'https://youtube.com/shorts/vxmv3snAkig?feature=share';
+    expect(getYoutubeEmbedUrl(shortsWithParams)).toBe('https://www.youtube.com/embed/vxmv3snAkig');
   });
 
   it('transforms YouTube and Vimeo URLs into proper embed URLs', () => {
@@ -37,6 +72,13 @@ describe('Asset Service', () => {
 
     const alreadyEmbed = getYoutubeEmbedUrl('https://www.youtube.com/embed/dQw4w9WgXcQ');
     expect(alreadyEmbed).toBe('https://www.youtube.com/embed/dQw4w9WgXcQ');
+  });
+
+  it('identifies direct and embed video URLs with isVideoUrl', () => {
+    expect(isVideoUrl('https://www.youtube.com/shorts/vxmv3snAkig')).toBe(true);
+    expect(isVideoUrl('https://cdn.example.com/recording.mp4')).toBe(true);
+    expect(isVideoUrl('assets/asset-12345-demo.webm')).toBe(true);
+    expect(isVideoUrl('https://example.com/image.png')).toBe(false);
   });
 
   it('returns external URLs as-is in resolveAssetUrl', async () => {

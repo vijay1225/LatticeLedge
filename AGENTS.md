@@ -309,6 +309,24 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 43/43 automated unit tests passing across all suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.79MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **YouTube Shorts Support, Live In-Modal Video Preview & Dual Link/Upload Media Hub**:
+    - **YouTube Shorts Engine (`assetService.ts`)**:
+      - Added `extractYoutubeVideoId` supporting YouTube Shorts (`youtube.com/shorts/<id>`), standard watch (`?v=`), short links (`youtu.be/`), embeds, and live streams.
+      - Added `isYoutubeShort` and `getYoutubeThumbnailUrl`.
+      - Automatically transforms Shorts URLs (e.g. `https://www.youtube.com/shorts/vxmv3snAkig`) into responsive embed URLs (`https://www.youtube.com/embed/vxmv3snAkig`).
+    - **Dual Link/Upload Media Modal Overhaul (`InsertMediaModal.tsx`)**:
+      - Solved "asking for MP4" friction: for videos, prominently defaults to the **Video Link** tab (`🔗 Video Link (YouTube, Shorts, MP4)`) while keeping **Upload Video File** (`📁 Upload Video File (assets/)`) clearly available.
+      - **Live In-Modal Video Preview**: pasting or entering any video URL (YouTube, YouTube Shorts, Vimeo, or MP4/WebM) renders an instant live video preview right inside the modal with detected metadata badges.
+      - 1-Tap **"Paste from Clipboard"** button next to the input for instant pasting on desktop and mobile.
+      - Quick demo chip pills: ⚡ *Try YouTube Short* (loads `https://www.youtube.com/shorts/vxmv3snAkig`) and 🎬 *Try YouTube Landscape*.
+    - **Responsive Shorts Display in TipTap WYSIWYG & Reading View**:
+      - `VideoNodeView.tsx`: renders YouTube Shorts in portrait vertical 9:16 aspect ratio (`max-w-[340px] aspect-[9/16] mx-auto rounded-xl`) instead of stretching in 16:9, with hover badge and external link button.
+      - `MarkdownViewer.tsx`: auto-detects Shorts in iframes, markdown image tags, and standalone video URLs, rendering them with responsive 9:16 portrait players.
+      - Drag-and-drop & paste support for local video files (MP4, WebM) directly in the editor canvas.
+    - **Verified & Built**:
+      - 51/51 automated unit tests passing across all 7 test suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.79MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Use 1-tap quick sync or automatic SQLite vault folder synchronization across devices.

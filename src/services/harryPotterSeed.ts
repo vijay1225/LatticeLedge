@@ -186,8 +186,14 @@ Click on any of the images below to open the **fullscreen modal Lightbox with in
 ---
 
 ## 2. Responsive YouTube & Video Embeds
-LatticeLedger automatically detects video links (YouTube, Vimeo, or local MP4 files) and embeds a responsive 16:9 player with full audio/video controls:
+LatticeLedger automatically detects video links: **YouTube Shorts (9:16 vertical)**, **standard YouTube (16:9 landscape)**, **Vimeo**, and **local MP4/WebM files in assets/**:
 
+### ⚡ YouTube Short (9:16 Vertical Portrait)
+YouTube Shorts are automatically detected and rendered with an authentic vertical mobile ratio:
+
+<iframe src="https://www.youtube.com/embed/vxmv3snAkig" data-is-short="true" allowfullscreen></iframe>
+
+### 🎬 Standard YouTube Video (16:9 Landscape)
 <iframe src="https://www.youtube.com/embed/26p_7q7k5n8" allowfullscreen></iframe>
 
 ---

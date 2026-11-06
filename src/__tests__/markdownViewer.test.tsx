@@ -52,4 +52,32 @@ describe('MarkdownViewer Component', () => {
     expect(screen.getByText('bold concept')).toBeDefined();
     expect(screen.getByText('inline code')).toBeDefined();
   });
+
+  it('renders YouTube Shorts embeds with responsive iframe', () => {
+    const markdown = `Check out this short:
+<iframe src="https://www.youtube.com/shorts/vxmv3snAkig" data-is-short="true" allowfullscreen></iframe>`;
+
+    const { container } = render(<MarkdownViewer content={markdown} />);
+    const iframe = container.querySelector('iframe');
+    expect(iframe).toBeDefined();
+    expect(iframe?.getAttribute('src')).toBe('https://www.youtube.com/embed/vxmv3snAkig');
+  });
+
+  it('auto-embeds standalone YouTube Shorts link into video player', () => {
+    const markdown = `https://www.youtube.com/shorts/vxmv3snAkig`;
+
+    const { container } = render(<MarkdownViewer content={markdown} />);
+    const iframe = container.querySelector('iframe');
+    expect(iframe).toBeDefined();
+    expect(iframe?.getAttribute('src')).toBe('https://www.youtube.com/embed/vxmv3snAkig');
+  });
+
+  it('renders HTML5 video elements', () => {
+    const markdown = `<video src="assets/demo.mp4" controls></video>`;
+
+    const { container } = render(<MarkdownViewer content={markdown} />);
+    const video = container.querySelector('video');
+    expect(video).toBeDefined();
+    expect(video?.getAttribute('src')).toBe('assets/demo.mp4');
+  });
 });

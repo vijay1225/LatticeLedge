@@ -71,6 +71,11 @@ export const CustomVideoNode = Node.create({
       },
       isYoutube: {
         default: false,
+      },
+      isShort: {
+        default: false,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-is-short') === 'true' || Boolean(element.getAttribute('src')?.includes('/shorts/')),
+        renderHTML: (attributes) => attributes.isShort ? { 'data-is-short': 'true' } : {}
       }
     };
   },
@@ -82,25 +87,32 @@ export const CustomVideoNode = Node.create({
         getAttrs: (element: HTMLElement) => ({
           src: element.getAttribute('src') || element.querySelector('source')?.getAttribute('src'),
           controls: element.hasAttribute('controls'),
-          isYoutube: false
+          isYoutube: false,
+          isShort: false
         })
       },
       {
         tag: 'iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="vimeo.com"]',
-        getAttrs: (element: HTMLElement) => ({
-          src: element.getAttribute('src'),
-          isYoutube: true
-        })
+        getAttrs: (element: HTMLElement) => {
+          const src = element.getAttribute('src');
+          const isShort = element.getAttribute('data-is-short') === 'true' || Boolean(src && src.includes('/shorts/'));
+          return {
+            src,
+            isYoutube: true,
+            isShort
+          };
+        }
       }
     ];
   },
 
   renderHTML({ HTMLAttributes }) {
     if (HTMLAttributes.isYoutube || HTMLAttributes.src?.includes('youtube') || HTMLAttributes.src?.includes('youtu.be')) {
+      const isShort = Boolean(HTMLAttributes.isShort || HTMLAttributes.src?.includes('/shorts/'));
       return [
         'iframe',
         mergeAttributes(HTMLAttributes, {
-          class: 'aspect-video w-full rounded-xl',
+          class: isShort ? 'aspect-[9/16] max-w-[340px] mx-auto w-full rounded-xl' : 'aspect-video w-full rounded-xl',
           allowfullscreen: 'true'
         })
       ];

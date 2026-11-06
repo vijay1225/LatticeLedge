@@ -245,43 +245,118 @@ export async function resolveAssetUrl(src: string): Promise<string> {
 }
 
 /**
- * Check if a URL is a YouTube or Vimeo embed link.
+ * Check if a URL is a YouTube, Vimeo, or standard video embed link.
  */
 export function isVideoEmbedUrl(url: string): boolean {
   if (!url) return false;
+  const clean = url.trim().toLowerCase();
   return (
-    url.includes('youtube.com') ||
-    url.includes('youtu.be') ||
-    url.includes('vimeo.com')
+    clean.includes('youtube.com') ||
+    clean.includes('youtu.be') ||
+    clean.includes('vimeo.com')
   );
 }
 
 /**
- * Convert any YouTube watch URL or share link to an embeddable URL.
+ * Check if a URL is a direct video link or embeddable video URL.
+ */
+export function isVideoUrl(url: string): boolean {
+  if (!url) return false;
+  if (isVideoEmbedUrl(url)) return true;
+  const clean = url.trim().toLowerCase();
+  return (
+    clean.endsWith('.mp4') ||
+    clean.endsWith('.webm') ||
+    clean.endsWith('.mov') ||
+    clean.endsWith('.ogg') ||
+    clean.includes('/assets/asset-') && (clean.includes('.mp4') || clean.includes('.webm'))
+  );
+}
+
+/**
+ * Check if a URL is specifically a YouTube Shorts video link.
+ * Matches:
+ *  - https://www.youtube.com/shorts/VIDEO_ID
+ *  - https://youtube.com/shorts/VIDEO_ID?feature=share
+ *  - https://youtu.be/shorts/VIDEO_ID
+ */
+export function isYoutubeShort(url: string): boolean {
+  if (!url) return false;
+  const clean = url.trim();
+  return Boolean(
+    clean.includes('/shorts/') ||
+    clean.match(/(?:youtube\.com|youtu\.be)\/shorts\/[a-zA-Z0-9_-]+/i)
+  );
+}
+
+/**
+ * Extract YouTube Video ID from any format:
+ * - Shorts: https://www.youtube.com/shorts/vxmv3snAkig
+ * - Standard Watch: https://www.youtube.com/watch?v=vxmv3snAkig
+ * - Share URL: https://youtu.be/vxmv3snAkig
+ * - Embed: https://www.youtube.com/embed/vxmv3snAkig
+ * - Live: https://www.youtube.com/live/vxmv3snAkig
+ */
+export function extractYoutubeVideoId(url: string): string | null {
+  if (!url) return null;
+  const clean = url.trim();
+
+  // 1. YouTube Shorts: /shorts/VIDEO_ID
+  const shortsMatch = clean.match(/(?:youtube\.com|youtu\.be)\/shorts\/([a-zA-Z0-9_-]{6,15})/i);
+  if (shortsMatch) return shortsMatch[1];
+
+  // 2. Standard Watch URL: ?v=VIDEO_ID or &v=VIDEO_ID
+  const watchMatch = clean.match(/[?&]v=([a-zA-Z0-9_-]{6,15})/i);
+  if (watchMatch) return watchMatch[1];
+
+  // 3. Short URL: youtu.be/VIDEO_ID
+  const shortMatch = clean.match(/youtu\.be\/([a-zA-Z0-9_-]{6,15})/i);
+  if (shortMatch) return shortMatch[1];
+
+  // 4. Embed URL: /embed/VIDEO_ID
+  const embedMatch = clean.match(/(?:youtube\.com|youtu\.be)\/embed\/([a-zA-Z0-9_-]{6,15})/i);
+  if (embedMatch) return embedMatch[1];
+
+  // 5. Live Stream URL: /live/VIDEO_ID
+  const liveMatch = clean.match(/(?:youtube\.com|youtu\.be)\/live\/([a-zA-Z0-9_-]{6,15})/i);
+  if (liveMatch) return liveMatch[1];
+
+  return null;
+}
+
+/**
+ * Get YouTube video thumbnail image URL (high resolution fallback to medium).
+ */
+export function getYoutubeThumbnailUrl(url: string): string | null {
+  const videoId = extractYoutubeVideoId(url);
+  if (!videoId) return null;
+  return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+}
+
+/**
+ * Convert any YouTube URL (Shorts, standard watch, share, live) or Vimeo link into a secure, responsive embed URL.
  */
 export function getYoutubeEmbedUrl(url: string): string {
   if (!url) return '';
-  if (url.includes('youtube.com/embed/')) return url;
+  const clean = url.trim();
 
-  // Handles https://www.youtube.com/watch?v=VIDEO_ID
-  const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]+)/);
-  if (watchMatch) {
-    return `https://www.youtube.com/embed/${watchMatch[1]}`;
+  // YouTube (including Shorts!)
+  const ytId = extractYoutubeVideoId(clean);
+  if (ytId) {
+    return `https://www.youtube.com/embed/${ytId}`;
   }
 
-  // Handles https://youtu.be/VIDEO_ID
-  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
-  if (shortMatch) {
-    return `https://www.youtube.com/embed/${shortMatch[1]}`;
-  }
+  // Already an embed URL
+  if (clean.includes('youtube.com/embed/')) return clean;
 
-  // Handles Vimeo https://vimeo.com/VIDEO_ID
-  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  // Vimeo https://vimeo.com/VIDEO_ID
+  const vimeoMatch = clean.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|)(\d+)/i) || clean.match(/vimeo\.com\/(\d+)/i);
   if (vimeoMatch) {
-    return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    const vimeoId = vimeoMatch[3] || vimeoMatch[1];
+    return `https://player.vimeo.com/video/${vimeoId}`;
   }
 
-  return url;
+  return clean;
 }
 
 function inferMimeType(fileName: string): string {
