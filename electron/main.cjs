@@ -25,6 +25,15 @@ function createWindow() {
   // Remove default menu bar for clean modern appearance (Alt key can still toggle or custom controls)
   mainWindow.setMenuBarVisibility(false);
 
+  // Forward renderer console logs to main process for diagnostics
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level >= 2) {
+      console.error(`[Renderer Error] ${message} (${sourceId}:${line})`);
+    } else {
+      console.log(`[Renderer] ${message}`);
+    }
+  });
+
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
     mainWindow.loadURL(devServerUrl);

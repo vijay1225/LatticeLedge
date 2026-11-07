@@ -350,6 +350,23 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 58/58 automated unit tests passing across all 8 test suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
       - Fresh native Android APK: `LatticeLedger.apk`.
+  - [x] **Resolved `[[` Black Screen Crash & Full Defensive Hardening**:
+    - **Diagnosed Root Cause**:
+      - When typing `[[`, if any note in the vault had an undefined/null title, non-string tag, or if `coordsAtPos` returned unusual caret bounds, unhandled JavaScript errors in `NoteEditor` and `WikiLinkSuggestionPopup` caused React 18 to unmount the entire component tree, resulting in an empty DOM over the dark `#09090b` background (a pitch black screen).
+    - **Global React ErrorBoundary & Note Editor Isolation (`ErrorBoundary.tsx`)**:
+      - Created a dedicated `ErrorBoundary` component with clean error message reporting, recovery action, and app restart options.
+      - Wrapped the root application in `src/main.tsx` and wrapped `<NoteEditor>` in `src/App.tsx`, guaranteeing that a component error will NEVER cause a black screen.
+      - Added global `window.onerror` and `window.onunhandledrejection` handlers in `main.tsx`.
+      - Added renderer console message forwarding in `electron/main.cjs`.
+    - **Deep Null Safety Across All Data Utilities**:
+      - `WikiLinkSuggestionPopup.tsx`: Wrapped component body in a safe try/catch; fully defensive `cleanQuery = (query || '').trim().toLowerCase()`; validated notes, string tags, and numeric viewport coordinates with robust fallbacks.
+      - `NoteEditor.tsx`: Robust checks for `(allNotes || [])`, safe caret coordinate calculation with fallback bounds `{ left: 40, top: 120, bottom: 140 }`, and safe title checks `(n.title || '').toLowerCase()`.
+      - `graphBuilder.ts`: Hardened against notes with missing titles, non-string tags, or missing link arrays.
+      - `wikiLinks.ts`: Hardened `findBacklinks` and `findRelatedQuickNotes` against null titles, undefined links, and malformed tags.
+    - **Verified & Built**:
+      - 59/59 automated unit tests passing across all 8 test suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
+      - Fresh native Android APK: `LatticeLedger.apk`.
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Type `[[` in any note to test the autocomplete dropdown and page creation.

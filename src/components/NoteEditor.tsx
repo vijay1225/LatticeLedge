@@ -223,11 +223,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   wikiSuggestionRef.current = wikiSuggestion;
 
   // Filter available wiki pages for suggestion dropdown
-  const wikiPages = allNotes.filter(n => n.type === 'wiki' && n.id !== note.id);
-  const cleanQuery = wikiSuggestion.query.trim().toLowerCase();
-  const hasExactMatch = wikiPages.some(n => n.title.toLowerCase() === cleanQuery);
+  const wikiPages = (allNotes || []).filter(n => n && n.type === 'wiki' && n.id !== note.id && n.title);
+  const cleanQuery = (wikiSuggestion.query || '').trim().toLowerCase();
+  const hasExactMatch = wikiPages.some(n => (n.title || '').toLowerCase() === cleanQuery);
   const matchingPages = cleanQuery
-    ? wikiPages.filter(n => n.title.toLowerCase().includes(cleanQuery))
+    ? wikiPages.filter(n => (n.title || '').toLowerCase().includes(cleanQuery))
     : wikiPages;
   const shouldShowCreateNew = cleanQuery.length > 0 && !hasExactMatch && cleanQuery !== 'pagename' && cleanQuery !== 'page name';
   const totalItemsCount = matchingPages.length + (shouldShowCreateNew ? 1 : 0);
@@ -244,13 +244,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   // Apply selected wiki page or create new
   const applyWikiSuggestion = (pageTitle: string) => {
     if (!editor) return;
-    const cleanTitle = pageTitle.trim();
+    const cleanTitle = (pageTitle || '').trim();
     if (!cleanTitle) return;
 
     const { startPos, endPos } = wikiSuggestionRef.current;
 
     // If new page, ensure it is created in SQLite and vault
-    const exists = allNotes.some(n => n.title.toLowerCase() === cleanTitle.toLowerCase());
+    const exists = (allNotes || []).some(n => (n.title || '').toLowerCase() === cleanTitle.toLowerCase());
     if (!exists && cleanTitle.toLowerCase() !== 'pagename' && cleanTitle.toLowerCase() !== 'page name') {
       onEnsurePageExists?.(cleanTitle);
     }
@@ -269,6 +269,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const checkWikiSuggestion = (editorInstance: any) => {
     if (!editorInstance) return;
     const { state } = editorInstance;
+    if (!state || !state.selection || !state.doc) return;
     const { from, to } = state.selection;
 
     if (from !== to) {
@@ -284,29 +285,46 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     // Match [[query at the end of textBefore
     const match = textBefore.match(/\[\[([^\]\n]*)$/);
     if (match) {
-      const query = match[1];
-      const startPos = from - match[0].length;
+      const query = match[1] || '';
+      const startPos = Math.max(0, from - match[0].length);
       const endPos = from;
 
       try {
-        const coords = editorInstance.view.coordsAtPos(from);
+        let coords: { left: number; top: number; bottom: number } | null = null;
+        if (editorInstance.view?.coordsAtPos) {
+          const rawCoords = editorInstance.view.coordsAtPos(from);
+          if (rawCoords && typeof rawCoords.left === 'number' && typeof rawCoords.bottom === 'number') {
+            coords = {
+              left: rawCoords.left,
+              top: rawCoords.top,
+              bottom: rawCoords.bottom
+            };
+          }
+        }
+
+        // Fallback default coordinates if coordsAtPos is unavailable or 0
+        if (!coords) {
+          coords = { left: 40, top: 120, bottom: 140 };
+        }
+
         setWikiSuggestion({
           isOpen: true,
           query,
           startPos,
           endPos,
-          coords: { left: coords.left, top: coords.top, bottom: coords.bottom },
+          coords,
           selectedIndex: 0
         });
-      } catch {
-        setWikiSuggestion(prev => ({
-          ...prev,
+      } catch (err) {
+        console.warn('[WikiLink] coordsAtPos safe catch:', err);
+        setWikiSuggestion({
           isOpen: true,
           query,
           startPos,
           endPos,
+          coords: { left: 40, top: 120, bottom: 140 },
           selectedIndex: 0
-        }));
+        });
       }
     } else {
       if (wikiSuggestionRef.current.isOpen) {
@@ -523,7 +541,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           rawTitle.toLowerCase() !== 'pagename' &&
           rawTitle.toLowerCase() !== 'page name'
         ) {
-          const exists = allNotes.some(n => n.title.toLowerCase() === rawTitle.toLowerCase());
+          const exists = (allNotes || []).some(n => (n.title || '').toLowerCase() === rawTitle.toLowerCase());
           if (!exists) {
             onEnsurePageExists?.(rawTitle);
           }
@@ -621,7 +639,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       const selectedText = state.doc.textBetween(from, to, ' ').trim();
       if (selectedText) {
         editor.chain().focus().insertContent(`[[${selectedText}]] `).run();
-        const exists = allNotes.some(n => n.title.toLowerCase() === selectedText.toLowerCase());
+        const exists = (allNotes || []).some(n => (n.title || '').toLowerCase() === selectedText.toLowerCase());
         if (!exists && selectedText.toLowerCase() !== 'pagename' && selectedText.toLowerCase() !== 'page name') {
           onEnsurePageExists?.(selectedText);
         }

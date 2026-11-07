@@ -32,6 +32,7 @@ import { KnowledgeGraphView } from './components/KnowledgeGraphView';
 import { SettingsModal } from './components/SettingsModal';
 import { RightPane } from './components/RightPane';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { 
   FileText, 
@@ -261,11 +262,11 @@ export function App() {
   }, [historyIndex, history, isFocusMode, currentMode]);
 
   const handleEnsurePageExists = (title: string): Note | undefined => {
-    const cleanTitle = title.trim();
+    const cleanTitle = (title || '').trim();
     if (!cleanTitle || cleanTitle.toLowerCase() === 'pagename' || cleanTitle.toLowerCase() === 'page name') {
       return undefined;
     }
-    const existing = notes.find(n => n.title.toLowerCase() === cleanTitle.toLowerCase());
+    const existing = notes.find(n => (n.title || '').toLowerCase() === cleanTitle.toLowerCase());
     if (existing) return existing;
 
     const newPage: Note = {
@@ -284,14 +285,14 @@ export function App() {
   };
 
   const navigateToNote = (titleOrId: string) => {
-    const clean = titleOrId.trim();
+    const clean = (titleOrId || '').trim();
     if (!clean || clean.toLowerCase() === 'pagename' || clean.toLowerCase() === 'page name') {
       return;
     }
 
     let target = notes.find(n => n.id === clean);
     if (!target) {
-      target = notes.find(n => n.title.toLowerCase() === clean.toLowerCase());
+      target = notes.find(n => (n.title || '').toLowerCase() === clean.toLowerCase());
     }
 
     if (target) {
@@ -675,26 +676,31 @@ export function App() {
           {currentMode === 'notes' && (
             <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden w-full h-full">
               {activeNote ? (
-                <NoteEditor
-                  key={activeNote.id}
-                  note={activeNote}
-                  allNotes={notes}
-                  onUpdateNote={(partial) => handleUpdateNote(activeNote.id, partial)}
-                  onRefreshSummary={() => handleRefreshAISummary(activeNote.id)}
-                  isSummaryLoading={isSummaryLoading}
-                  onNavigateToNote={navigateToNote}
-                  onEnsurePageExists={handleEnsurePageExists}
-                  onNewPage={() => handleCreateNewWikiPage()}
-                  onDeletePage={handleDeleteWikiPage}
-                  onTagClick={() => setCurrentMode('search')}
-                  isFocusMode={isFocusMode}
-                  onToggleFocusMode={() => setIsFocusMode(prev => !prev)}
-                  hasApiKey={hasGeminiKey}
-                  onOpenSettings={() => setCurrentMode('settings')}
-                  summaryError={summaryError}
-                  onBackToPages={() => setCurrentMode('pages')}
-                  isOnline={isOnline}
-                />
+                <ErrorBoundary
+                  fallbackTitle="Note Editor Recovered"
+                  onReset={() => setCurrentMode('pages')}
+                >
+                  <NoteEditor
+                    key={activeNote.id}
+                    note={activeNote}
+                    allNotes={notes}
+                    onUpdateNote={(partial) => handleUpdateNote(activeNote.id, partial)}
+                    onRefreshSummary={() => handleRefreshAISummary(activeNote.id)}
+                    isSummaryLoading={isSummaryLoading}
+                    onNavigateToNote={navigateToNote}
+                    onEnsurePageExists={handleEnsurePageExists}
+                    onNewPage={() => handleCreateNewWikiPage()}
+                    onDeletePage={handleDeleteWikiPage}
+                    onTagClick={() => setCurrentMode('search')}
+                    isFocusMode={isFocusMode}
+                    onToggleFocusMode={() => setIsFocusMode(prev => !prev)}
+                    hasApiKey={hasGeminiKey}
+                    onOpenSettings={() => setCurrentMode('settings')}
+                    summaryError={summaryError}
+                    onBackToPages={() => setCurrentMode('pages')}
+                    isOnline={isOnline}
+                  />
+                </ErrorBoundary>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 text-xs gap-3">
                   <FileText className="w-8 h-8 text-zinc-700" />

@@ -24,12 +24,14 @@ export function findBacklinks(targetTitle: string, allNotes: Note[]): Note[] {
   if (!targetTitle) return [];
   const normalizedTarget = targetTitle.toLowerCase().trim();
   
-  return allNotes.filter(note => {
+  return (allNotes || []).filter(note => {
+    if (!note) return false;
+    const noteTitle = (note.title || '').toLowerCase().trim();
     // A note cannot be a backlink to itself
-    if (note.title.toLowerCase().trim() === normalizedTarget) return false;
+    if (noteTitle === normalizedTarget) return false;
     
     // Check if target is in outgoing links
-    return note.links.some(link => link.toLowerCase().trim() === normalizedTarget);
+    return (note.links || []).some(link => typeof link === 'string' && link.toLowerCase().trim() === normalizedTarget);
   });
 }
 
@@ -37,21 +39,24 @@ export function findBacklinks(targetTitle: string, allNotes: Note[]): Note[] {
  * Finds Quick Notes that share tags or keywords with a target note.
  */
 export function findRelatedQuickNotes(currentNote: Note, allNotes: Note[]) {
-  if (currentNote.type !== 'wiki') return [];
+  if (!currentNote || currentNote.type !== 'wiki') return [];
   
-  const currentTags = new Set(currentNote.tags.map(t => t.toLowerCase().replace(/^#/, '')));
+  const currentTags = new Set(
+    (currentNote.tags || []).map(t => (typeof t === 'string' ? t.toLowerCase().replace(/^#/, '') : ''))
+  );
   const currentEntities = new Set(
-    (currentNote.summary?.keyEntities || []).map(e => e.toLowerCase())
+    (currentNote.summary?.keyEntities || []).map(e => (typeof e === 'string' ? e.toLowerCase() : ''))
   );
   
-  const quickNotes = allNotes.filter(n => n.type === 'quick');
+  const quickNotes = (allNotes || []).filter(n => n && n.type === 'quick');
   const scoredSuggestions: { quickNote: Note; matchedTags: string[]; reason: string }[] = [];
 
   for (const qNote of quickNotes) {
     const matched: string[] = [];
     
     // Check tags
-    for (const tag of qNote.tags) {
+    for (const tag of (qNote.tags || [])) {
+      if (typeof tag !== 'string') continue;
       const cleanTag = tag.toLowerCase().replace(/^#/, '');
       if (currentTags.has(cleanTag)) {
         matched.push(tag);
@@ -59,13 +64,14 @@ export function findRelatedQuickNotes(currentNote: Note, allNotes: Note[]) {
     }
     
     // Check title/entity overlap
-    const contentLower = qNote.content.toLowerCase();
-    if (contentLower.includes(currentNote.title.toLowerCase())) {
+    const contentLower = (qNote.content || '').toLowerCase();
+    const currentTitleLower = (currentNote.title || '').toLowerCase();
+    if (currentTitleLower && contentLower.includes(currentTitleLower)) {
       matched.push(`Mentions "${currentNote.title}"`);
     }
 
     for (const ent of currentEntities) {
-      if (contentLower.includes(ent) && !matched.includes(ent)) {
+      if (ent && contentLower.includes(ent) && !matched.includes(ent)) {
         matched.push(ent);
       }
     }

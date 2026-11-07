@@ -175,4 +175,31 @@ describe('WikiLinkSuggestionPopup Component', () => {
 
     expect(handleSelect).toHaveBeenCalledWith('Diagon Alley');
   });
+
+  it('safely handles notes with undefined/null titles, missing tags, and invalid coords without crashing', () => {
+    const malformedNotes: any[] = [
+      { id: '1', type: 'wiki', title: null, tags: null, links: null },
+      { id: '2', type: 'wiki', title: undefined, tags: [123, { name: 'tag' }], links: undefined },
+      { id: '3', type: 'wiki', title: 'Valid Page', tags: ['#valid'], links: [] },
+      null,
+      undefined
+    ];
+
+    expect(() => {
+      render(
+        <WikiLinkSuggestionPopup
+          isOpen={true}
+          query="Valid"
+          coords={{ left: NaN, top: NaN, bottom: NaN }}
+          allNotes={malformedNotes}
+          currentNoteId="current-id"
+          selectedIndex={0}
+          onSelect={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+    }).not.toThrow();
+
+    expect(screen.getByText('Valid Page')).toBeDefined();
+  });
 });
