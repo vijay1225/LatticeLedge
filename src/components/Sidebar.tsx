@@ -11,9 +11,12 @@ import {
   Layers, 
   PanelLeftClose,
   CloudOff,
-  RefreshCw
+  RefreshCw,
+  Moon,
+  Sun,
+  BookOpen
 } from 'lucide-react';
-import { ViewMode } from '../types';
+import { ViewMode, AppTheme } from '../types';
 
 interface SidebarProps {
   currentMode: ViewMode;
@@ -29,6 +32,8 @@ interface SidebarProps {
   isSyncing?: boolean;
   onQuickSync?: () => void;
   syncConfigured?: boolean;
+  theme?: AppTheme;
+  onThemeChange?: (theme: AppTheme) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -44,7 +49,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOnline = true,
   isSyncing = false,
   onQuickSync,
-  syncConfigured = false
+  syncConfigured = false,
+  theme = 'dark',
+  onThemeChange
 }) => {
   return (
     <aside className="w-56 border-r border-zinc-800/80 bg-zinc-950 flex flex-col h-full shrink-0 select-none text-xs">
@@ -215,6 +222,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title={!isOnline ? "Offline: cannot sync to cloud" : "Sync Now with Google Drive"}
           >
             <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-indigo-400' : ''}`} />
+          </button>
+        </div>
+
+        {/* Color Theme Quick Switcher */}
+        <div className="flex items-center justify-between p-0.5 rounded-lg bg-zinc-900 border border-zinc-800/80 mb-2">
+          <button
+            type="button"
+            onClick={() => onThemeChange?.('dark')}
+            className={`flex-1 py-1 rounded flex items-center justify-center gap-1 text-[10px] font-medium transition-all ${
+              theme === 'dark'
+                ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+            title="Obsidian Dark Theme"
+          >
+            <Moon className="w-3 h-3 text-amber-400" />
+            <span className="hidden sm:inline">Dark</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onThemeChange?.('light')}
+            className={`flex-1 py-1 rounded flex items-center justify-center gap-1 text-[10px] font-medium transition-all ${
+              theme === 'light'
+                ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+            title="Modern Light Theme"
+          >
+            <Sun className="w-3 h-3 text-amber-500" />
+            <span className="hidden sm:inline">Light</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onThemeChange?.('sepia')}
+            className={`flex-1 py-1 rounded flex items-center justify-center gap-1 text-[10px] font-medium transition-all ${
+              theme === 'sepia'
+                ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+            title="Warm Paper (Writing Mode)"
+          >
+            <BookOpen className="w-3 h-3 text-amber-600" />
+            <span className="hidden sm:inline">Warm</span>
           </button>
         </div>
 

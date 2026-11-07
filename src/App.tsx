@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { 
   Note, 
   ViewMode, 
-  AIProviderConfig 
+  AIProviderConfig,
+  AppTheme 
 } from './types';
 import { HARRY_POTTER_SEED_NOTES } from './services/harryPotterSeed';
 import { buildKnowledgeGraph } from './utils/graphBuilder';
@@ -49,13 +50,43 @@ import {
   CloudOff,
   AlertTriangle,
   RefreshCw,
-  Check
+  Check,
+  Moon,
+  Sun,
+  BookOpen
 } from 'lucide-react';
 
 const STORAGE_KEY = 'LATTICE_LEDGER_NOTES_V1';
 const AI_CONFIG_KEY = 'LATTICE_LEDGER_AI_CONFIG';
+const THEME_STORAGE_KEY = 'LATTICE_LEDGER_THEME';
 
 export function App() {
+  const [theme, setTheme] = useState<AppTheme>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem(THEME_STORAGE_KEY);
+        if (saved === 'dark' || saved === 'light' || saved === 'sepia') {
+          return saved;
+        }
+      }
+    } catch {}
+    return 'dark';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {}
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [theme]);
+
   const [aiConfig, setAiConfig] = useState<AIProviderConfig>(() => {
     try {
       const saved = localStorage.getItem(AI_CONFIG_KEY);
@@ -510,7 +541,7 @@ export function App() {
   const graphData = buildKnowledgeGraph(notes);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-zinc-800 selection:text-white">
+    <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-zinc-800 selection:text-zinc-50">
       {/* 1. LEFT PANE: Master Navigation & Mode Switcher (Fixed menu buttons, no nested expanding lists) */}
       {!isFocusMode && (
         <>
@@ -530,6 +561,8 @@ export function App() {
                 isSyncing={isQuickSyncing}
                 onQuickSync={handleQuickSync}
                 syncConfigured={vaultSyncState?.isConfigured}
+                theme={theme}
+                onThemeChange={setTheme}
               />
             </div>
           ) : (
@@ -635,6 +668,21 @@ export function App() {
                   <span className="hidden xs:inline text-[10px]">Sync</span>
                 </>
               )}
+            </button>
+
+            {/* Mobile 1-Tap Theme Switcher */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextTheme: AppTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'sepia' : 'dark';
+                setTheme(nextTheme);
+              }}
+              className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+              title={`Active Theme: ${theme === 'dark' ? 'Obsidian Dark' : theme === 'light' ? 'Modern Light' : 'Warm Paper'}. Tap to switch.`}
+            >
+              {theme === 'dark' && <Moon className="w-4 h-4 text-amber-400" />}
+              {theme === 'light' && <Sun className="w-4 h-4 text-amber-500" />}
+              {theme === 'sepia' && <BookOpen className="w-4 h-4 text-amber-600" />}
             </button>
 
             <button
@@ -762,6 +810,7 @@ export function App() {
             <KnowledgeGraphView
               graphData={graphData}
               onSelectNode={navigateToNote}
+              theme={theme}
             />
           )}
 
@@ -773,6 +822,8 @@ export function App() {
               onResetSeedData={handleResetSeedData}
               notes={notes}
               onNotesUpdated={handleNotesUpdated}
+              theme={theme}
+              onThemeChange={setTheme}
             />
           )}
         </div>

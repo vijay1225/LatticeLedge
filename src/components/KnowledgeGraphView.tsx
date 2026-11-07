@@ -16,11 +16,12 @@ import {
   EyeOff
 } from 'lucide-react';
 import * as d3Force from 'd3-force';
-import { KnowledgeGraphData, KnowledgeGraphNode } from '../types';
+import { KnowledgeGraphData, KnowledgeGraphNode, AppTheme } from '../types';
 
 interface KnowledgeGraphViewProps {
   graphData: KnowledgeGraphData;
   onSelectNode: (noteId: string) => void;
+  theme?: AppTheme;
 }
 
 interface D3Node extends d3Force.SimulationNodeDatum, KnowledgeGraphNode {
@@ -45,7 +46,8 @@ interface ContextMenuState {
 
 export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   graphData,
-  onSelectNode
+  onSelectNode,
+  theme = 'dark'
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -254,11 +256,17 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
     }
 
     // 1. Draw Satellite Orbit Rings around Planets
+    const orbitStroke = theme === 'light' 
+      ? 'rgba(217, 119, 6, 0.16)' 
+      : theme === 'sepia' 
+      ? 'rgba(180, 83, 9, 0.16)' 
+      : 'rgba(217, 119, 6, 0.08)';
+
     for (const node of nodes) {
       if (node.isPlanet && node.x !== undefined && node.y !== undefined) {
         ctx.beginPath();
         ctx.arc(node.x, node.y, 55, 0, 2 * Math.PI);
-        ctx.strokeStyle = 'rgba(217, 119, 6, 0.08)';
+        ctx.strokeStyle = orbitStroke;
         ctx.lineWidth = 1;
         ctx.setLineDash([2, 4]);
         ctx.stroke();
@@ -357,29 +365,45 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
 
       if (showLabel && alpha > 0.3) {
         ctx.font = `${node.isPlanet ? '600 11px' : '500 10px'} -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-        ctx.fillStyle = isSelected ? '#ffffff' : isHovered ? '#ffffff' : node.isPlanet ? '#f4f4f5' : '#a1a1aa';
         ctx.textAlign = 'center';
 
         const text = node.label;
         const metrics = ctx.measureText(text);
         const textY = node.y + node.radius + 12;
 
-        ctx.fillStyle = isSelected ? 'rgba(24, 24, 27, 0.95)' : 'rgba(9, 9, 11, 0.85)';
+        const isThemeLight = theme === 'light';
+        const isThemeSepia = theme === 'sepia';
+
+        const labelBg = isSelected 
+          ? (isThemeLight ? '#4f46e5' : isThemeSepia ? '#b45309' : 'rgba(24, 24, 27, 0.95)')
+          : (isThemeLight ? 'rgba(255, 255, 255, 0.94)' : isThemeSepia ? 'rgba(245, 240, 230, 0.95)' : 'rgba(9, 9, 11, 0.85)');
+
+        const labelBorder = isSelected 
+          ? 'rgba(255, 255, 255, 0.6)'
+          : (isThemeLight ? 'rgba(203, 213, 225, 0.9)' : isThemeSepia ? 'rgba(214, 203, 187, 0.9)' : 'rgba(63, 63, 70, 0.5)');
+
+        const labelTextColor = isSelected 
+          ? '#ffffff'
+          : (isThemeLight
+              ? (node.isPlanet ? '#0f172a' : '#475569')
+              : isThemeSepia
+              ? (node.isPlanet ? '#2b221b' : '#706253')
+              : (node.isPlanet ? '#e4e4e7' : '#a1a1aa'));
+
+        ctx.fillStyle = labelBg;
         ctx.fillRect(node.x - metrics.width / 2 - 4, textY - 9, metrics.width + 8, 14);
 
-        if (isSelected) {
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-          ctx.lineWidth = 0.8;
-          ctx.strokeRect(node.x - metrics.width / 2 - 4, textY - 9, metrics.width + 8, 14);
-        }
+        ctx.strokeStyle = labelBorder;
+        ctx.lineWidth = isSelected ? 1 : 0.6;
+        ctx.strokeRect(node.x - metrics.width / 2 - 4, textY - 9, metrics.width + 8, 14);
 
-        ctx.fillStyle = isSelected ? '#ffffff' : node.isPlanet ? '#e4e4e7' : '#a1a1aa';
+        ctx.fillStyle = labelTextColor;
         ctx.fillText(text, node.x, textY);
       }
     }
 
     ctx.restore();
-  }, [transform, hoveredNode, selectedNode, filterQuery]);
+  }, [transform, hoveredNode, selectedNode, filterQuery, theme]);
 
   useEffect(() => {
     const sim = simulationRef.current;

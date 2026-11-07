@@ -27,9 +27,13 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  FileText
+  FileText,
+  Palette,
+  Moon,
+  Sun,
+  BookOpen
 } from 'lucide-react';
-import { AIProviderConfig, Note, GeminiModelInfo } from '../types';
+import { AIProviderConfig, Note, GeminiModelInfo, AppTheme } from '../types';
 import { downloadVaultBackup, importVaultFromJson } from '../utils/vaultExportImport';
 import { downloadSqliteDatabaseFile, importSqliteDatabaseFile, replaceAllNotesInSql } from '../services/sqliteService';
 import { sanitizeApiKey, fetchAvailableGeminiModels, DEFAULT_GEMINI_MODELS } from '../services/aiService';
@@ -52,6 +56,8 @@ interface SettingsModalProps {
   onResetSeedData: () => void;
   notes?: Note[];
   onNotesUpdated?: (notes: Note[]) => void;
+  theme?: AppTheme;
+  onThemeChange?: (theme: AppTheme) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -59,7 +65,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSaveConfig,
   onResetSeedData,
   notes = [],
-  onNotesUpdated
+  onNotesUpdated,
+  theme = 'dark',
+  onThemeChange
 }) => {
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.apiKey);
@@ -472,6 +480,133 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
 
       <form onSubmit={handleManualSave} className="space-y-5 pb-16">
+        {/* Appearance & Color Theme Section */}
+        <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 shadow-md space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-semibold text-zinc-100 text-sm">
+              <Palette className="w-4 h-4 text-amber-500" />
+              <span>Appearance & Color Theme</span>
+            </div>
+            <span className="text-[11px] font-medium text-zinc-400 capitalize">
+              Active: {theme === 'dark' ? 'Obsidian Dark' : theme === 'light' ? 'Modern Light' : 'Warm Paper (Sepia)'}
+            </span>
+          </div>
+
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            Choose your preferred reading and writing aesthetic. Instantly transforms the editor, pages, navigation, and knowledge graph.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            {/* Theme 1: Obsidian Dark */}
+            <button
+              type="button"
+              onClick={() => onThemeChange?.('dark')}
+              className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                theme === 'dark'
+                  ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-zinc-950/90 shadow-md'
+                  : 'border-zinc-800/80 bg-zinc-950/40 hover:border-zinc-700 hover:bg-zinc-950/70'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-400">
+                      <Moon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-semibold text-zinc-100">Obsidian Dark</span>
+                  </div>
+                  {theme === 'dark' && (
+                    <span className="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                      <Check className="w-2.5 h-2.5" />
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-400 line-clamp-2">
+                  Default midnight contrast with amber & sky accents. Ideal for low-light focus and coding.
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-zinc-800/60">
+                <div className="w-3.5 h-3.5 rounded-full bg-[#09090b] border border-zinc-700" title="Canvas #09090b" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#18181b] border border-zinc-700" title="Card #18181b" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#f59e0b]" title="Amber Accent" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#38bdf8]" title="Sky Accent" />
+              </div>
+            </button>
+
+            {/* Theme 2: Modern Light */}
+            <button
+              type="button"
+              onClick={() => onThemeChange?.('light')}
+              className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                theme === 'light'
+                  ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-white shadow-md'
+                  : 'border-zinc-800/80 bg-zinc-950/40 hover:border-zinc-700 hover:bg-zinc-950/70'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-slate-100 border border-slate-300 flex items-center justify-center text-amber-500">
+                      <Sun className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-semibold text-zinc-100">Modern Light</span>
+                  </div>
+                  {theme === 'light' && (
+                    <span className="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                      <Check className="w-2.5 h-2.5" />
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-400 line-clamp-2">
+                  Clean crisp paper white with slate typography and indigo accents for bright daytime clarity.
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-zinc-800/60">
+                <div className="w-3.5 h-3.5 rounded-full bg-[#ffffff] border border-slate-300" title="Canvas #ffffff" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#f8fafc] border border-slate-300" title="Card #f8fafc" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#4f46e5]" title="Indigo Accent" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#0284c7]" title="Sky Accent" />
+              </div>
+            </button>
+
+            {/* Theme 3: Warm Paper (Sepia) - The Ultimate Note Writing Palette */}
+            <button
+              type="button"
+              onClick={() => onThemeChange?.('sepia')}
+              className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                theme === 'sepia'
+                  ? 'border-amber-600 ring-2 ring-amber-600/20 bg-[#fbf8f2] shadow-md'
+                  : 'border-zinc-800/80 bg-zinc-950/40 hover:border-zinc-700 hover:bg-zinc-950/70'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-[#eee7d8] border border-[#d6cbba] flex items-center justify-center text-amber-700">
+                      <BookOpen className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-semibold text-zinc-100">Warm Paper (Sepia)</span>
+                  </div>
+                  {theme === 'sepia' && (
+                    <span className="w-4 h-4 rounded-full bg-amber-600 flex items-center justify-center text-white">
+                      <Check className="w-2.5 h-2.5" />
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-400 line-clamp-2">
+                  Moleskine cream with espresso ink. Zero blue-light glare, most comfortable for 10+ hours of writing.
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-zinc-800/60">
+                <div className="w-3.5 h-3.5 rounded-full bg-[#fbf8f2] border border-[#ded3bc]" title="Paper #fbf8f2" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#f5f0e6] border border-[#ded3bc]" title="Panel #f5f0e6" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#b45309]" title="Warm Bronze" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#2b221b]" title="Espresso Ink" />
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* 1. TOP SECTION: AI Model & Google Gemini API Key (Direct Connection) */}
         <div className="p-4 rounded-xl bg-zinc-900 border-2 border-indigo-500/30 shadow-lg space-y-4">
           <div className="flex items-center justify-between">

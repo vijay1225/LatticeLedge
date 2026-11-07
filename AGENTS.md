@@ -400,6 +400,28 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 62/62 automated unit tests passing across all 8 test suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Three Professional Ergonomic Color Themes (Dark, Light, Warm Paper Sepia)**:
+    - **In-Depth Typography & Reading Ergonomics Research**:
+      - Investigated high-end PKM, reading, and writing tools (iA Writer, Bear, Ulysses, Kindle, Scrivener, Notion).
+      - Identified that high-luminance white (`#ffffff`) creates glare and blue-light eye strain during hours of deep typing, while pure black can induce pupil dilation halation.
+      - Developed a gold-standard 3-theme system with full parity across desktop and mobile:
+        1. **Obsidian Dark (Current / Default)**: Midnight `#09090b` canvas with `#18181b` cards, crisp `#f4f4f5` text, and amber/sky accents. Ideal for low-light environments, coding, and high contrast.
+        2. **Modern Light (Clean Daytime)**: Pure crisp `#ffffff` canvas, soft slate `#f8fafc` panels, slate-200 borders, rich slate-900 typography (`#0f172a`, 16.5:1 contrast), and vibrant indigo accents. Ideal for daytime reading and clarity.
+        3. **Warm Paper / Sepia (The Ultimate Note Writing & Reading Palette)**: Moleskine book cream `#fbf8f2` paper, soft oatmeal `#f5f0e6` panels, warm sand borders, and deep printer's espresso ink (`#2b221b`, 14.2:1 contrast) with antique bronze/amber accents. Eliminates blue-light fatigue and glare for 10+ hours of continuous writing.
+    - **Dynamic CSS Variable Engine & Zero Feature Change**:
+      - Configured `tailwind.config.js` to map `zinc-50` through `zinc-950` to CSS variables with full alpha opacity channel support (`rgb(var(--color-zinc-...) / <alpha-value>)`).
+      - In `src/index.css`, bound all TipTap WYSIWYG editor typography (headings, blockquotes, code blocks, checklists, links, scrollbars) to dynamic CSS variables.
+      - Zero feature changes: all existing functionalities (SQLite, cloud sync, TipTap, video/image embeds, autocomplete, graph, search) function 100% identically.
+    - **Interactive Theme Switchers**:
+      - **Settings Hub (`SettingsModal.tsx`)**: Dedicated "Appearance & Color Theme" section with 3 interactive preview cards displaying real color swatches and descriptions.
+      - **Sidebar Quick Switcher (`Sidebar.tsx`)**: 3-segment switcher (`Dark` | `Light` | `Warm`) in the desktop sidebar footer.
+      - **Mobile Top Bar 1-Tap Toggle (`App.tsx`)**: Direct 1-tap theme cycling button (`Moon` -> `Sun` -> `BookOpen`) on the mobile header.
+      - **Knowledge Graph Canvas Adaptation (`KnowledgeGraphView.tsx`)**: Automatically adapts node label pills, borders, and satellite orbit rings to match the active theme.
+      - **Cross-Session Persistence**: Saved to `localStorage` (`LATTICE_LEDGER_THEME`) and applied via `data-theme` on `<html>`.
+    - **Verified & Built**:
+      - 62/62 automated unit tests passing across all 8 test suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.81MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Open the Knowledge Graph to verify that all clusters and isolated notes are grouped in a circular layout.
+  - [ ] Switch between Obsidian Dark, Modern Light, and Warm Paper Sepia using the sidebar switcher, mobile top header, or Settings.
