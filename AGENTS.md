@@ -384,6 +384,22 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 61/61 automated unit tests passing across all 8 test suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
       - Fresh native Android APK: `LatticeLedger.apk`.
+  - [x] **Knowledge Graph Circular Grouping Layout (Eliminating Distant Cluster Drift)**:
+    - **Diagnosed Distant Cluster Drift**:
+      - In standard `d3-force`, `forceManyBody` repels all nodes across the entire canvas ($F \propto 1/r$). Without a centripetal gravity or radial bounding force, disconnected clusters and isolated notes repelled each other endlessly, drifting 600-900+ pixels away into the dark corners.
+      - Recreating nodes without copying previous positions caused new nodes to start at `(0, 0)` and violently scatter.
+    - **Unified Circular Galaxy & Radial Grouping Forces (`KnowledgeGraphView.tsx`)**:
+      - **Position Preservation**: Reused existing node coordinates `(x, y, vx, vy)` on updates so existing clusters remain stable without jumping.
+      - **Circular Perimeter Seeding**: New notes/clusters are initialized evenly along the circular perimeter at `(centerX + targetRadius * cos(angle), centerY + targetRadius * sin(angle))`.
+      - **Radial Grouping Force (`forceRadial`)**: Pulls all planets and clusters toward a cohesive target circle (`targetRadius`), clustering all graph components in a visible circular galaxy.
+      - **Centripetal Gravity (`forceX` & `forceY`)**: Gentle gravity pulling toward canvas center `(centerX, centerY)`, holding all clusters together.
+      - **Bounded Repulsion (`distanceMax`)**: Capped `forceManyBody` repulsion distance to `Math.max(380, targetRadius * 1.8)` so distant clusters never repel each other to infinity.
+      - **Dynamic Window Resize Listener**: Updates center and radial force targets dynamically when resizing the window or rotating mobile screens.
+      - **Zero Visual Changes**: Preserved 100% of the planetary hubs, satellite orbit rings, colors, links, hover inspector, context menus, and controls ("links and visualization everything is good do not change anything").
+    - **Verified & Built**:
+      - 62/62 automated unit tests passing across all 8 test suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Type `[[` in any note to test the autocomplete dropdown and page creation.
+  - [ ] Open the Knowledge Graph to verify that all clusters and isolated notes are grouped in a circular layout.

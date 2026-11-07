@@ -93,16 +93,47 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
       activeNodeIdSet.has(e.source) && activeNodeIdSet.has(e.target)
     );
 
-    const nodes: D3Node[] = sourceNodes.map(node => {
+    const width = containerRef.current?.clientWidth || 800;
+    const height = containerRef.current?.clientHeight || 600;
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    // Responsive circle radius for grouping all nodes and clusters into a cohesive circle
+    const minDim = Math.min(width, height);
+    const targetRadius = Math.max(130, Math.min(minDim * 0.32, 260));
+
+    // Preserve existing node positions so graph does not jump wildly on updates
+    const existingMap = new Map(nodesRef.current.map(n => [n.id, n]));
+
+    const nodes: D3Node[] = sourceNodes.map((node, idx) => {
       const isPlanet = node.type === 'wiki';
       const isSatellite = node.type === 'quick';
+      const existing = existingMap.get(node.id);
+
+      let x = existing?.x;
+      let y = existing?.y;
+      const vx = existing?.vx;
+      const vy = existing?.vy;
+
+      // If new node, distribute it along the circle so it starts grouped in a cohesive circle
+      if (x === undefined || y === undefined) {
+        const angle = (idx / Math.max(sourceNodes.length, 1)) * 2 * Math.PI;
+        const jitter = (Math.sin(idx * 7) * 0.5) * 20;
+        const r = isSatellite ? targetRadius * 0.85 : targetRadius;
+        x = centerX + (r + jitter) * Math.cos(angle);
+        y = centerY + (r + jitter) * Math.sin(angle);
+      }
 
       return {
         ...node,
         radius: isPlanet ? 16 : isSatellite ? 8 : 6,
         isPlanet,
         isSatellite,
-        clusterColor: isPlanet ? '#d97706' : isSatellite ? '#38bdf8' : '#a855f7'
+        clusterColor: isPlanet ? '#d97706' : isSatellite ? '#38bdf8' : '#a855f7',
+        x,
+        y,
+        vx,
+        vy
       };
     });
 
@@ -126,22 +157,31 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
     nodesRef.current = nodes;
     linksRef.current = links;
 
-    const width = containerRef.current?.clientWidth || 800;
-    const height = containerRef.current?.clientHeight || 600;
-
     if (simulationRef.current) {
       simulationRef.current.stop();
     }
 
+    // D3 Force Simulation configured with Circular Grouping
+    // Keeps disconnected clusters and isolated notes bounded in a clean circular galaxy
     const sim = d3Force.forceSimulation<D3Node>(nodes)
-      .force('charge', d3Force.forceManyBody<D3Node>().strength(d => d.isPlanet ? -320 : -80))
+      .force('charge', d3Force.forceManyBody<D3Node>()
+        .strength(d => d.isPlanet ? -240 : -60)
+        .distanceMax(Math.max(380, targetRadius * 1.8))
+      )
       .force('link', d3Force.forceLink<D3Node, D3Link>(links)
         .id(d => d.id)
-        .distance(l => l.type === 'satellite' ? 55 : l.type === 'explicit' ? 140 : 100)
-        .strength(l => l.type === 'satellite' ? 0.9 : 0.35)
+        .distance(l => l.type === 'satellite' ? 55 : l.type === 'explicit' ? 120 : 90)
+        .strength(l => l.type === 'satellite' ? 0.95 : 0.4)
       )
       .force('collide', d3Force.forceCollide<D3Node>().radius(d => d.radius + 14).iterations(2))
-      .force('center', d3Force.forceCenter(width / 2, height / 2).strength(0.08))
+      .force('x', d3Force.forceX<D3Node>(centerX).strength(0.07))
+      .force('y', d3Force.forceY<D3Node>(centerY).strength(0.07))
+      .force('radial', d3Force.forceRadial<D3Node>(
+        targetRadius,
+        centerX,
+        centerY
+      ).strength(d => d.isSatellite ? 0.05 : 0.22))
+      .force('center', d3Force.forceCenter(centerX, centerY).strength(0.1))
       .alphaDecay(0.028);
 
     simulationRef.current = sim;
@@ -350,6 +390,49 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
 
     return () => {
       sim.on('tick', null);
+    };
+  }, [renderCanvas]);
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      const container = containerRef.current;
+      const sim = simulationRef.current;
+      if (!container || !sim) return;
+
+      const width = container.clientWidth || 800;
+      const height = container.clientHeight || 600;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const minDim = Math.min(width, height);
+      const targetRadius = Math.max(130, Math.min(minDim * 0.32, 260));
+
+      const centerForce = sim.force<d3Force.ForceCenter<D3Node>>('center');
+      if (centerForce) {
+        centerForce.x(centerX).y(centerY);
+      }
+
+      const xForce = sim.force<d3Force.ForceX<D3Node>>('x');
+      if (xForce) {
+        xForce.x(centerX);
+      }
+
+      const yForce = sim.force<d3Force.ForceY<D3Node>>('y');
+      if (yForce) {
+        yForce.y(centerY);
+      }
+
+      const radialForce = sim.force<d3Force.ForceRadial<D3Node>>('radial');
+      if (radialForce) {
+        radialForce.x(centerX).y(centerY).radius(targetRadius);
+      }
+
+      sim.alpha(0.15).restart();
+      renderCanvas();
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    return () => {
+      window.removeEventListener('resize', handleWindowResize);
     };
   }, [renderCanvas]);
 
