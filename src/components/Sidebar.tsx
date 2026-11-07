@@ -30,6 +30,8 @@ interface SidebarProps {
   quickNotesCount: number;
   onToggleCollapse?: () => void;
   syncConfigured?: boolean;
+  syncFolderName?: string;
+  onChangeVaultFolder?: () => void;
   theme?: AppTheme;
   onThemeChange?: (theme: AppTheme) => void;
 }
@@ -45,6 +47,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   quickNotesCount,
   onToggleCollapse,
   syncConfigured = false,
+  syncFolderName,
+  onChangeVaultFolder,
   theme = 'dark',
   onThemeChange
 }) => {
@@ -188,9 +192,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-2 border-t border-zinc-800/80 space-y-1.5">
         <button
           type="button"
-          onClick={() => onSelectMode('settings')}
+          onClick={() => {
+            if (onChangeVaultFolder) {
+              onChangeVaultFolder();
+            } else {
+              onSelectMode('settings');
+            }
+          }}
           className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] bg-zinc-900 border-zinc-800/80 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
-          title={syncConfigured ? "Vault Folder Active (Click to manage in Settings)" : "Local Storage (Click to select folder in Settings)"}
+          title={syncConfigured ? `Vault Folder: ${syncFolderName || 'Active'} (Click to Change Folder)` : "Local Storage (Click to Choose Vault Folder)"}
         >
           <div className="flex items-center gap-1.5 min-w-0">
             {syncConfigured ? (
@@ -199,10 +209,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <HardDrive className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             )}
             <span className="text-[10px] text-zinc-300 truncate">
-              {syncConfigured ? 'Vault Folder Active' : 'Local Storage'}
+              {syncConfigured ? (syncFolderName || 'Vault Folder Active') : 'Local Storage'}
             </span>
           </div>
-          <span className="text-[9px] text-indigo-400/80 hover:text-indigo-300 font-medium">Manage</span>
+          <span className="text-[9px] text-indigo-400/90 hover:text-indigo-300 font-medium shrink-0 ml-1">Change</span>
         </button>
 
         {/* Color Theme Quick Switcher (4 Themes) */}

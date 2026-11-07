@@ -246,17 +246,39 @@ function insertNotesBatch(db: Database, notes: Note[]) {
   }
 }
 
+let folderSaveTimer: any = null;
+
 /**
  * Persist in-memory SQLite state to persistent device storage & bound vault folder.
  */
-export async function persistDatabase(): Promise<void> {
+export async function persistDatabase(immediateFolderSync = false): Promise<void> {
   if (!activeDb) return;
   const binary = activeDb.export();
   await saveBytesToIndexedDb(binary);
-  try {
-    await saveVaultDbToFolder(binary);
-  } catch (err) {
-    console.warn('[SQLite] Vault folder sync warning:', err);
+
+  if (immediateFolderSync) {
+    if (folderSaveTimer) {
+      clearTimeout(folderSaveTimer);
+      folderSaveTimer = null;
+    }
+    try {
+      await saveVaultDbToFolder(binary);
+    } catch (err) {
+      console.warn('[SQLite] Vault folder sync warning:', err);
+    }
+  } else {
+    // Debounce disk writes to vault folder (1000ms) to prevent I/O thrashing during typing
+    if (folderSaveTimer) {
+      clearTimeout(folderSaveTimer);
+    }
+    folderSaveTimer = setTimeout(async () => {
+      folderSaveTimer = null;
+      try {
+        await saveVaultDbToFolder(binary);
+      } catch (err) {
+        console.warn('[SQLite] Debounced vault folder sync warning:', err);
+      }
+    }, 1000);
   }
 }
 
@@ -409,6 +431,7 @@ export async function importSqliteDatabaseFile(fileOrBuffer: ArrayBuffer | Uint8
   const bytes = fileOrBuffer instanceof Uint8Array ? fileOrBuffer : new Uint8Array(fileOrBuffer);
   activeDb = new sqlModule.Database(bytes);
   createSchemaIfMissing(activeDb);
-  await persistDatabase();
+  // Cache in IndexedDB for offline persistence, but DO NOT write back to vault folder (prevents recursive watcher loop)
+  await saveBytesToIndexedDb(bytes);
   return getAllNotesFromSql();
 }

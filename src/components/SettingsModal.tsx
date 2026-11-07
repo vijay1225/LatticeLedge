@@ -23,7 +23,8 @@ import {
   Moon, 
   Sun, 
   BookOpen, 
-  Compass 
+  Compass,
+  ChevronLeft 
 } from 'lucide-react';
 import { AIProviderConfig, Note, GeminiModelInfo, AppTheme } from '../types';
 import { sanitizeApiKey, fetchAvailableGeminiModels, DEFAULT_GEMINI_MODELS } from '../services/aiService';
@@ -44,6 +45,8 @@ interface SettingsModalProps {
   onNotesUpdated?: (notes: Note[]) => void;
   theme?: AppTheme;
   onThemeChange?: (theme: AppTheme) => void;
+  onClose?: () => void;
+  returnModeLabel?: string;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -53,7 +56,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   notes = [],
   onNotesUpdated,
   theme = 'dark',
-  onThemeChange
+  onThemeChange,
+  onClose,
+  returnModeLabel
 }) => {
   const [provider, setProvider] = useState(config.provider);
   const [apiKey, setApiKey] = useState(config.apiKey);
@@ -333,6 +338,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="flex-1 h-full overflow-y-auto px-4 sm:px-6 lg:px-12 py-8 max-w-2xl mx-auto w-full text-xs">
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-zinc-100 transition-colors text-xs font-medium mb-5"
+          title="Return to your previous workspace"
+        >
+          <ChevronLeft className="w-4 h-4 text-indigo-400" />
+          <span>Back to {returnModeLabel || 'Workspace'}</span>
+        </button>
+      )}
+
       <div className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
           <span>Settings & Configuration</span>

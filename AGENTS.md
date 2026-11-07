@@ -457,7 +457,28 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 62/62 automated unit tests passing across all 8 test suites (`assetService`, `vaultSyncService`, `sqliteService`, `graphBuilder`, `wikiLinks`, `aiService`, `markdownViewer`, `wikiLinkAutocomplete`).
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Eliminated Note Jumping, Watcher Self-Echo Loop & Added Back-to-Note Navigation**:
+    - **Diagnosed Root Cause of Sudden Note Jumping During Writing**:
+      - Auto-save debounced write (`saveNoteToSql`) persisted `lattice_vault.db` to the vault folder.
+      - In `electron/main.cjs`, `fs.watch` caught the app's own write and emitted `vault:file-changed`.
+      - `reloadVaultFromFolder` re-read `lattice_vault.db` from disk and called `importSqliteDatabaseFile`, which had a rogue `await persistDatabase()` inside it, causing an infinite recursive loop of writes and reloads.
+      - Additionally, `handleNotesUpdated` in `App.tsx` was trapped in an old mount closure where `activeNoteId` was evaluated as `'wiki-code-showcase'`. When the array updated, `!updatedNotes.some(n => n.id === activeNoteId)` evaluated to true and reset `activeNoteId` to `updatedNotes[0].id`, instantly unmounting the active note editor and jumping to another note!
+    - **Watcher Self-Echo Loop Elimination**:
+      - Updated `electron/main.cjs` to track `lastSelfWriteTimestamp`, `lastSelfWriteMtime`, and `lastSelfWriteSize`.
+      - In `fs.watch`, if the file was modified within 5000ms of self-write OR if file size and mtime match our self-write, the event is cleanly ignored.
+      - In `src/services/sqliteService.ts`, removed `await persistDatabase()` from `importSqliteDatabaseFile`, replacing it with offline IndexedDB caching only (`await saveBytesToIndexedDb(bytes)`), permanently stopping the self-triggering loop.
+      - Debounced disk persistence (`persistDatabase(immediateFolderSync)`) by 1000ms so rapid keystrokes update in-memory SQLite instantly without hammering disk I/O.
+    - **Live Reference & Active Note Preservation (`App.tsx`)**:
+      - Wrapped `activeNoteId`, `currentMode`, and `notes` in `useRef` hooks (`activeNoteIdRef`, `currentModeRef`, `notesRef`).
+      - In `handleNotesUpdated`, if `currentActiveId` is present in `finalNotes`, it is strictly preserved without ever changing `activeNoteId`. If the active note is an in-flight new note, it is merged into the note list so local work is never wiped out.
+    - **Seamless Vault Folder Picker & Settings Return Navigation**:
+      - `Sidebar.tsx`: The vault button above settings now has a dedicated `Change` action calling `chooseVaultFolder()` directly, opening the native folder picker without replacing the center workspace with Settings.
+      - `SettingsModal.tsx`: Added a prominent `← Back to [Note / Workspace]` return breadcrumb at the top of Settings. Clicking it immediately returns the user to the exact note they were editing.
+    - **Verified & Built**:
+      - 62/62 automated unit tests passing across all suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Select or change the vault folder in Settings.
-  - [ ] Verify clean slate on empty folder vs. instant resume on folders with existing notes.
+  - [ ] Write notes on a new page and verify smooth typing without any page jumping.
+  - [ ] Click the vault button in the sidebar or Settings and verify smooth return navigation.

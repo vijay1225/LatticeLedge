@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Note, 
   ViewMode, 
@@ -19,7 +19,8 @@ import {
 import { 
   initVaultSync, 
   subscribeVaultSyncState, 
-  VaultSyncState
+  VaultSyncState,
+  chooseVaultFolder
 } from './services/vaultSyncService';
 
 import { Sidebar } from './components/Sidebar';
@@ -127,7 +128,24 @@ export function App() {
 
   // Default mode starts on 'pages' so user immediately sees all page names with AI summaries
   const [currentMode, setCurrentMode] = useState<ViewMode>('pages');
+  const [previousMode, setPreviousMode] = useState<ViewMode>('pages');
   const [activeNoteId, setActiveNoteId] = useState<string>('wiki-code-showcase');
+
+  // Maintain live references to prevent stale closure bugs in sync/file watcher callbacks
+  const activeNoteIdRef = useRef(activeNoteId);
+  activeNoteIdRef.current = activeNoteId;
+  const currentModeRef = useRef(currentMode);
+  currentModeRef.current = currentMode;
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+
+  const switchMode = (newMode: ViewMode) => {
+    if (newMode !== currentMode) {
+      setPreviousMode(currentMode);
+      setCurrentMode(newMode);
+    }
+  };
+
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [mobileQuickText, setMobileQuickText] = useState('');
   const [newNoteModalType, setNewNoteModalType] = useState<'wiki' | 'quick'>('wiki');
@@ -143,16 +161,31 @@ export function App() {
   const [history, setHistory] = useState<string[]>(['wiki-code-showcase']);
   const [historyIndex, setHistoryIndex] = useState(0);
 
-  const handleNotesUpdated = (updatedNotes: Note[]) => {
-    setNotes(updatedNotes);
-    if (updatedNotes.length === 0) {
+  const handleNotesUpdated = (updatedNotes: Note[], forceResetActive = false) => {
+    const currentActiveId = activeNoteIdRef.current;
+    const currentNotes = notesRef.current;
+
+    // Check if the note being actively written/viewed exists in local state but not yet in incoming updatedNotes
+    const activeLocalNote = currentNotes.find(n => n.id === currentActiveId);
+    let finalNotes = updatedNotes;
+    if (!forceResetActive && activeLocalNote && !updatedNotes.some(n => n.id === currentActiveId)) {
+      // Keep active note so it is never dropped or lost
+      finalNotes = [activeLocalNote, ...updatedNotes];
+    }
+
+    setNotes(finalNotes);
+
+    if (finalNotes.length === 0) {
       setActiveNoteId('');
       setHistory([]);
       setHistoryIndex(0);
       setCurrentMode('pages');
     } else {
-      if (!updatedNotes.some(n => n.id === activeNoteId)) {
-        setActiveNoteId(updatedNotes[0].id);
+      // If currentActiveId exists and is in finalNotes, KEEP IT! NEVER JUMP!
+      if (!forceResetActive && currentActiveId && finalNotes.some(n => n.id === currentActiveId)) {
+        // User stays exactly where they are!
+      } else {
+        setActiveNoteId(finalNotes[0].id);
       }
     }
   };
@@ -187,7 +220,7 @@ export function App() {
     }).catch(err => {
       console.warn('[SQLite] Fallback to cache:', err);
     });
-  }, [hasGeminiKey]);
+  }, []);
 
   const [vaultSyncState, setVaultSyncState] = useState<VaultSyncState | null>(null);
 
@@ -195,10 +228,22 @@ export function App() {
   useEffect(() => {
     initVaultSync((externalNotes) => {
       console.log('[App] Vault updated externally from folder, reloading notes...');
-      handleNotesUpdated(externalNotes);
+      // Preserve active note when reloading externally so typing is NEVER interrupted
+      handleNotesUpdated(externalNotes, false);
     });
     return subscribeVaultSyncState(setVaultSyncState);
   }, []);
+
+  const handleChangeVaultFolder = async () => {
+    const res = await chooseVaultFolder();
+    if (res.success) {
+      if (res.isFresh) {
+        handleNotesUpdated([], true);
+      } else if (res.loadedNotes) {
+        handleNotesUpdated(res.loadedNotes, true);
+      }
+    }
+  };
 
   useEffect(() => {
     try {
@@ -482,7 +527,7 @@ export function App() {
 
   const wikiNotes = notes.filter(n => n.type === 'wiki');
   const quickNotes = notes.filter(n => n.type === 'quick');
-  const activeNote = notes.find(n => n.id === activeNoteId) || wikiNotes[0] || notes[0];
+  const activeNote = notes.find(n => n.id === activeNoteId) || (activeNoteId ? undefined : (wikiNotes[0] || notes[0]));
   const graphData = buildKnowledgeGraph(notes);
 
   return (
@@ -494,7 +539,7 @@ export function App() {
             <div className="hidden md:flex h-full">
               <Sidebar
                 currentMode={currentMode}
-                onSelectMode={setCurrentMode}
+                onSelectMode={switchMode}
                 canGoBack={historyIndex > 0}
                 canGoForward={historyIndex < history.length - 1}
                 onGoBack={handleGoBack}
@@ -503,6 +548,8 @@ export function App() {
                 quickNotesCount={quickNotes.length}
                 onToggleCollapse={() => setIsSidebarCollapsed(true)}
                 syncConfigured={vaultSyncState?.isConfigured}
+                syncFolderName={vaultSyncState?.folderName}
+                onChangeVaultFolder={handleChangeVaultFolder}
                 theme={theme}
                 onThemeChange={setTheme}
               />
@@ -713,6 +760,8 @@ export function App() {
               onNotesUpdated={handleNotesUpdated}
               theme={theme}
               onThemeChange={setTheme}
+              onClose={() => setCurrentMode(previousMode === 'settings' ? 'pages' : previousMode)}
+              returnModeLabel={previousMode === 'notes' ? (activeNote?.title || 'Note') : previousMode === 'graph' ? 'Graph' : previousMode === 'quick' ? 'Quick Notes' : 'Pages'}
             />
           )}
         </div>

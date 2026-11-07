@@ -5,6 +5,8 @@ const fs = require('fs');
 let mainWindow = null;
 let activeWatcher = null;
 let lastSelfWriteTimestamp = 0;
+let lastSelfWriteMtime = 0;
+let lastSelfWriteSize = 0;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -112,6 +114,8 @@ ipcMain.handle('vault:write-file', async (_event, { folderPath, data, fileName =
   await fs.promises.writeFile(fullPath, buffer);
   
   const stats = await fs.promises.stat(fullPath);
+  lastSelfWriteMtime = stats.mtimeMs;
+  lastSelfWriteSize = stats.size;
   return { success: true, mtime: stats.mtimeMs, size: stats.size };
 });
 
@@ -133,14 +137,18 @@ ipcMain.handle('vault:watch-folder', async (_event, { folderPath, fileName = 'la
         // Debounce external sync notifications
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(async () => {
-          // If we wrote this file ourselves within the last 2000ms, ignore
-          if (Date.now() - lastSelfWriteTimestamp < 2000) return;
+          // If we wrote this file ourselves within the last 5000ms, ignore self-write echo
+          if (Date.now() - lastSelfWriteTimestamp < 5000) return;
           
           if (mainWindow && !mainWindow.isDestroyed()) {
             try {
               const fullPath = path.join(folderPath, fileName);
               if (fs.existsSync(fullPath)) {
                 const stats = await fs.promises.stat(fullPath);
+                // If file size and mtime match our self-write, ignore
+                if (stats.size === lastSelfWriteSize && Math.abs(stats.mtimeMs - lastSelfWriteMtime) < 100) {
+                  return;
+                }
                 mainWindow.webContents.send('vault:file-changed', {
                   fileName,
                   mtime: stats.mtimeMs,
@@ -149,7 +157,7 @@ ipcMain.handle('vault:watch-folder', async (_event, { folderPath, fileName = 'la
               }
             } catch {}
           }
-        }, 600);
+        }, 800);
       }
     });
     return true;
