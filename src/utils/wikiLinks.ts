@@ -79,6 +79,65 @@ export function extractTags(content: string, title?: string): string[] {
 }
 
 /**
+ * Strips duplicate top-level # Title heading from markdown content if it matches the note title.
+ * This ensures the user only has a single place to edit the page title (the title input),
+ * eliminating redundant double titles.
+ */
+export function stripDuplicateTitleHeading(content: string, title?: string): string {
+  if (!content) return '';
+  const cleanTitle = (title || '').trim();
+  if (cleanTitle) {
+    const escaped = cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const duplicateRegex = new RegExp(`^#\\s+${escaped}\\s*(\\n+|$)`, 'i');
+    if (duplicateRegex.test(content.trimStart())) {
+      return content.trimStart().replace(duplicateRegex, '');
+    }
+  }
+
+  // Also strip generic # Untitled Page if present as first heading
+  if (/^#\s+Untitled(\s+Page)?\s*(\\n+|$)/i.test(content.trimStart())) {
+    return content.trimStart().replace(/^#\s+Untitled(\s+Page)?\s*(\\n+|$)/i, '');
+  }
+
+  return content;
+}
+
+/**
+ * Detects whether pasted text contains common Markdown formatting syntax.
+ */
+export function isMarkdownText(text: string): boolean {
+  if (!text || typeof text !== 'string') return false;
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return false;
+
+  const hasHeading = /^#{1,6}\s+\S/m.test(trimmed);
+  const hasList = /^(\s*[-*+]|\s*\d+\.)\s+\S/m.test(trimmed);
+  const hasTaskList = /^\s*[-*+]\s+\[[ xX]\]\s+\S/m.test(trimmed);
+  const hasBoldOrItalic = /(\*\*|__)[^\s*].*?\1|(\*|_)[^\s*].*?\2/.test(trimmed);
+  const hasBlockquote = /^>\s+\S/m.test(trimmed);
+  const hasCodeFence = /```[\s\S]*?```/.test(trimmed);
+  const hasInlineCode = /`[^`\n]+`/.test(trimmed);
+  const hasTable = /\|.+?\|.+?\|\n\s*\|[-: ]+\|/m.test(trimmed);
+  const hasMdLink = /\[[^\]]+\]\([^)]+\)/.test(trimmed);
+  const hasWikiLink = /\[\[[^\]]+\]\]/.test(trimmed);
+  const hasHorizontalRule = /^(\*{3,}|-{3,}|_{3,})$/m.test(trimmed);
+
+  return (
+    hasHeading ||
+    hasList ||
+    hasTaskList ||
+    hasBoldOrItalic ||
+    hasBlockquote ||
+    hasCodeFence ||
+    hasInlineCode ||
+    hasTable ||
+    hasMdLink ||
+    hasWikiLink ||
+    hasHorizontalRule
+  );
+}
+
+/**
  * Finds all notes that link back to the given note title.
  */
 export function findBacklinks(targetTitle: string, allNotes: Note[]): Note[] {

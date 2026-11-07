@@ -40,7 +40,7 @@ import { Markdown } from 'tiptap-markdown';
 
 import { Note } from '../types';
 import { AISummaryCard } from './AISummaryCard';
-import { findBacklinks, findRelatedQuickNotes, extractWikiLinks } from '../utils/wikiLinks';
+import { findBacklinks, findRelatedQuickNotes, extractWikiLinks, stripDuplicateTitleHeading, isMarkdownText } from '../utils/wikiLinks';
 import { CustomCodeBlockNode, CustomImageNode, CustomVideoNode } from './editor/editorExtensions';
 import { InsertMediaModal } from './editor/InsertMediaModal';
 import { WikiLinkSuggestionPopup } from './editor/WikiLinkSuggestionPopup';
@@ -350,6 +350,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   };
 
+  // Clean initial content removing duplicate # Heading if it matches the page title
+  const cleanInitialContent = React.useMemo(() => {
+    return stripDuplicateTitleHeading(note.content, note.title);
+  }, [note.id]);
+
+  const editorRef = React.useRef<any>(null);
+
   // Initialize TipTap Live In-Place WYSIWYG Editor
   const editor = useEditor({
     extensions: [
@@ -372,10 +379,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       Markdown.configure({
         html: true,
         tightLists: true,
-        bulletListMarker: '-'
+        bulletListMarker: '-',
+        transformPastedText: true,
+        transformCopiedText: true
       })
     ],
-    content: note.content,
+    content: cleanInitialContent,
     editorProps: {
       attributes: {
         class: 'tiptap ProseMirror px-5 py-4 focus:outline-none'
@@ -444,6 +453,33 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             );
             view.dispatch(tr);
             return true;
+          }
+        }
+
+        // 4. Paste Markdown formatted text (e.g. from .md files, notes, or code blocks)
+        const rawText = event.clipboardData?.getData('text/plain');
+        if (rawText && isMarkdownText(rawText)) {
+          event.preventDefault();
+
+          let textToParse = rawText;
+          // Check if pasting into an Untitled page and first line is # Page Title
+          const firstHeadingMatch = textToParse.match(/^#\s+([^\n]+)(\n+|$)/);
+          if (firstHeadingMatch && (localTitle === 'Untitled Page' || !localTitle.trim())) {
+            const extractedTitle = firstHeadingMatch[1].trim();
+            if (extractedTitle) {
+              setLocalTitle(extractedTitle);
+              triggerChange({ title: extractedTitle });
+              textToParse = textToParse.replace(/^#\s+[^\n]+(\n+|$)/, '');
+            }
+          }
+
+          const parser = editorRef.current?.storage?.markdown?.parser;
+          if (parser) {
+            const parsedHtml = parser.parse(textToParse);
+            if (parsedHtml) {
+              editorRef.current?.commands.insertContent(parsedHtml);
+              return true;
+            }
           }
         }
 
@@ -579,6 +615,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   });
 
   useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
@@ -589,12 +629,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [editor]);
 
-  // Sync editor content when switching between notes
+  // Sync editor content when switching between notes (with duplicate top heading stripped)
   useEffect(() => {
     if (editor && note) {
+      const cleanTarget = stripDuplicateTitleHeading(note.content, note.title);
       const currentMarkdown = getCleanMarkdown((editor.storage as any).markdown?.getMarkdown() || '');
-      if (currentMarkdown.trim() !== note.content.trim()) {
-        editor.commands.setContent(note.content);
+      if (currentMarkdown.trim() !== cleanTarget.trim()) {
+        editor.commands.setContent(cleanTarget);
       }
     }
   }, [note.id, editor]);
@@ -745,31 +786,25 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             className="w-full text-2xl lg:text-3xl font-bold bg-transparent text-zinc-100 placeholder-zinc-700 focus:outline-none tracking-tight border-none p-0"
           />
 
-          <div className="flex items-center gap-3 text-[11px] text-zinc-500 mt-1.5 flex-wrap">
-            <span className="flex items-center gap-1">
+          <div className="min-h-[22px] flex items-center gap-3 text-[11px] text-zinc-500 mt-1.5 flex-wrap">
+            <span className="flex items-center gap-1 shrink-0">
               <Clock className="w-3 h-3 text-zinc-600" />
               <span>Updated {new Date(note.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(note.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </span>
 
-            <span className="flex items-center gap-1 text-[11px]">
-              {saveStatus === 'saving' ? (
-                <span className="text-amber-400 font-medium animate-pulse">● Auto-saving...</span>
-              ) : saveStatus === 'unsaved' ? (
-                <span className="text-amber-400 font-medium">● Unsaved changes</span>
-              ) : (
-                <span className="text-emerald-400/90 font-medium">● Saved to SQLite {lastSavedTime ? `(${lastSavedTime})` : ''}</span>
-              )}
-            </span>
-
-            {note.tags.map((t, idx) => (
-              <span
-                key={idx}
-                onClick={() => onTagClick?.(t)}
-                className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
-              >
-                {t}
-              </span>
-            ))}
+            {note.tags && note.tags.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {note.tags.map((t, idx) => (
+                  <span
+                    key={idx}
+                    onClick={() => onTagClick?.(t)}
+                    className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {relatedSuggestions.length > 0 && (
               <button
@@ -783,13 +818,33 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
 
-        {/* Header Controls: Auto-save, Save, New Page, Delete, Full Width & Focus Mode */}
+        {/* Header Controls: Live Save Status, Auto-save Toggle, Save Button, Delete, Full Width & Focus Mode */}
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+          {/* Stationary Save Status Indicator: Fixed in toolbar, eliminates note bouncing */}
+          <div className="flex items-center px-2 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] font-medium shrink-0 h-[26px]">
+            {saveStatus === 'saving' ? (
+              <span className="text-amber-400 flex items-center gap-1 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                <span>Auto-saving...</span>
+              </span>
+            ) : saveStatus === 'unsaved' ? (
+              <span className="text-amber-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                <span>Unsaved</span>
+              </span>
+            ) : (
+              <span className="text-emerald-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span>Saved {lastSavedTime ? `(${lastSavedTime})` : ''}</span>
+              </span>
+            )}
+          </div>
+
           {/* Auto-Save Toggle */}
           <button
             type="button"
             onClick={toggleAutoSave}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors h-[26px] ${
               isAutoSaveEnabled
                 ? 'bg-zinc-900 border-emerald-500/30 text-emerald-300'
                 : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
@@ -804,7 +859,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           <button
             type="button"
             onClick={handleManualSave}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all shadow-sm ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all shadow-sm h-[26px] ${
               justSaved
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                 : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-200 hover:text-white border-zinc-700/80 active:scale-95'

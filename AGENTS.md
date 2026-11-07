@@ -497,7 +497,23 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 69/69 automated unit tests passing across all 8 suites (`wikiLinks`, `graphBuilder`, `sqliteService`, `vaultSyncService`, `aiService`, `assetService`, `wikiLinkAutocomplete`, `markdownViewer`).
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Rock-Solid Note Editor Stability, Instant Markdown Paste Formatting & Single-Source Page Title**:
+    - **Eliminated Vertical Note Jitter & Bounce During Typing**:
+      - Relocated live `saveStatus` indicator (`● Auto-saving...`, `● Saved to SQLite (time)`, `● Unsaved`) from the wrapping note title metadata line into the stationary top controls toolbar next to the `Auto-save: ON/OFF` toggle and `Save` button.
+      - Locked the note metadata subtitle row with fixed height (`min-h-[22px]`), guaranteeing zero vertical layout shifting while typing.
+    - **Instant Markdown File Paste Formatting**:
+      - Enabled `transformPastedText: true` and `transformCopiedText: true` in `Markdown.configure`.
+      - Added intelligent markdown detection (`isMarkdownText`) and interceptor in `editorProps.handlePaste`: when pasting `.md` file content or markdown snippets (headings, task checklists, bulleted lists, bold text, blockquotes, code blocks, tables), it automatically parses into TipTap formatted nodes in real time.
+      - If pasting markdown into an Untitled page, automatically adopts the document's top `# Heading` as the page title.
+    - **Single Source of Truth for Page Title (No Duplicate Headings)**:
+      - Removed redundant `# ${cleanTitle}` injection on page creation in `handleEnsurePageExists`, `navigateToNote`, and `handleCreateNewWikiPage`.
+      - Implemented `stripDuplicateTitleHeading(content, title)` in `src/utils/wikiLinks.ts`: automatically normalizes notes so the user edits the title in strictly one place (the top title input), without duplicate `# Title` lines in the note body.
+    - **Verified & Built**:
+      - 75/75 automated unit tests passing across all suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Create a new page and verify it no longer has `#Draft` or `#New`.
-  - [ ] Check Knowledge Graph to verify clean, authentic clustering without any false `#draft` hub.
+  - [ ] Test typing in NoteEditor and verify zero vertical jumping when auto-saving.
+  - [ ] Copy and paste a `.md` file into the editor and verify instant rich formatting.
+  - [ ] Create a new page and verify title is edited in only one place with no duplicate heading.

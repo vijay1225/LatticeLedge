@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { extractWikiLinks, extractTags, findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
+import { 
+  extractWikiLinks, 
+  extractTags, 
+  stripDuplicateTitleHeading, 
+  isMarkdownText, 
+  findBacklinks, 
+  findRelatedQuickNotes 
+} from '../utils/wikiLinks';
 import { HARRY_POTTER_SEED_NOTES } from '../services/harryPotterSeed';
 
 describe('Wiki-Links and Backlinks', () => {
@@ -119,6 +126,48 @@ describe('Wiki-Links and Backlinks', () => {
       const content = 'Mentions #Hogwarts and later #hogwarts and #HOGWARTS';
       const tags = extractTags(content);
       expect(tags).toEqual(['#Hogwarts']);
+    });
+  });
+
+  describe('stripDuplicateTitleHeading', () => {
+    it('strips matching top-level # Title from content to avoid duplicate headings', () => {
+      const content = '# Harry Potter\n\nThe boy who lived and saved the wizarding world.';
+      const stripped = stripDuplicateTitleHeading(content, 'Harry Potter');
+      expect(stripped).toBe('The boy who lived and saved the wizarding world.');
+    });
+
+    it('preserves non-matching headings and subheadings (##, ###)', () => {
+      const content = '## Early Years\n\nHarry grew up with the Dursleys.\n\n### Hogwarts Years';
+      const stripped = stripDuplicateTitleHeading(content, 'Harry Potter');
+      expect(stripped).toBe(content);
+    });
+
+    it('strips generic # Untitled Page or # Untitled heading', () => {
+      const content = '# Untitled Page\n\nStart writing notes here...';
+      const stripped = stripDuplicateTitleHeading(content, 'Untitled Page');
+      expect(stripped).toBe('Start writing notes here...');
+    });
+
+    it('handles empty or whitespace content safely', () => {
+      expect(stripDuplicateTitleHeading('', 'Title')).toBe('');
+      expect(stripDuplicateTitleHeading('   ', 'Title')).toBe('   ');
+    });
+  });
+
+  describe('isMarkdownText', () => {
+    it('detects markdown headings, checklists, bullet lists, code blocks and bold', () => {
+      expect(isMarkdownText('# Overview\n\nSome text')).toBe(true);
+      expect(isMarkdownText('- [ ] Checklist task')).toBe(true);
+      expect(isMarkdownText('- Bullet item 1\n- Bullet item 2')).toBe(true);
+      expect(isMarkdownText('```python\nprint(1)\n```')).toBe(true);
+      expect(isMarkdownText('This is **bold text**')).toBe(true);
+      expect(isMarkdownText('[[Wiki Link]] reference')).toBe(true);
+    });
+
+    it('returns false for plain sentences without markdown indicators', () => {
+      expect(isMarkdownText('Just a regular plain text sentence.')).toBe(false);
+      expect(isMarkdownText('Hello world!')).toBe(false);
+      expect(isMarkdownText('')).toBe(false);
     });
   });
 });
