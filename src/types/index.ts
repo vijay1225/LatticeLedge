@@ -61,7 +61,7 @@ export interface GeminiModelInfo {
 
 export type ViewMode = 'pages' | 'notes' | 'quick' | 'search' | 'graph' | 'settings';
 export type SearchTab = 'instant' | 'ask-ai';
-export type AppTheme = 'dark' | 'light' | 'sepia';
+export type AppTheme = 'dark' | 'slate' | 'sepia' | 'light';
 
 export interface ContextualSuggestion {
   quickNote: Note;

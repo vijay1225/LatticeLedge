@@ -53,7 +53,8 @@ import {
   Check,
   Moon,
   Sun,
-  BookOpen
+  BookOpen,
+  Compass
 } from 'lucide-react';
 
 const STORAGE_KEY = 'LATTICE_LEDGER_NOTES_V1';
@@ -65,7 +66,7 @@ export function App() {
     try {
       if (typeof window !== 'undefined') {
         const saved = localStorage.getItem(THEME_STORAGE_KEY);
-        if (saved === 'dark' || saved === 'light' || saved === 'sepia') {
+        if (saved === 'dark' || saved === 'slate' || saved === 'sepia' || saved === 'light') {
           return saved;
         }
       }
@@ -674,15 +675,25 @@ export function App() {
             <button
               type="button"
               onClick={() => {
-                const nextTheme: AppTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'sepia' : 'dark';
+                const nextTheme: AppTheme = 
+                  theme === 'dark' ? 'slate' : 
+                  theme === 'slate' ? 'sepia' : 
+                  theme === 'sepia' ? 'light' : 
+                  'dark';
                 setTheme(nextTheme);
               }}
               className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-              title={`Active Theme: ${theme === 'dark' ? 'Obsidian Dark' : theme === 'light' ? 'Modern Light' : 'Warm Paper'}. Tap to switch.`}
+              title={`Active Theme: ${
+                theme === 'dark' ? 'Obsidian Dark' : 
+                theme === 'slate' ? 'Midnight Slate (Cool Dark)' : 
+                theme === 'sepia' ? 'Warm Paper (Sepia)' : 
+                'Modern Light'
+              }. Tap to switch.`}
             >
               {theme === 'dark' && <Moon className="w-4 h-4 text-amber-400" />}
-              {theme === 'light' && <Sun className="w-4 h-4 text-amber-500" />}
+              {theme === 'slate' && <Compass className="w-4 h-4 text-cyan-400" />}
               {theme === 'sepia' && <BookOpen className="w-4 h-4 text-amber-600" />}
+              {theme === 'light' && <Sun className="w-4 h-4 text-amber-500" />}
             </button>
 
             <button

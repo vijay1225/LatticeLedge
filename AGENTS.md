@@ -422,6 +422,20 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 62/62 automated unit tests passing across all 8 test suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.81MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Knowledge Graph Hover vs. Click Decoupling & Midnight Slate Cool Dark Theme**:
+    - **Knowledge Graph Hover vs. Click Decoupling (`KnowledgeGraphView.tsx`)**:
+      - **Mouse Hover (Calm Browsing)**: Hovering over any node does **not** highlight connection lines or dim unhovered nodes. The entire graph stays 100% visible at full opacity. It purely renders a clean floating label pill displaying the hovered node's title under the cursor.
+      - **Node Selection on Click (Subgraph Focus)**: Clicking any node (`selectedNode`) highlights that specific node and all of its connected edges and neighbors at full opacity, while gently dimming unrelated nodes and edges (to 15% and 8% opacity respectively) and presenting the connected notes inspector card.
+    - **Midnight Slate Theme (`slate`) Added to Theme Engine**:
+      - Researched low-glare cool dark palettes (Nord, GitHub Dark Dimmed, Tokyo Night).
+      - Built a dedicated 4th theme (`slate`) engineered specifically for long reading and writing sessions without blinding, high-contrast stark black-and-white.
+      - Deep navy slate canvas (`#0f172a`), soft cool panels (`#18212f`), gentle frost slate text (`#e2e8f0`, 12.4:1 contrast, zero optical halation), and glacier cyan accents (`#38bdf8`).
+      - Added 4th preview card in Settings modal, 4-segment switcher in desktop sidebar footer (`Dark | Slate | Warm | Light`), and 1-tap mobile cycle (`dark -> slate -> sepia -> light -> dark`) with compass icon.
+      - Automatically tunes canvas background, label pills, borders, and orbit rings in Knowledge Graph View.
+    - **Verified & Built**:
+      - 62/62 automated unit tests passing across all 8 test suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.81MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Switch between Obsidian Dark, Modern Light, and Warm Paper Sepia using the sidebar switcher, mobile top header, or Settings.
+  - [ ] Switch between Obsidian Dark, Midnight Slate, Warm Paper Sepia, and Modern Light using the sidebar switcher, mobile top header, or Settings.

@@ -14,7 +14,8 @@ import {
   RefreshCw,
   Moon,
   Sun,
-  BookOpen
+  BookOpen,
+  Compass
 } from 'lucide-react';
 import { ViewMode, AppTheme } from '../types';
 
@@ -225,46 +226,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Color Theme Quick Switcher */}
-        <div className="flex items-center justify-between p-0.5 rounded-lg bg-zinc-900 border border-zinc-800/80 mb-2">
+        {/* Color Theme Quick Switcher (4 Themes) */}
+        <div className="grid grid-cols-4 gap-0.5 p-0.5 rounded-lg bg-zinc-900 border border-zinc-800/80 mb-2">
           <button
             type="button"
             onClick={() => onThemeChange?.('dark')}
-            className={`flex-1 py-1 rounded flex items-center justify-center gap-1 text-[10px] font-medium transition-all ${
+            className={`py-1 rounded flex items-center justify-center gap-1 text-[9px] font-medium transition-all ${
               theme === 'dark'
                 ? 'bg-zinc-800 text-zinc-100 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
-            title="Obsidian Dark Theme"
+            title="Obsidian Dark Theme (Midnight Black)"
           >
-            <Moon className="w-3 h-3 text-amber-400" />
+            <Moon className="w-2.5 h-2.5 text-amber-400" />
             <span className="hidden sm:inline">Dark</span>
           </button>
           <button
             type="button"
-            onClick={() => onThemeChange?.('light')}
-            className={`flex-1 py-1 rounded flex items-center justify-center gap-1 text-[10px] font-medium transition-all ${
-              theme === 'light'
+            onClick={() => onThemeChange?.('slate')}
+            className={`py-1 rounded flex items-center justify-center gap-1 text-[9px] font-medium transition-all ${
+              theme === 'slate'
                 ? 'bg-zinc-800 text-zinc-100 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
-            title="Modern Light Theme"
+            title="Midnight Slate Theme (Cool Dark Reading Mode)"
           >
-            <Sun className="w-3 h-3 text-amber-500" />
-            <span className="hidden sm:inline">Light</span>
+            <Compass className="w-2.5 h-2.5 text-cyan-400" />
+            <span className="hidden sm:inline">Slate</span>
           </button>
           <button
             type="button"
             onClick={() => onThemeChange?.('sepia')}
-            className={`flex-1 py-1 rounded flex items-center justify-center gap-1 text-[10px] font-medium transition-all ${
+            className={`py-1 rounded flex items-center justify-center gap-1 text-[9px] font-medium transition-all ${
               theme === 'sepia'
                 ? 'bg-zinc-800 text-zinc-100 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
-            title="Warm Paper (Writing Mode)"
+            title="Warm Paper (Moleskine Book Mode)"
           >
-            <BookOpen className="w-3 h-3 text-amber-600" />
+            <BookOpen className="w-2.5 h-2.5 text-amber-600" />
             <span className="hidden sm:inline">Warm</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onThemeChange?.('light')}
+            className={`py-1 rounded flex items-center justify-center gap-1 text-[9px] font-medium transition-all ${
+              theme === 'light'
+                ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+            title="Modern Light Theme (Daytime Mode)"
+          >
+            <Sun className="w-2.5 h-2.5 text-amber-500" />
+            <span className="hidden sm:inline">Light</span>
           </button>
         </div>
 

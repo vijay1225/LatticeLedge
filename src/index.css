@@ -36,6 +36,39 @@
   --scrollbar-thumb-hover: rgba(168, 162, 158, 0.4);
 }
 
+[data-theme='slate'] {
+  --color-zinc-950: 15 23 42;    /* #0f172a - deep cool navy slate canvas */
+  --color-zinc-900: 24 33 47;    /* #18212f - cards/panels/sidebar */
+  --color-zinc-850: 30 41 59;    /* #1e293b - elevated panels */
+  --color-zinc-800: 40 53 72;    /* #283548 - borders/dividers */
+  --color-zinc-700: 55 71 93;    /* #37475d - input borders */
+  --color-zinc-600: 100 116 139; /* #64748b - muted icons */
+  --color-zinc-500: 120 136 155; /* #78889b - timestamps/meta */
+  --color-zinc-400: 148 163 184; /* #94a3b8 - secondary text */
+  --color-zinc-300: 203 213 225; /* #cbd5e1 - subheadings */
+  --color-zinc-200: 226 232 240; /* #e2e8f0 - soft frost body text (non-glare) */
+  --color-zinc-100: 241 245 249; /* #f1f5f9 - primary headings */
+  --color-zinc-50: 248 250 252;  /* #f8fafc - high contrast */
+
+  --tiptap-text: #e2e8f0;
+  --tiptap-placeholder: #64748b;
+  --tiptap-h1: #f1f5f9;
+  --tiptap-border: rgba(51, 65, 85, 0.6);
+  --tiptap-link: #38bdf8;
+  --tiptap-link-hover: #7dd3fc;
+  --tiptap-quote-text: #94a3b8;
+  --tiptap-quote-bg: rgba(30, 41, 59, 0.5);
+  --tiptap-quote-border: #38bdf8;
+  --tiptap-code-bg: rgba(24, 33, 47, 0.95);
+  --tiptap-code-text: #38bdf8;
+  --tiptap-code-border: rgba(51, 65, 85, 0.6);
+  --tiptap-pre-bg: #0b0f19;
+  --tiptap-pre-text: #e2e8f0;
+
+  --scrollbar-thumb: rgba(148, 163, 184, 0.2);
+  --scrollbar-thumb-hover: rgba(148, 163, 184, 0.4);
+}
+
 [data-theme='light'] {
   --color-zinc-950: 255 255 255;
   --color-zinc-900: 248 250 252;

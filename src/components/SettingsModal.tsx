@@ -31,7 +31,8 @@ import {
   Palette,
   Moon,
   Sun,
-  BookOpen
+  BookOpen,
+  Compass
 } from 'lucide-react';
 import { AIProviderConfig, Note, GeminiModelInfo, AppTheme } from '../types';
 import { downloadVaultBackup, importVaultFromJson } from '../utils/vaultExportImport';
@@ -488,7 +489,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <span>Appearance & Color Theme</span>
             </div>
             <span className="text-[11px] font-medium text-zinc-400 capitalize">
-              Active: {theme === 'dark' ? 'Obsidian Dark' : theme === 'light' ? 'Modern Light' : 'Warm Paper (Sepia)'}
+              Active: {
+                theme === 'dark' ? 'Obsidian Dark' : 
+                theme === 'slate' ? 'Midnight Slate (Cool Dark)' : 
+                theme === 'sepia' ? 'Warm Paper (Sepia)' : 
+                'Modern Light'
+              }
             </span>
           </div>
 
@@ -496,7 +502,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             Choose your preferred reading and writing aesthetic. Instantly transforms the editor, pages, navigation, and knowledge graph.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
             {/* Theme 1: Obsidian Dark */}
             <button
               type="button"
@@ -522,7 +528,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   )}
                 </div>
                 <p className="text-[11px] text-zinc-400 line-clamp-2">
-                  Default midnight contrast with amber & sky accents. Ideal for low-light focus and coding.
+                  Classic midnight black with amber & sky accents. High-contrast OLED focus.
                 </p>
               </div>
               <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-zinc-800/60">
@@ -533,7 +539,79 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </button>
 
-            {/* Theme 2: Modern Light */}
+            {/* Theme 2: Midnight Slate (Cool Dark Reading Mode) */}
+            <button
+              type="button"
+              onClick={() => onThemeChange?.('slate')}
+              className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                theme === 'slate'
+                  ? 'border-cyan-500 ring-2 ring-cyan-500/20 bg-[#0f172a] shadow-md'
+                  : 'border-zinc-800/80 bg-zinc-950/40 hover:border-zinc-700 hover:bg-zinc-950/70'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-[#18212f] border border-[#283548] flex items-center justify-center text-cyan-400">
+                      <Compass className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-semibold text-zinc-100">Midnight Slate</span>
+                  </div>
+                  {theme === 'slate' && (
+                    <span className="w-4 h-4 rounded-full bg-cyan-600 flex items-center justify-center text-white">
+                      <Check className="w-2.5 h-2.5" />
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-400 line-clamp-2">
+                  Deep cool dark slate with soft frost typography & glacier cyan accents. Zero harsh glare for notes.
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-zinc-800/60">
+                <div className="w-3.5 h-3.5 rounded-full bg-[#0f172a] border border-[#283548]" title="Canvas #0f172a" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#18212f] border border-[#283548]" title="Card #18212f" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#38bdf8]" title="Glacier Cyan" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#818cf8]" title="Cool Indigo" />
+              </div>
+            </button>
+
+            {/* Theme 3: Warm Paper (Sepia) - The Ultimate Note Writing Palette */}
+            <button
+              type="button"
+              onClick={() => onThemeChange?.('sepia')}
+              className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                theme === 'sepia'
+                  ? 'border-amber-600 ring-2 ring-amber-600/20 bg-[#fbf8f2] shadow-md'
+                  : 'border-zinc-800/80 bg-zinc-950/40 hover:border-zinc-700 hover:bg-zinc-950/70'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-[#eee7d8] border border-[#d6cbba] flex items-center justify-center text-amber-700">
+                      <BookOpen className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-semibold text-zinc-100">Warm Paper</span>
+                  </div>
+                  {theme === 'sepia' && (
+                    <span className="w-4 h-4 rounded-full bg-amber-600 flex items-center justify-center text-white">
+                      <Check className="w-2.5 h-2.5" />
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-400 line-clamp-2">
+                  Moleskine cream with espresso ink. Zero blue-light glare, most comfortable for 10+ hours of writing.
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-zinc-800/60">
+                <div className="w-3.5 h-3.5 rounded-full bg-[#fbf8f2] border border-[#ded3bc]" title="Paper #fbf8f2" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#f5f0e6] border border-[#ded3bc]" title="Panel #f5f0e6" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#b45309]" title="Warm Bronze" />
+                <div className="w-3.5 h-3.5 rounded-full bg-[#2b221b]" title="Espresso Ink" />
+              </div>
+            </button>
+
+            {/* Theme 4: Modern Light */}
             <button
               type="button"
               onClick={() => onThemeChange?.('light')}
@@ -566,42 +644,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="w-3.5 h-3.5 rounded-full bg-[#f8fafc] border border-slate-300" title="Card #f8fafc" />
                 <div className="w-3.5 h-3.5 rounded-full bg-[#4f46e5]" title="Indigo Accent" />
                 <div className="w-3.5 h-3.5 rounded-full bg-[#0284c7]" title="Sky Accent" />
-              </div>
-            </button>
-
-            {/* Theme 3: Warm Paper (Sepia) - The Ultimate Note Writing Palette */}
-            <button
-              type="button"
-              onClick={() => onThemeChange?.('sepia')}
-              className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
-                theme === 'sepia'
-                  ? 'border-amber-600 ring-2 ring-amber-600/20 bg-[#fbf8f2] shadow-md'
-                  : 'border-zinc-800/80 bg-zinc-950/40 hover:border-zinc-700 hover:bg-zinc-950/70'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-[#eee7d8] border border-[#d6cbba] flex items-center justify-center text-amber-700">
-                      <BookOpen className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-semibold text-zinc-100">Warm Paper (Sepia)</span>
-                  </div>
-                  {theme === 'sepia' && (
-                    <span className="w-4 h-4 rounded-full bg-amber-600 flex items-center justify-center text-white">
-                      <Check className="w-2.5 h-2.5" />
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-zinc-400 line-clamp-2">
-                  Moleskine cream with espresso ink. Zero blue-light glare, most comfortable for 10+ hours of writing.
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-zinc-800/60">
-                <div className="w-3.5 h-3.5 rounded-full bg-[#fbf8f2] border border-[#ded3bc]" title="Paper #fbf8f2" />
-                <div className="w-3.5 h-3.5 rounded-full bg-[#f5f0e6] border border-[#ded3bc]" title="Panel #f5f0e6" />
-                <div className="w-3.5 h-3.5 rounded-full bg-[#b45309]" title="Warm Bronze" />
-                <div className="w-3.5 h-3.5 rounded-full bg-[#2b221b]" title="Espresso Ink" />
               </div>
             </button>
           </div>

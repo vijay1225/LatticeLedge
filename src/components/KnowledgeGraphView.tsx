@@ -235,20 +235,20 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
       });
     }
 
-    // Active focused node (Selected node takes priority, otherwise hovered node)
-    const activeFocusNode = selectedNode || hoveredNode;
+    // Only when a node is clicked (selectedNode), compute its connected neighbors and links for connection highlighting
+    // When hovering mouse, we only display the node name without dimming or highlighting the graph
     const connectedNodeIds = new Set<string>();
     const activeLinkIds = new Set<string>();
 
-    if (activeFocusNode) {
-      connectedNodeIds.add(activeFocusNode.id);
+    if (selectedNode) {
+      connectedNodeIds.add(selectedNode.id);
       links.forEach(link => {
         const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
         const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-        if (sourceId === activeFocusNode.id) {
+        if (sourceId === selectedNode.id) {
           connectedNodeIds.add(targetId);
           activeLinkIds.add(link.id);
-        } else if (targetId === activeFocusNode.id) {
+        } else if (targetId === selectedNode.id) {
           connectedNodeIds.add(sourceId);
           activeLinkIds.add(link.id);
         }
@@ -260,6 +260,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
       ? 'rgba(217, 119, 6, 0.16)' 
       : theme === 'sepia' 
       ? 'rgba(180, 83, 9, 0.16)' 
+      : theme === 'slate'
+      ? 'rgba(56, 189, 248, 0.12)'
       : 'rgba(217, 119, 6, 0.08)';
 
     for (const node of nodes) {
@@ -280,8 +282,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
       const target = link.target as D3Node;
       if (!source || !target || source.x === undefined || source.y === undefined || target.x === undefined || target.y === undefined) continue;
 
-      const isConnected = activeFocusNode ? activeLinkIds.has(link.id) : true;
-      const opacity = activeFocusNode ? (isConnected ? 0.95 : 0.06) : isFiltered ? 0.2 : 0.35;
+      const isConnected = selectedNode ? activeLinkIds.has(link.id) : true;
+      const opacity = selectedNode ? (isConnected ? 0.95 : 0.08) : isFiltered ? 0.2 : 0.35;
 
       ctx.beginPath();
       ctx.moveTo(source.x, source.y);
@@ -289,15 +291,15 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
 
       if (link.type === 'satellite') {
         ctx.strokeStyle = `rgba(56, 189, 248, ${opacity * 0.9})`;
-        ctx.lineWidth = isConnected && activeFocusNode ? 1.8 : 1;
+        ctx.lineWidth = isConnected && selectedNode ? 2.0 : 1;
         ctx.setLineDash([3, 3]);
       } else if (link.type === 'explicit') {
         ctx.strokeStyle = `rgba(217, 119, 6, ${opacity})`;
-        ctx.lineWidth = isConnected && activeFocusNode ? 2.5 : 1.4;
+        ctx.lineWidth = isConnected && selectedNode ? 2.6 : 1.4;
         ctx.setLineDash([]);
       } else {
         ctx.strokeStyle = `rgba(168, 85, 247, ${opacity * 0.7})`;
-        ctx.lineWidth = isConnected && activeFocusNode ? 1.5 : 0.9;
+        ctx.lineWidth = isConnected && selectedNode ? 1.8 : 0.9;
         ctx.setLineDash([4, 4]);
       }
 
@@ -311,12 +313,12 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
 
       const isSelected = selectedNode?.id === node.id;
       const isHovered = hoveredNode?.id === node.id;
-      const isConnected = activeFocusNode ? connectedNodeIds.has(node.id) : true;
+      const isConnected = selectedNode ? connectedNodeIds.has(node.id) : true;
       const isMatched = isFiltered ? matchingNodeIds.has(node.id) : true;
 
-      const alpha = activeFocusNode ? (isConnected ? 1.0 : 0.12) : isFiltered ? (isMatched ? 1.0 : 0.2) : 1.0;
+      const alpha = selectedNode ? (isConnected ? 1.0 : 0.15) : isFiltered ? (isMatched ? 1.0 : 0.2) : 1.0;
 
-      // Outer Selection / Glow Ring
+      // Outer Selection / Hover Ring
       if (isSelected) {
         ctx.beginPath();
         ctx.arc(node.x, node.y, node.radius + 8, 0, 2 * Math.PI);
@@ -328,12 +330,17 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
         ctx.arc(node.x, node.y, node.radius + 12, 0, 2 * Math.PI);
         ctx.fillStyle = node.clusterColor + '44';
         ctx.fill();
-      } else if (isHovered || (node.isPlanet && alpha > 0.5)) {
+      } else if (isHovered) {
+        // Hover only: Clean outline ring around hovered node without dimming the graph
         ctx.beginPath();
-        ctx.arc(node.x, node.y, node.radius + (node.isPlanet ? 6 : 4), 0, 2 * Math.PI);
-        ctx.fillStyle = node.isPlanet 
-          ? `rgba(217, 119, 6, ${isHovered ? 0.4 : 0.15})`
-          : `rgba(56, 189, 248, ${isHovered ? 0.4 : 0.2})`;
+        ctx.arc(node.x, node.y, node.radius + 4, 0, 2 * Math.PI);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else if (node.isPlanet && alpha > 0.5) {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.radius + 6, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(217, 119, 6, 0.15)';
         ctx.fill();
       }
 
@@ -361,7 +368,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
       ctx.globalAlpha = 1.0;
 
       // 4. Labels
-      const showLabel = isSelected || isHovered || node.isPlanet || (activeFocusNode && isConnected) || (isFiltered && isMatched);
+      // Hover only displays the hovered node's label! Selected node shows its label and connected neighbors.
+      const showLabel = isSelected || isHovered || node.isPlanet || (selectedNode && isConnected) || (isFiltered && isMatched);
 
       if (showLabel && alpha > 0.3) {
         ctx.font = `${node.isPlanet ? '600 11px' : '500 10px'} -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
@@ -373,14 +381,27 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
 
         const isThemeLight = theme === 'light';
         const isThemeSepia = theme === 'sepia';
+        const isThemeSlate = theme === 'slate';
 
         const labelBg = isSelected 
-          ? (isThemeLight ? '#4f46e5' : isThemeSepia ? '#b45309' : 'rgba(24, 24, 27, 0.95)')
-          : (isThemeLight ? 'rgba(255, 255, 255, 0.94)' : isThemeSepia ? 'rgba(245, 240, 230, 0.95)' : 'rgba(9, 9, 11, 0.85)');
+          ? (isThemeLight ? '#4f46e5' : isThemeSepia ? '#b45309' : isThemeSlate ? '#0284c7' : 'rgba(24, 24, 27, 0.95)')
+          : (isThemeLight
+              ? 'rgba(255, 255, 255, 0.94)'
+              : isThemeSepia
+              ? 'rgba(245, 240, 230, 0.95)'
+              : isThemeSlate
+              ? 'rgba(24, 33, 47, 0.92)'
+              : 'rgba(9, 9, 11, 0.85)');
 
         const labelBorder = isSelected 
           ? 'rgba(255, 255, 255, 0.6)'
-          : (isThemeLight ? 'rgba(203, 213, 225, 0.9)' : isThemeSepia ? 'rgba(214, 203, 187, 0.9)' : 'rgba(63, 63, 70, 0.5)');
+          : (isThemeLight
+              ? 'rgba(203, 213, 225, 0.9)'
+              : isThemeSepia
+              ? 'rgba(214, 203, 187, 0.9)'
+              : isThemeSlate
+              ? 'rgba(51, 65, 85, 0.8)'
+              : 'rgba(63, 63, 70, 0.5)');
 
         const labelTextColor = isSelected 
           ? '#ffffff'
@@ -388,6 +409,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
               ? (node.isPlanet ? '#0f172a' : '#475569')
               : isThemeSepia
               ? (node.isPlanet ? '#2b221b' : '#706253')
+              : isThemeSlate
+              ? (node.isPlanet ? '#f1f5f9' : '#94a3b8')
               : (node.isPlanet ? '#e4e4e7' : '#a1a1aa'));
 
         ctx.fillStyle = labelBg;
