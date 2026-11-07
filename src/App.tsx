@@ -19,9 +19,7 @@ import {
 import { 
   initVaultSync, 
   subscribeVaultSyncState, 
-  VaultSyncState,
-  pushVaultDbToFolder,
-  shareVaultDatabaseFile
+  VaultSyncState
 } from './services/vaultSyncService';
 
 import { Sidebar } from './components/Sidebar';
@@ -46,11 +44,6 @@ import {
   Sparkles,
   PanelLeftOpen,
   Zap,
-  Cloud,
-  CloudOff,
-  AlertTriangle,
-  RefreshCw,
-  Check,
   Moon,
   Sun,
   BookOpen,
@@ -197,60 +190,11 @@ export function App() {
   }, [hasGeminiKey]);
 
   const [vaultSyncState, setVaultSyncState] = useState<VaultSyncState | null>(null);
-  const [isOnline, setIsOnline] = useState<boolean>(() => {
-    return typeof navigator !== 'undefined' ? navigator.onLine : true;
-  });
-  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
-  const [isQuickSyncing, setIsQuickSyncing] = useState<boolean>(false);
 
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      setSyncFeedback('Internet connection restored. Ready to sync with Google Drive.');
-      setTimeout(() => setSyncFeedback(null), 4000);
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-      setSyncFeedback('⚠️ Offline: Changes are saved in local SQLite, but not synced to Google Drive until connected.');
-      setTimeout(() => setSyncFeedback(null), 6000);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  const handleQuickSync = async () => {
-    if (!isOnline) {
-      setSyncFeedback('⚠️ You are offline. Your notes are safely stored in your local SQLite vault, but not synced to Google Drive.');
-      setTimeout(() => setSyncFeedback(null), 5000);
-      return;
-    }
-
-    setIsQuickSyncing(true);
-    try {
-      if (vaultSyncState?.platform === 'electron' || vaultSyncState?.isConfigured) {
-        const res = await pushVaultDbToFolder();
-        setSyncFeedback(res.message);
-      } else {
-        const res = await shareVaultDatabaseFile();
-        setSyncFeedback(res.message || 'Sync initiated!');
-      }
-    } catch (err: any) {
-      setSyncFeedback(`Sync failed: ${err.message}`);
-    } finally {
-      setIsQuickSyncing(false);
-      setTimeout(() => setSyncFeedback(null), 5000);
-    }
-  };
-
-  // Initialize unified Vault Folder Sync (Google Drive / local directory)
+  // Initialize unified Vault Folder Sync & Storage
   useEffect(() => {
     initVaultSync((externalNotes) => {
-      console.log('[App] Vault updated externally from folder/Drive, reloading notes...');
+      console.log('[App] Vault updated externally from folder, reloading notes...');
       handleNotesUpdated(externalNotes);
     });
     return subscribeVaultSyncState(setVaultSyncState);
@@ -558,9 +502,6 @@ export function App() {
                 notesCount={wikiNotes.length}
                 quickNotesCount={quickNotes.length}
                 onToggleCollapse={() => setIsSidebarCollapsed(true)}
-                isOnline={isOnline}
-                isSyncing={isQuickSyncing}
-                onQuickSync={handleQuickSync}
                 syncConfigured={vaultSyncState?.isConfigured}
                 theme={theme}
                 onThemeChange={setTheme}
@@ -633,44 +574,6 @@ export function App() {
           )}
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Direct 1-Tap Sync Button & Network Status */}
-            <button
-              type="button"
-              onClick={handleQuickSync}
-              disabled={isQuickSyncing}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium border transition-all ${
-                !isOnline
-                  ? 'bg-amber-950/50 border-amber-500/40 text-amber-300 shadow-sm animate-pulse'
-                  : isQuickSyncing
-                  ? 'bg-indigo-950/50 border-indigo-500/40 text-indigo-300'
-                  : vaultSyncState?.isConfigured
-                  ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700'
-                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-              }`}
-              title={
-                !isOnline
-                  ? 'Offline: File may not be synced to Google Drive (tap for info)'
-                  : 'Tap to sync with Google Drive / Vault'
-              }
-            >
-              {!isOnline ? (
-                <>
-                  <CloudOff className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="hidden xs:inline text-[10px]">Not Synced</span>
-                </>
-              ) : isQuickSyncing ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
-                  <span className="hidden xs:inline text-[10px]">Syncing...</span>
-                </>
-              ) : (
-                <>
-                  <Cloud className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="hidden xs:inline text-[10px]">Sync</span>
-                </>
-              )}
-            </button>
-
             {/* Mobile 1-Tap Theme Switcher */}
             <button
               type="button"
@@ -709,30 +612,6 @@ export function App() {
             </button>
           </div>
         </header>
-
-        {/* Sync Feedback Toast / Offline Warning Banner */}
-        {syncFeedback && (
-          <div className={`px-3 py-1.5 text-[11px] flex items-center justify-between border-b shrink-0 animate-in fade-in ${
-            !isOnline
-              ? 'bg-amber-950/90 border-amber-700/50 text-amber-300'
-              : 'bg-indigo-950/90 border-indigo-700/50 text-indigo-200'
-          }`}>
-            <div className="flex items-center gap-2 min-w-0">
-              {!isOnline ? (
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              ) : (
-                <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              )}
-              <span className="truncate">{syncFeedback}</span>
-            </div>
-            <button
-              onClick={() => setSyncFeedback(null)}
-              className="p-1 text-zinc-400 hover:text-white shrink-0 ml-2"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
 
         {/* Content by Current View Mode */}
         <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
@@ -776,7 +655,6 @@ export function App() {
                     onOpenSettings={() => setCurrentMode('settings')}
                     summaryError={summaryError}
                     onBackToPages={() => setCurrentMode('pages')}
-                    isOnline={isOnline}
                   />
                 </ErrorBoundary>
               ) : (

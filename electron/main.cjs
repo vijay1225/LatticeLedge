@@ -18,7 +18,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      webSecurity: false
     }
   });
 
@@ -164,6 +165,42 @@ ipcMain.handle('vault:unwatch-folder', async () => {
     activeWatcher = null;
   }
   return true;
+});
+
+ipcMain.handle('vault:get-wasm-binary', async () => {
+  const possiblePaths = [
+    path.join(__dirname, '../dist/sql-wasm.wasm'),
+    path.join(__dirname, 'sql-wasm.wasm'),
+    path.join(app.getAppPath(), 'dist/sql-wasm.wasm'),
+    path.join(process.resourcesPath || '', 'dist/sql-wasm.wasm'),
+    path.join(process.resourcesPath || '', 'app.asar/dist/sql-wasm.wasm'),
+    path.join(__dirname, '../node_modules/sql.js/dist/sql-wasm.wasm')
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const buffer = await fs.promises.readFile(p);
+        return buffer;
+      } catch (err) {
+        console.error('[Electron] Failed to read wasm from', p, err);
+      }
+    }
+  }
+  return null;
+});
+
+ipcMain.handle('vault:ensure-assets-dir', async (_event, { folderPath }) => {
+  if (!folderPath) return false;
+  try {
+    const assetsPath = path.join(folderPath, 'assets');
+    if (!fs.existsSync(assetsPath)) {
+      await fs.promises.mkdir(assetsPath, { recursive: true });
+    }
+    return true;
+  } catch (err) {
+    console.error('[Electron] Failed to ensure assets dir:', err);
+    return false;
+  }
 });
 
 // App Lifecycle

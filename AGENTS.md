@@ -436,6 +436,28 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 62/62 automated unit tests passing across all 8 test suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.81MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Direct WASM Binary Loading & Simplified Single Vault Folder Engine (`lattice_vault.db` & `assets/`)**:
+    - **Diagnosed & Fixed Electron WASM Fetch Failure**:
+      - Root Cause: In packaged Electron apps running under `file://`, Chromium blocks `fetch()` and synchronous `XMLHttpRequest` for `.wasm` assets by default, throwing `both async and sync fetching of the wasm failed` during SQLite initialization.
+      - Implemented IPC handler `vault:get-wasm-binary` in `electron/main.cjs` that directly reads `sql-wasm.wasm` from disk using Node.js `fs.promises.readFile` into a raw Buffer and passes it as an `ArrayBuffer` directly to `initSqlJs({ wasmBinary })` in `sqliteService.ts`.
+      - This completely bypasses network/fetch calls in Electron, eliminating the WASM fetch error permanently.
+      - Enabled `webSecurity: false` in `webPreferences` for seamless local asset resolution.
+    - **Radically Simplified Single Vault Folder Architecture**:
+      - Completely removed confusing and cluttered options: "Push Notes to Folder", "Pull Notes from Folder", "Import from Google Drive", "Save / Share to Google Drive", "Import SQLite DB", "Import JSON Backup", "Export SQLite DB", "Export JSON Backup", Google Drive cross-device sync guide, and offline warnings (`⚠️ File not synced (Offline)`).
+      - Replaced Section 2 of Settings with **Vault Storage Location**: displays current folder path, badges (`🟢 Custom Folder` / `⚪ Default Storage`), `lattice_vault.db` & `assets/` structure indicators, note count, a single primary button **"Change Vault Folder"**, and an optional **"Reset to Default"** button.
+    - **Clean Slate vs. Resume Logic (`vaultSyncService.ts`)**:
+      - **When folder is empty** (no `lattice_vault.db`): Creates a fresh empty SQLite database (`lattice_vault.db`) and an `assets/` subfolder inside the selected folder, clears UI notes state to `[]`, and starts from a clean slate.
+      - **When folder already contains `lattice_vault.db`**: Automatically reads and loads that database into SQLite and UI, resumes the entire knowledge graph, and guarantees that the `assets/` subfolder exists.
+      - Notes and media attachments automatically save directly to `<vaultFolder>/lattice_vault.db` and `<vaultFolder>/assets/`. Users can sync their folder across devices using Google Drive, OneDrive, or Dropbox folder sync client without any manual import/export hassle.
+    - **UI Cleanup Across Components**:
+      - `Sidebar.tsx`: Replaced complex sync buttons with a clean vault folder status indicator (`<Folder /> Vault Folder Active` or `<HardDrive /> Local Storage`) opening Settings on click.
+      - `NoteEditor.tsx`: Cleaned save status badge to show `● Saved to SQLite (time)` or `● Auto-saving...`.
+      - `App.tsx`: Removed offline warning toasts and header sync buttons.
+    - **Verified & Built**:
+      - 62/62 automated unit tests passing across all 8 test suites (`assetService`, `vaultSyncService`, `sqliteService`, `graphBuilder`, `wikiLinks`, `aiService`, `markdownViewer`, `wikiLinkAutocomplete`).
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Switch between Obsidian Dark, Midnight Slate, Warm Paper Sepia, and Modern Light using the sidebar switcher, mobile top header, or Settings.
+  - [ ] Select or change the vault folder in Settings.
+  - [ ] Verify clean slate on empty folder vs. instant resume on folders with existing notes.

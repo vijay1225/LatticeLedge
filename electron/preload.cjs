@@ -25,5 +25,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const listener = (_event, info) => callback(info);
     ipcRenderer.on('vault:file-changed', listener);
     return () => ipcRenderer.removeListener('vault:file-changed', listener);
-  }
+  },
+
+  getSqlWasmBinary: () => ipcRenderer.invoke('vault:get-wasm-binary'),
+
+  ensureAssetsDir: (folderPath) => ipcRenderer.invoke('vault:ensure-assets-dir', { folderPath })
 });

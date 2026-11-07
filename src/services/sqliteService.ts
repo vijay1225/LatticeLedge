@@ -66,26 +66,72 @@ async function saveBytesToIndexedDb(bytes: Uint8Array): Promise<void> {
 }
 
 /**
+ * Load and initialize the sql.js WebAssembly engine reliably across Electron, Browser, and Node.
+ */
+export async function loadSqlJsModule(): Promise<SqlJsStatic> {
+  if (sqlModule) return sqlModule;
+
+  // 1. Electron Desktop: Load wasm binary directly from local disk via IPC
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.getSqlWasmBinary) {
+    try {
+      const wasmBuffer = await (window as any).electronAPI.getSqlWasmBinary();
+      if (wasmBuffer && (wasmBuffer.byteLength > 0 || wasmBuffer.length > 0)) {
+        let arrayBuf: ArrayBuffer;
+        if (wasmBuffer instanceof ArrayBuffer) {
+          arrayBuf = wasmBuffer;
+        } else if (wasmBuffer.buffer instanceof ArrayBuffer) {
+          arrayBuf = wasmBuffer.buffer.slice(wasmBuffer.byteOffset, wasmBuffer.byteOffset + wasmBuffer.byteLength);
+        } else {
+          arrayBuf = new Uint8Array(wasmBuffer).buffer as ArrayBuffer;
+        }
+        sqlModule = await initSqlJs({ wasmBinary: arrayBuf });
+        return sqlModule;
+      }
+    } catch (err) {
+      console.warn('[SQLite] Electron IPC wasm binary fetch failed, falling back:', err);
+    }
+  }
+
+  // 2. Direct fetch of wasm binary in browser environments to avoid CORS/sync XHR crashes
+  if (typeof window !== 'undefined' && typeof fetch === 'function') {
+    try {
+      const res = await fetch('./sql-wasm.wasm');
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        sqlModule = await initSqlJs({ wasmBinary: buf });
+        return sqlModule;
+      }
+    } catch {
+      // ignore and continue to locateFile
+    }
+  }
+
+  // 3. Emscripten locateFile strategy
+  try {
+    sqlModule = await initSqlJs({
+      locateFile: (file) => {
+        if (typeof window === 'undefined') {
+          return `./node_modules/sql.js/dist/${file}`;
+        }
+        return `./${file}`;
+      }
+    });
+    return sqlModule;
+  } catch (err) {
+    // 4. Fallback default
+    sqlModule = await initSqlJs();
+    return sqlModule;
+  }
+}
+
+/**
  * Initialize SQLite WebAssembly Engine and Database.
  */
 export async function getSqliteDatabase(): Promise<Database> {
   if (activeDb) return activeDb;
 
   if (!sqlModule) {
-    try {
-      sqlModule = await initSqlJs({
-        locateFile: (file) => {
-          if (typeof window === 'undefined') {
-            return `./node_modules/sql.js/dist/${file}`;
-          }
-          // Use relative path so it resolves correctly on file:// (Electron/Capacitor) and http://
-          return `./${file}`;
-        }
-      });
-    } catch {
-      // Fallback
-      sqlModule = await initSqlJs();
-    }
+    sqlModule = await loadSqlJsModule();
   }
 
   // 1. Try to load existing binary database from folder or IndexedDB
@@ -357,9 +403,7 @@ export async function downloadSqliteDatabaseFile(): Promise<void> {
 export async function importSqliteDatabaseFile(fileOrBuffer: ArrayBuffer | Uint8Array): Promise<Note[]> {
   await getSqliteDatabase();
   if (!sqlModule) {
-    sqlModule = await initSqlJs({
-      locateFile: (file) => (typeof window === 'undefined' ? `./node_modules/sql.js/dist/${file}` : `./${file}`)
-    });
+    sqlModule = await loadSqlJsModule();
   }
 
   const bytes = fileOrBuffer instanceof Uint8Array ? fileOrBuffer : new Uint8Array(fileOrBuffer);

@@ -10,8 +10,8 @@ import {
   Sparkles, 
   Layers, 
   PanelLeftClose,
-  CloudOff,
-  RefreshCw,
+  Folder,
+  HardDrive,
   Moon,
   Sun,
   BookOpen,
@@ -29,9 +29,6 @@ interface SidebarProps {
   notesCount: number;
   quickNotesCount: number;
   onToggleCollapse?: () => void;
-  isOnline?: boolean;
-  isSyncing?: boolean;
-  onQuickSync?: () => void;
   syncConfigured?: boolean;
   theme?: AppTheme;
   onThemeChange?: (theme: AppTheme) => void;
@@ -47,9 +44,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   notesCount,
   quickNotesCount,
   onToggleCollapse,
-  isOnline = true,
-  isSyncing = false,
-  onQuickSync,
   syncConfigured = false,
   theme = 'dark',
   onThemeChange
@@ -190,41 +184,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </nav>
 
-      {/* Cloud Sync Status & Settings Footer */}
+      {/* Vault Location & Settings Footer */}
       <div className="p-2 border-t border-zinc-800/80 space-y-1.5">
-        <div className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] transition-colors ${
-          !isOnline
-            ? 'bg-amber-950/40 border-amber-600/40 text-amber-300'
-            : 'bg-zinc-900 border-zinc-800/80 text-zinc-400'
-        }`}>
+        <button
+          type="button"
+          onClick={() => onSelectMode('settings')}
+          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] bg-zinc-900 border-zinc-800/80 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+          title={syncConfigured ? "Vault Folder Active (Click to manage in Settings)" : "Local Storage (Click to select folder in Settings)"}
+        >
           <div className="flex items-center gap-1.5 min-w-0">
-            {!isOnline ? (
-              <>
-                <CloudOff className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="text-[10px] font-medium text-amber-400 truncate">File not synced (Offline)</span>
-              </>
+            {syncConfigured ? (
+              <Folder className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             ) : (
-              <>
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                  syncConfigured ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-600'
-                }`} />
-                <span className="text-[10px] text-zinc-300 truncate">
-                  {syncConfigured ? 'Google Drive Synced' : 'Vault Local'}
-                </span>
-              </>
+              <HardDrive className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             )}
+            <span className="text-[10px] text-zinc-300 truncate">
+              {syncConfigured ? 'Vault Folder Active' : 'Local Storage'}
+            </span>
           </div>
-
-          <button
-            type="button"
-            onClick={onQuickSync}
-            disabled={isSyncing}
-            className="p-1 rounded text-zinc-400 hover:text-indigo-300 hover:bg-zinc-800 transition-colors shrink-0"
-            title={!isOnline ? "Offline: cannot sync to cloud" : "Sync Now with Google Drive"}
-          >
-            <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-indigo-400' : ''}`} />
-          </button>
-        </div>
+          <span className="text-[9px] text-indigo-400/80 hover:text-indigo-300 font-medium">Manage</span>
+        </button>
 
         {/* Color Theme Quick Switcher (4 Themes) */}
         <div className="grid grid-cols-4 gap-0.5 p-0.5 rounded-lg bg-zinc-900 border border-zinc-800/80 mb-2">

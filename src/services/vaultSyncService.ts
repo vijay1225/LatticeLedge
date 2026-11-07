@@ -330,6 +330,15 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
       setStoredItem(VAULT_FOLDER_STORAGE_KEY, selected);
       setStoredItem(VAULT_FOLDER_NAME_KEY, folderName);
 
+      // Ensure assets/ folder exists inside the chosen vault folder
+      if (typeof window !== 'undefined' && (window as any).electronAPI?.ensureAssetsDir) {
+        try {
+          await (window as any).electronAPI.ensureAssetsDir(selected);
+        } catch (assetsErr) {
+          console.warn('[VaultSync] Could not ensure assets directory:', assetsErr);
+        }
+      }
+
       // Check if lattice_vault.db already exists in this chosen folder
       const info = await (window as any).electronAPI.checkVaultFileInfo(selected, DEFAULT_VAULT_FILE);
       let loadedNotes: Note[] | undefined = undefined;
@@ -386,6 +395,11 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
       await saveDirHandleToIdb(dirHandle);
       setStoredItem(VAULT_FOLDER_STORAGE_KEY, dirHandle.name);
       setStoredItem(VAULT_FOLDER_NAME_KEY, dirHandle.name);
+
+      // Ensure assets/ folder exists
+      try {
+        await dirHandle.getDirectoryHandle('assets', { create: true });
+      } catch {}
 
       let loadedNotes: Note[] | undefined = undefined;
       let isFresh = false;
@@ -447,6 +461,15 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
   const cleanPath = customPath.trim().replace(/^[/\\]+|[/\\]+$/g, '') || 'Documents/LatticeLedger';
   setStoredItem(VAULT_FOLDER_STORAGE_KEY, cleanPath);
   setStoredItem(VAULT_FOLDER_NAME_KEY, cleanPath.split(/[/\\]/).pop() || cleanPath);
+
+  // Ensure assets/ folder exists
+  try {
+    await Filesystem.mkdir({
+      path: `${cleanPath}/assets`,
+      directory: Directory.Documents,
+      recursive: true
+    });
+  } catch {}
 
   let loadedNotes: Note[] | undefined = undefined;
   let isFresh = false;

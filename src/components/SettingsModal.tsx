@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Key, 
   Cpu, 
@@ -8,47 +8,32 @@ import {
   Save, 
   ExternalLink, 
   Sparkles, 
-  Download, 
-  Upload, 
-  Database as DatabaseIcon, 
-  HardDrive,
+  Database,
   Zap,
-  FolderSync,
-  Eye,
-  EyeOff,
-  Clipboard,
-  Loader2,
   RefreshCw,
   Sliders,
-  Folder,
-  FolderOpen,
-  Unlink,
-  Share2,
-  HelpCircle,
-  ChevronDown,
-  ChevronUp,
-  FileText,
-  Palette,
-  Moon,
-  Sun,
-  BookOpen,
-  Compass
+  Eye, 
+  EyeOff, 
+  Clipboard, 
+  Loader2, 
+  Folder, 
+  FolderOpen, 
+  Unlink, 
+  Palette, 
+  Moon, 
+  Sun, 
+  BookOpen, 
+  Compass 
 } from 'lucide-react';
 import { AIProviderConfig, Note, GeminiModelInfo, AppTheme } from '../types';
-import { downloadVaultBackup, importVaultFromJson } from '../utils/vaultExportImport';
-import { downloadSqliteDatabaseFile, importSqliteDatabaseFile, replaceAllNotesInSql } from '../services/sqliteService';
 import { sanitizeApiKey, fetchAvailableGeminiModels, DEFAULT_GEMINI_MODELS } from '../services/aiService';
 import {
   chooseVaultFolder,
   setMobileVaultFolder,
-  shareVaultDatabaseFile,
   subscribeVaultSyncState,
   VaultSyncState,
   disconnectVaultFolder,
-  getVaultSyncState,
-  saveVaultDbToFolder,
-  pushVaultDbToFolder,
-  pullVaultDbFromFolder
+  getVaultSyncState
 } from '../services/vaultSyncService';
 
 interface SettingsModalProps {
@@ -100,8 +85,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isBindingFolder, setIsBindingFolder] = useState(false);
   const [isEditingMobilePath, setIsEditingMobilePath] = useState(false);
   const [mobilePathInput, setMobilePathInput] = useState(getVaultSyncState().folderPath || 'Documents/LatticeLedger');
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
-
   useEffect(() => {
     return subscribeVaultSyncState((state) => {
       setSyncState(state);
@@ -110,9 +93,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     });
   }, []);
-
-  const sqliteInputRef = useRef<HTMLInputElement>(null);
-  const jsonInputRef = useRef<HTMLInputElement>(null);
 
   // Check if current model exists in availableModels; if not and it's deprecated gemini-2.5-flash, upgrade
   useEffect(() => {
@@ -278,55 +258,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // SQLite Database Export (.db)
-  const handleExportSqlite = async () => {
-    try {
-      await downloadSqliteDatabaseFile();
-      setImportStatus('Exported lattice_vault.db! Save this single file to your Google Drive folder.');
-      setTimeout(() => setImportStatus(null), 5000);
-    } catch (err: any) {
-      setImportStatus(`Export failed: ${err.message}`);
-    }
-  };
-
-  // Share / Export SQLite DB (.db) directly to Google Drive or download
-  const handleShareToGoogleDrive = async () => {
-    try {
-      setImportStatus('Preparing lattice_vault.db for Google Drive...');
-      const res = await shareVaultDatabaseFile();
-      setImportStatus(res.message || 'lattice_vault.db export complete!');
-      setTimeout(() => setImportStatus(null), 5000);
-    } catch (err: any) {
-      setImportStatus(`Export notice: ${err.message}`);
-      setTimeout(() => setImportStatus(null), 5000);
-    }
-  };
-
-  // SQLite Database Import (.db or .sqlite)
-  const handleSqliteFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setImportStatus('Loading SQLite database from Google Drive / file...');
-      const buffer = await file.arrayBuffer();
-      const importedNotes = await importSqliteDatabaseFile(buffer);
-      if (onNotesUpdated) {
-        onNotesUpdated(importedNotes);
-        setImportStatus(`Loaded SQLite database successfully (${importedNotes.length} notes from Google Drive)!`);
-      }
-      // Also automatically save to bound folder if one exists
-      if (syncState.isConfigured) {
-        await saveVaultDbToFolder(new Uint8Array(buffer));
-      }
-    } catch (err: any) {
-      setImportStatus(`SQLite import error: ${err.message}`);
-    }
-    setTimeout(() => setImportStatus(null), 6000);
-    e.target.value = '';
-  };
-
-  // Vault Folder Binding (Google Drive / Local Directory)
+  // Vault Folder Selection & Management
   const handleChooseFolder = async () => {
     if (syncState.platform === 'capacitor') {
       setIsEditingMobilePath(true);
@@ -334,7 +266,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
 
     setIsBindingFolder(true);
-    setImportStatus('Selecting vault folder (Google Drive / Local)...');
+    setImportStatus('Selecting vault folder...');
     try {
       const res = await chooseVaultFolder();
       if (res.success) {
@@ -342,18 +274,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           if (onNotesUpdated) {
             onNotesUpdated([]);
           }
-          setImportStatus(`Bound to empty folder "${res.folderName || res.folderPath}"! Created fresh empty vault (0 notes). Ready for new notes.`);
+          setImportStatus(`Selected empty folder "${res.folderName || res.folderPath}". Created fresh vault (lattice_vault.db & assets/) - Ready for new notes!`);
         } else if (res.loadedNotes && onNotesUpdated) {
           onNotesUpdated(res.loadedNotes);
-          setImportStatus(`Bound to folder: "${res.folderName || res.folderPath}"! Resumed from existing vault (${res.loadedNotes.length} notes loaded).`);
+          setImportStatus(`Resumed vault from "${res.folderName || res.folderPath}" (${res.loadedNotes.length} notes loaded).`);
         } else {
-          setImportStatus(`Bound to folder: "${res.folderName || res.folderPath}"!`);
+          setImportStatus(`Connected to folder: "${res.folderName || res.folderPath}".`);
         }
       } else if (res.error && res.error !== 'Folder selection canceled') {
         setImportStatus(`Folder selection notice: ${res.error}`);
       }
     } catch (err: any) {
-      setImportStatus(`Failed to bind folder: ${err.message}`);
+      setImportStatus(`Failed to select folder: ${err.message}`);
     } finally {
       setIsBindingFolder(false);
       setTimeout(() => setImportStatus(null), 6000);
@@ -371,16 +303,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           if (onNotesUpdated) {
             onNotesUpdated([]);
           }
-          setImportStatus(`Bound to empty folder "${res.folderPath}"! Created fresh empty vault (0 notes). Ready for new notes.`);
+          setImportStatus(`Created fresh vault in "${res.folderPath}" with assets/ folder. Ready for new notes!`);
         } else if (res.loadedNotes && onNotesUpdated) {
           onNotesUpdated(res.loadedNotes);
-          setImportStatus(`Bound to "${res.folderPath}"! Resumed from existing vault (${res.loadedNotes.length} notes loaded).`);
+          setImportStatus(`Resumed vault from "${res.folderPath}" (${res.loadedNotes.length} notes loaded).`);
         } else {
-          setImportStatus(`Bound to "${res.folderPath}"!`);
+          setImportStatus(`Connected to "${res.folderPath}".`);
         }
         setIsEditingMobilePath(false);
       } else {
-        setImportStatus(`Failed to bind folder: ${res.error}`);
+        setImportStatus(`Failed to configure folder: ${res.error}`);
       }
     } catch (err: any) {
       setImportStatus(`Mobile folder error: ${err.message}`);
@@ -390,79 +322,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // Push / Save all active notes into lattice_vault.db in folder
-  const handlePushToFolder = async () => {
-    setIsBindingFolder(true);
-    setImportStatus('Saving current notes to lattice_vault.db in folder...');
-    try {
-      const res = await pushVaultDbToFolder();
-      setImportStatus(res.message);
-    } catch (err: any) {
-      setImportStatus(`Save error: ${err.message}`);
-    } finally {
-      setIsBindingFolder(false);
-      setTimeout(() => setImportStatus(null), 5000);
-    }
-  };
-
-  // Pull / Reload entire notes from lattice_vault.db in folder
-  const handlePullFromFolder = async () => {
-    setIsBindingFolder(true);
-    setImportStatus('Reloading entire notes from folder lattice_vault.db...');
-    try {
-      const res = await pullVaultDbFromFolder();
-      if (res.success && res.notes && onNotesUpdated) {
-        onNotesUpdated(res.notes);
-      }
-      setImportStatus(res.message);
-    } catch (err: any) {
-      setImportStatus(`Reload error: ${err.message}`);
-    } finally {
-      setIsBindingFolder(false);
-      setTimeout(() => setImportStatus(null), 5000);
-    }
-  };
-
   const handleDisconnectFolder = async () => {
     await disconnectVaultFolder();
-    setImportStatus('Disconnected vault folder binding.');
+    setImportStatus('Reset to default local storage.');
     setTimeout(() => setImportStatus(null), 4000);
-  };
-
-  // JSON / Backup Handlers
-  const handleExportJson = () => {
-    downloadVaultBackup(notes);
-    setImportStatus(`Exported JSON backup (${notes.length} notes).`);
-    setTimeout(() => setImportStatus(null), 5000);
-  };
-
-  const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const content = event.target?.result as string;
-      if (!content) return;
-
-      const result = importVaultFromJson(content);
-      if (result.success && result.notes && result.notes.length > 0) {
-        try {
-          const updatedSqlNotes = await replaceAllNotesInSql(result.notes);
-          if (onNotesUpdated) {
-            onNotesUpdated(updatedSqlNotes);
-          }
-          setImportStatus(`Imported ${updatedSqlNotes.length} notes successfully from JSON! Replaced active vault.`);
-        } catch (err: any) {
-          setImportStatus(`Import error: ${err.message}`);
-        }
-      } else {
-        setImportStatus(`Import failed: ${result.error || 'Invalid format'}`);
-      }
-      setTimeout(() => setImportStatus(null), 6000);
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   };
 
   const recommendedModels = availableModels.filter(m => m.isRecommended);
@@ -476,7 +339,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <Sparkles className="w-4 h-4 text-indigo-400" />
         </h2>
         <p className="text-xs text-zinc-500 mt-0.5">
-          Manage your Gemini AI Key, fetch active models, configure SQLite engine, and sync Google Drive vault.
+          Manage your Gemini AI Key, fetch active models, and choose your vault storage folder.
         </p>
       </div>
 
@@ -864,119 +727,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        {/* 2. SECOND SECTION: High-Speed SQLite Database Engine & Google Drive Vault */}
+        {/* 2. SECOND SECTION: Vault Storage Location */}
         <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-medium text-zinc-200">
-              <DatabaseIcon className="w-4 h-4 text-indigo-400" />
-              <span>SQLite Engine & Cloud Folder Sync (lattice_vault.db)</span>
+              <Folder className="w-4 h-4 text-indigo-400" />
+              <span>Vault Storage Location</span>
             </div>
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-              <Zap className="w-3 h-3" />
-              B-Tree Indexed (Ultra Fast)
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
+              syncState.isConfigured
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                : 'bg-zinc-800 text-zinc-400 border border-zinc-700/60'
+            }`}>
+              {syncState.isConfigured ? '🟢 Active Vault' : 'Default Storage'}
             </span>
           </div>
 
           <p className="text-[11px] text-zinc-400 leading-relaxed">
-            All notes are saved into an indexed <strong>SQLite database</strong> for instantaneous sub-millisecond loading and saving without loose markdown file overhead. You can share this exact same <code>lattice_vault.db</code> file across <strong>Mobile</strong> and <strong>Desktop</strong> via Google Drive or any synchronized folder.
+            All notes, pages, and media files are stored directly in your chosen folder as <code>lattice_vault.db</code> and an <code>assets/</code> subfolder.
           </p>
-
-          {/* Google Drive Cross-Device Sync Guide */}
-          <div className="p-3.5 rounded-lg bg-zinc-950/70 border border-zinc-800/90 space-y-2.5">
-            <button
-              type="button"
-              onClick={() => setIsGuideOpen(!isGuideOpen)}
-              className="w-full flex items-center justify-between text-left text-xs font-semibold text-zinc-200 hover:text-indigo-300 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <HelpCircle className="w-4 h-4 text-indigo-400" />
-                <span>How to Sync with Google Drive between Desktop & Phone</span>
-              </div>
-              {isGuideOpen ? <ChevronUp className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />}
-            </button>
-
-            {isGuideOpen && (
-              <div className="pt-2 text-[11px] text-zinc-400 space-y-3 leading-relaxed border-t border-zinc-800/60 animate-in fade-in">
-                <div className="flex gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-500/40 text-indigo-300 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
-                  <div>
-                    <strong className="text-zinc-200">On Windows PC Desktop:</strong>
-                    <p className="text-zinc-400 mt-0.5">
-                      In Settings, click <strong>"Choose Vault Folder"</strong> and select your Google Drive folder (e.g. <code>G:\My Drive\LatticeLedger</code>). The desktop app will automatically write and monitor <code>lattice_vault.db</code>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-500/40 text-indigo-300 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">2</span>
-                  <div>
-                    <strong className="text-zinc-200">On Android Phone (1-Tap Google Drive Sync):</strong>
-                    <p className="text-zinc-400 mt-0.5">
-                      Tap <strong className="text-indigo-300">"Import from Google Drive"</strong> below → pick <code>lattice_vault.db</code> directly from the Google Drive app. All notes load instantly!
-                    </p>
-                    <p className="text-zinc-400 mt-1">
-                      To send phone edits back to Google Drive, tap <strong className="text-emerald-300">"Save / Share to Google Drive"</strong> → tap <em>"Save to Drive"</em> in the Android share menu.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-500/40 text-indigo-300 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">3</span>
-                  <div>
-                    <strong className="text-zinc-200">Continuous Auto-Sync (Optional):</strong>
-                    <p className="text-zinc-400 mt-0.5">
-                      If you use Google Drive offline sync or <em>FolderSync</em> on Android to sync a device folder (e.g. <code>Documents/LatticeLedger</code>), configure that path below. LatticeLedger will write all changes directly to that folder in real time!
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Primary Google Drive 1-Tap Sync Hub */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => sqliteInputRef.current?.click()}
-              className="p-3 rounded-lg bg-zinc-950 border border-indigo-500/40 hover:border-indigo-400/70 text-left transition-all group shadow-sm active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-2 text-indigo-300 font-medium text-xs">
-                <Upload className="w-4 h-4 text-indigo-400 group-hover:-translate-y-0.5 transition-transform" />
-                <span>Import from Google Drive</span>
-              </div>
-              <p className="text-[10px] text-zinc-400 mt-1 leading-normal">
-                Pick <code>lattice_vault.db</code> from Google Drive to load all your notes instantly.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleShareToGoogleDrive}
-              className="p-3 rounded-lg bg-zinc-950 border border-emerald-500/40 hover:border-emerald-400/70 text-left transition-all group shadow-sm active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-2 text-emerald-300 font-medium text-xs">
-                <Share2 className="w-4 h-4 text-emerald-400 group-hover:-translate-y-0.5 transition-transform" />
-                <span>Save / Share to Google Drive</span>
-              </div>
-              <p className="text-[10px] text-zinc-400 mt-1 leading-normal">
-                Export and upload <code>lattice_vault.db</code> directly to your Google Drive folder.
-              </p>
-            </button>
-          </div>
 
           {/* Real-time Folder Binding Card */}
           <div className="p-3.5 rounded-lg bg-zinc-950 border border-zinc-800/90 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-medium text-zinc-200 text-xs">
-                <FolderSync className="w-4 h-4 text-indigo-400" />
-                <span>Device Synced Folder</span>
+                <FolderOpen className="w-4 h-4 text-indigo-400" />
+                <span>Vault Folder</span>
               </div>
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
                 syncState.isConfigured
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                   : 'bg-zinc-800 text-zinc-400 border border-zinc-700/60'
               }`}>
-                {syncState.isConfigured ? '🟢 In Sync' : '⚪ Not Bound'}
+                {syncState.isConfigured ? '🟢 Custom Folder' : '⚪ Default Storage'}
               </span>
             </div>
 
@@ -1038,8 +821,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {syncState.isConfigured ? (
               <div className="space-y-2.5 p-3 rounded-lg bg-zinc-900/80 border border-indigo-500/30">
                 <div className="space-y-1">
-                  <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-                    Bound Vault Folder ({syncState.platform === 'electron' ? 'Desktop App' : syncState.platform === 'capacitor' ? 'Android Device' : 'Browser Engine'})
+                  <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider flex items-center justify-between">
+                    <span>Selected Vault Folder ({syncState.platform === 'electron' ? 'Desktop Local' : syncState.platform === 'capacitor' ? 'Android Device' : 'Local Storage'})</span>
+                    <span className="font-mono text-indigo-400 font-semibold">{notes.length} notes</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-zinc-950 px-2.5 py-1.5 rounded border border-zinc-800 overflow-x-auto break-all">
                     <Folder className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
@@ -1048,13 +832,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Automatic sync active (<code>{syncState.fileName}</code>)</span>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-zinc-300">
+                      <Database className="w-3.5 h-3.5 text-indigo-400" />
+                      <code>lattice_vault.db</code>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-zinc-300">
+                      <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+                      <code>assets/</code>
+                    </span>
                   </div>
                   {syncState.lastSyncedAt && (
                     <span className="text-[10px] text-zinc-500 font-mono">
-                      Last sync: {new Date(syncState.lastSyncedAt).toLocaleTimeString()}
+                      Last saved: {new Date(syncState.lastSyncedAt).toLocaleTimeString()}
                     </span>
                   )}
                 </div>
@@ -1062,42 +852,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center gap-2 pt-2 flex-wrap">
                   <button
                     type="button"
-                    onClick={handlePushToFolder}
-                    className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
-                    title="Export and save all active notes into lattice_vault.db in this folder"
-                  >
-                    <Save className="w-3 h-3" />
-                    <span>Save / Push Notes to Folder</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handlePullFromFolder}
-                    className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700"
-                    title="Read lattice_vault.db from this folder and reload notes"
-                  >
-                    <RefreshCw className="w-3 h-3 text-indigo-400" />
-                    <span>Reload / Pull from Folder</span>
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={handleChooseFolder}
-                    className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700"
-                    title="Change folder location"
+                    disabled={isBindingFolder}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
                   >
-                    <FolderOpen className="w-3 h-3 text-zinc-400" />
-                    <span>Change Folder</span>
+                    {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
+                    <span>Change Vault Folder</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleDisconnectFolder}
-                    className="px-2.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-rose-800/40 ml-auto"
-                    title="Unbind folder"
+                    className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 ml-auto"
+                    title="Disconnect custom folder and return to default local storage"
                   >
-                    <Unlink className="w-3 h-3 text-rose-400" />
-                    <span>Disconnect</span>
+                    <Unlink className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>Reset to Default</span>
                   </button>
                 </div>
               </div>
@@ -1105,7 +875,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               !isEditingMobilePath && (
                 <div className="space-y-3">
                   <p className="text-[11px] text-zinc-400 leading-relaxed">
-                    Select or configure your <strong>Google Drive / Synced folder</strong> (e.g. <code>G:\My Drive\LatticeLedger</code> on Desktop or <code>Documents/LatticeLedger</code> on Mobile). Both devices will automatically share and edit the exact same <code>lattice_vault.db</code> file.
+                    Currently using <strong>default local storage</strong>. Choose any folder on your device to store your notes and media files.
                   </p>
 
                   <button
@@ -1119,112 +889,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     ) : (
                       <FolderOpen className="w-4 h-4" />
                     )}
-                    <span>{syncState.platform === 'capacitor' ? 'Configure Device Sync Folder' : 'Choose Vault Folder (Google Drive / Local)'}</span>
+                    <span>{syncState.platform === 'capacitor' ? 'Configure Device Vault Folder' : 'Choose Vault Folder'}</span>
                   </button>
                 </div>
               )
             )}
+
+            {/* Smart Resume hint */}
+            <p className="text-[10px] text-zinc-500 leading-normal pt-2 border-t border-zinc-800/60">
+              💡 <strong>Smart Resume:</strong> If the selected folder is empty, LatticeLedger creates a fresh <code>lattice_vault.db</code> and <code>assets/</code> folder starting from a clean slate. If it already contains notes, your knowledge graph will resume immediately.
+            </p>
           </div>
 
-          {/* Vault Records & Direct Transfer Controls */}
-          <div className="p-3.5 rounded-lg bg-zinc-950 border border-zinc-800/80 space-y-3.5">
-            <div className="flex items-center justify-between text-zinc-300">
-              <span className="flex items-center gap-1.5 font-medium">
-                <HardDrive className="w-3.5 h-3.5 text-zinc-400" />
-                <span>SQLite Vault Records</span>
-              </span>
-              <span className="font-mono text-indigo-400 font-semibold">{notes.length} notes</span>
+          {importStatus && (
+            <div className="text-[11px] font-medium p-2.5 rounded bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 animate-in fade-in">
+              {importStatus}
             </div>
-
-            {/* Load Entire Notes from File (Import) */}
-            <div className="p-3 rounded-lg bg-zinc-900/80 border border-zinc-800 space-y-2">
-              <div className="text-[11px] font-semibold text-zinc-200 flex items-center gap-1.5">
-                <Upload className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Load / Replace Entire Notes from File</span>
-              </div>
-              <p className="text-[10px] text-zinc-400 leading-normal">
-                Import and replace all notes in your vault using a SQLite database file or a JSON backup file.
-              </p>
-              <div className="flex items-center gap-2 pt-1 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => sqliteInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-md bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-200 border border-indigo-500/40 text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
-                  title="Import and replace entire vault from a .db or .sqlite file"
-                >
-                  <DatabaseIcon className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Import SQLite DB (.db, .sqlite)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => jsonInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
-                  title="Import and replace entire vault from a .json backup file"
-                >
-                  <FileText className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Import JSON Backup (.json)</span>
-                </button>
-
-                <input
-                  ref={sqliteInputRef}
-                  type="file"
-                  accept=".db,.sqlite"
-                  onChange={handleSqliteFileChange}
-                  className="hidden"
-                />
-                <input
-                  ref={jsonInputRef}
-                  type="file"
-                  accept=".json"
-                  onChange={handleJsonFileChange}
-                  className="hidden"
-                />
-              </div>
-            </div>
-
-            {/* Export & Backup Vault Controls */}
-            <div className="p-3 rounded-lg bg-zinc-900/80 border border-zinc-800 space-y-2">
-              <div className="text-[11px] font-semibold text-zinc-200 flex items-center gap-1.5">
-                <Download className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Export & Backup Entire Vault</span>
-              </div>
-              <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleExportSqlite}
-                  className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700/80 shadow-sm"
-                  title="Export raw SQLite database file (lattice_vault.db)"
-                >
-                  <DatabaseIcon className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Export SQLite DB (lattice_vault.db)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleExportJson}
-                  className="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700/80"
-                  title="Export standard JSON backup"
-                >
-                  <FileText className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Export JSON Backup (.json)</span>
-                </button>
-              </div>
-            </div>
-
-            {importStatus && (
-              <div className="text-[11px] font-medium p-2.5 rounded bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 animate-in fade-in">
-                {importStatus}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-start gap-2 pt-1 text-[11px] text-zinc-500 leading-normal">
-            <FolderSync className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
-            <span>
-              <strong>Google Drive Single-File Strategy:</strong> Because everything resides in <code>lattice_vault.db</code>, Google Drive syncs just one unified database file. When the desktop app opens, it reads this same database file with zero file system fragmentation!
-            </span>
-          </div>
+          )}
         </div>
 
         {/* 3. THIRD SECTION: Sample Vault Reset */}
