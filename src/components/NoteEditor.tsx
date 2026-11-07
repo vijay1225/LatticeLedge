@@ -14,7 +14,6 @@ import {
   ArrowUpRight, 
   Lightbulb, 
   Plus,
-  Sparkles,
   Expand,
   FoldHorizontal,
   Maximize2,
@@ -930,11 +929,6 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               <span className="hidden sm:inline">{isFocusMode ? 'Exit Focus' : 'Focus Mode'}</span>
             </button>
           )}
-
-          <div className="hidden lg:flex items-center gap-1 text-[11px] text-zinc-500 bg-zinc-900/40 px-2 py-1 rounded-md border border-zinc-800/80 shrink-0">
-            <Sparkles className="w-3 h-3 text-indigo-400" />
-            <span>WYSIWYG</span>
-          </div>
         </div>
       </div>
 

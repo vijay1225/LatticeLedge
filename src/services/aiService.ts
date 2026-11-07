@@ -3,6 +3,13 @@ import { Note, AISummary, AIProviderConfig, GeminiModelInfo } from '../types';
 
 export type { GeminiModelInfo };
 
+export const DEFAULT_OPENAI_MODELS: GeminiModelInfo[] = [
+  { id: 'gpt-4o-mini', name: 'gpt-4o-mini', displayName: 'GPT-4o Mini (Fast & Smart - Recommended)', isRecommended: true, description: 'Affordable, high-speed flagship model' },
+  { id: 'gpt-4o', name: 'gpt-4o', displayName: 'GPT-4o (High Intelligence Flagship)', isRecommended: true, description: 'Most capable model for deep reasoning' },
+  { id: 'o3-mini', name: 'o3-mini', displayName: 'o3-mini (Advanced Reasoning)', isRecommended: false, description: 'High-speed reasoning model' },
+  { id: 'gpt-3.5-turbo', name: 'gpt-3.5-turbo', displayName: 'GPT-3.5 Turbo (Legacy Fast)', isRecommended: false, description: 'Legacy OpenAI model' }
+];
+
 export const DEFAULT_GEMINI_MODELS: GeminiModelInfo[] = [
   { id: 'gemini-3.8-flash', name: 'models/gemini-3.8-flash', displayName: 'Gemini 3.8 Flash (Current Standard - Recommended)', isRecommended: true },
   { id: 'gemini-flash-latest', name: 'models/gemini-flash-latest', displayName: 'Gemini Flash Latest (Auto-Updating)', isRecommended: true },
@@ -49,11 +56,85 @@ function parseJsonFromText<T>(text: string): T | null {
 }
 
 /**
- * Checks whether a valid Gemini API key is configured.
+ * Checks whether a valid API key / connection is configured for the active provider.
  */
-export function isGeminiKeyConfigured(config?: AIProviderConfig): boolean {
+export function isAIConfigured(config?: AIProviderConfig): boolean {
+  const provider = config?.provider || 'gemini';
+  if (provider === 'openai') {
+    const apiKey = sanitizeApiKey(config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_OPENAI_API_KEY') : null));
+    return apiKey.length > 0;
+  }
+  if (provider === 'claude') {
+    const apiKey = sanitizeApiKey(config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_CLAUDE_API_KEY') : null));
+    return apiKey.length > 0;
+  }
+  if (provider === 'ollama') {
+    return Boolean(config?.baseUrl || (typeof window !== 'undefined' ? localStorage.getItem('LL_OLLAMA_BASE_URL') : null));
+  }
+  // Default: Google Gemini
   const apiKey = sanitizeApiKey(config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null));
   return apiKey.length > 0;
+}
+
+// Backward-compatible alias
+export const isGeminiKeyConfigured = isAIConfigured;
+
+/**
+ * Dynamically queries OpenAI API to fetch all active models available for the given API key.
+ */
+export async function fetchAvailableOpenAIModels(rawKey?: string): Promise<GeminiModelInfo[]> {
+  const apiKey = sanitizeApiKey(rawKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_OPENAI_API_KEY') : null));
+  if (!apiKey) return DEFAULT_OPENAI_MODELS;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
+
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => null);
+      throw new Error(errJson?.error?.message || `Failed to fetch OpenAI models (HTTP ${response.status})`);
+    }
+
+    const data = await response.json();
+    if (!data.data || !Array.isArray(data.data)) {
+      return DEFAULT_OPENAI_MODELS;
+    }
+
+    const chatModels: GeminiModelInfo[] = data.data
+      .filter((m: any) => {
+        const id = (m.id || '').toLowerCase();
+        return (
+          id.startsWith('gpt-4') ||
+          id.startsWith('gpt-3.5') ||
+          id.startsWith('o1') ||
+          id.startsWith('o3') ||
+          id.startsWith('chatgpt')
+        ) && !id.includes('audio') && !id.includes('realtime') && !id.includes('transcription');
+      })
+      .map((m: any) => {
+        const id = m.id;
+        const isRec = id === 'gpt-4o-mini' || id === 'gpt-4o' || id === 'o3-mini';
+        return {
+          id,
+          name: id,
+          displayName: id === 'gpt-4o-mini' ? 'GPT-4o Mini (Recommended)' : id === 'gpt-4o' ? 'GPT-4o (Flagship)' : id,
+          isRecommended: isRec
+        };
+      })
+      .sort((a: GeminiModelInfo, b: GeminiModelInfo) => {
+        if (a.isRecommended && !b.isRecommended) return -1;
+        if (!a.isRecommended && b.isRecommended) return 1;
+        return a.id.localeCompare(b.id);
+      });
+
+    return chatModels.length > 0 ? chatModels : DEFAULT_OPENAI_MODELS;
+  } catch (err: any) {
+    console.warn('[OpenAI] Model fetch error:', err);
+    return DEFAULT_OPENAI_MODELS;
+  }
 }
 
 /**
@@ -240,6 +321,83 @@ export async function generateNoteSummary(
   note: Note,
   config?: AIProviderConfig
 ): Promise<AISummary> {
+  const provider = config?.provider || 'gemini';
+
+  // 1. OpenAI Provider
+  if (provider === 'openai') {
+    const rawKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_OPENAI_API_KEY') : null);
+    const apiKey = sanitizeApiKey(rawKey);
+
+    if (!apiKey || apiKey === '') {
+      throw new Error('OpenAI API key is required. Please configure your OpenAI API key in Settings.');
+    }
+
+    const modelName = config?.modelName || 'gpt-4o-mini';
+    const prompt = `You are a high-speed knowledge synthesizer for LatticeLedger.
+Note Title: "${note.title}"
+Content:
+${note.content.slice(0, 4000)}
+
+Generate an ultra-fast JSON object:
+{
+  "tldr": ["2 to 3 bullet points, each 1 brief sentence. Strictly <= 3 points."],
+  "actionItems": ["action items or open questions, max 3"],
+  "tags": ["relevant tags starting with #, max 4"],
+  "keyEntities": ["key people, places, concepts, max 4"]
+}
+Respond ONLY with valid JSON.`;
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            { role: 'system', content: 'You are a structured knowledge synthesizer. Return ONLY valid JSON.' },
+            { role: 'user', content: prompt }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.2
+        })
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => null);
+        throw new Error(errJson?.error?.message || `OpenAI error (HTTP ${response.status})`);
+      }
+
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content || '{}';
+      const parsed = parseJsonFromText<{
+        tldr?: string[];
+        actionItems?: string[];
+        tags?: string[];
+        keyEntities?: string[];
+      }>(text);
+
+      if (!parsed || !Array.isArray(parsed.tldr)) {
+        throw new Error('OpenAI did not return a valid structured summary JSON.');
+      }
+
+      return {
+        tldr: parsed.tldr.slice(0, 3),
+        actionItems: (parsed.actionItems || []).slice(0, 3),
+        tags: (parsed.tags || note.tags || []).slice(0, 4),
+        keyEntities: (parsed.keyEntities || []).slice(0, 4),
+        generatedAt: Date.now(),
+        model: modelName
+      };
+    } catch (err: any) {
+      console.error('[OpenAI API] Summary generation error:', err);
+      throw err;
+    }
+  }
+
+  // 2. Google Gemini Provider
   const rawKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null);
   const apiKey = sanitizeApiKey(rawKey);
 
@@ -330,12 +488,7 @@ export async function queryKnowledgeBase(
   deepInvestigate: boolean = false,
   targetNoteIds?: string[]
 ): Promise<KnowledgeQueryResult> {
-  const rawKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null);
-  const apiKey = sanitizeApiKey(rawKey);
-
-  if (!apiKey || apiKey === '') {
-    throw new Error('Gemini API key is required. Please configure your Gemini API key in Settings to use Ask AI.');
-  }
+  const provider = config?.provider || 'gemini';
 
   const qLower = question.toLowerCase();
   const queryTokens = qLower.split(/\s+/).filter(t => t.length > 2);
@@ -361,8 +514,6 @@ export async function queryKnowledgeBase(
 
   const citations = relevantNotes.map(n => n.title);
   const relevantNoteIds = relevantNotes.map(n => n.id);
-  const modelName = config?.modelName || 'gemini-3.8-flash';
-  const ai = new GoogleGenAI({ apiKey });
 
   let prompt = '';
 
@@ -400,6 +551,65 @@ Instructions:
 - Use [[Note Title]] wiki links when referencing notes.
 - Format with clean Markdown. Do NOT generate unnecessary filler.`;
   }
+
+  // 1. OpenAI Query Execution
+  if (provider === 'openai') {
+    const rawKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_OPENAI_API_KEY') : null);
+    const apiKey = sanitizeApiKey(rawKey);
+
+    if (!apiKey || apiKey === '') {
+      throw new Error('OpenAI API key is required. Please configure your OpenAI API key in Settings to use Ask AI.');
+    }
+
+    const modelName = config?.modelName || 'gpt-4o-mini';
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            { role: 'system', content: 'You are the knowledge synthesis engine for LatticeLedger. Provide a direct, well-synthesized answer in clean Markdown, referencing [[Wiki Links]] where relevant.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.3
+        })
+      });
+
+      if (!response.ok) {
+        const errorJson = await response.json().catch(() => null);
+        throw new Error(errorJson?.error?.message || `OpenAI error (HTTP ${response.status})`);
+      }
+
+      const data = await response.json();
+      const answer = data.choices?.[0]?.message?.content || 'No answer generated.';
+
+      return {
+        answer,
+        citations,
+        relevantNoteIds,
+        isDeepInvestigation: deepInvestigate
+      };
+    } catch (err: any) {
+      console.error('[OpenAI API] Query error:', err);
+      throw err;
+    }
+  }
+
+  // 2. Google Gemini Query Execution
+  const rawKey = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('LL_GEMINI_API_KEY') : null);
+  const apiKey = sanitizeApiKey(rawKey);
+
+  if (!apiKey || apiKey === '') {
+    throw new Error('Gemini API key is required. Please configure your Gemini API key in Settings to use Ask AI.');
+  }
+
+  const modelName = config?.modelName || 'gemini-3.8-flash';
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const { text } = await callGeminiWithFallback(ai, modelName, {

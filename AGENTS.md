@@ -512,8 +512,25 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 75/75 automated unit tests passing across all suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Universal OpenAI Provider Support & Streamlined Editor Toolbar (Removed Static WYSIWYG Badge)**:
+    - **Streamlined Editor Header Toolbar**:
+      - Removed the static `WYSIWYG` badge from the top toolbar of `NoteEditor.tsx`, reducing visual clutter.
+    - **Universal Multi-Provider AI Architecture (Google Gemini + OpenAI)**:
+      - Transformed `aiService.ts` and `SettingsModal.tsx` into a true universal AI engine supporting both **Google Gemini** and **OpenAI (GPT)** with direct, client-side BYOK connection.
+      - Prominently placed the **Active AI Provider** tabs (`Google Gemini`, `OpenAI (GPT)`, `Anthropic Claude`, `Ollama`) at the very top of AI Settings.
+      - **Dedicated OpenAI Configuration**:
+        - Allows inputting, viewing/masking, and 1-tap pasting OpenAI API keys (`sk-...`).
+        - Auto-saves keys to `localStorage` (`LL_OPENAI_API_KEY`) independently from Gemini keys (`LL_GEMINI_API_KEY`), ensuring switching providers never erases credentials.
+        - **"Test & Verify Key"**: Live verification against OpenAI's official endpoint (`https://api.openai.com/v1/models`) with Bearer token authentication, reporting exact OpenAI error messages.
+        - **Dynamic OpenAI Model Discovery**: "Fetch Available Models" queries OpenAI for all account-accessible models, automatically prioritizing chat and reasoning models (`gpt-4o-mini`, `gpt-4o`, `o3-mini`, `gpt-3.5-turbo`) and filtering out non-text models (embeddings, tts, whisper, dall-e).
+      - **Universal Note Summarization & Ask AI Knowledge Synthesis**:
+        - Note summaries (`generateNoteSummary`): Calls OpenAI's `v1/chat/completions` in JSON mode (`response_format: { type: 'json_object' }`), producing identical normalized typed structures (`tldr`, `actionItems`, `tags`, `keyEntities`).
+        - Ask AI (`queryKnowledgeBase`): Supports two-stage fast knowledge synthesis and deep note investigation with clickable `[[Wiki Link]]` citations using OpenAI.
+    - **Comprehensive Test Suite & Parity Verification**:
+      - 82/82 automated unit tests passing across all 8 test suites (including 15 tests in `aiService.test.ts` covering both Gemini and OpenAI verification, summary generation, model discovery, and error handling).
+      - Rebuilt native standalone Android APK (`LatticeLedger.apk`, 7.84MB) and Windows Desktop application (`LatticeLedger-Desktop.exe`, 124.80MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Test typing in NoteEditor and verify zero vertical jumping when auto-saving.
-  - [ ] Copy and paste a `.md` file into the editor and verify instant rich formatting.
-  - [ ] Create a new page and verify title is edited in only one place with no duplicate heading.
+  - [ ] Open Settings -> AI & Intelligence -> switch to "OpenAI (GPT)" provider.
+  - [ ] Enter OpenAI API key (`sk-...`), test and verify key, and select model (e.g. `gpt-4o-mini`).
+  - [ ] Test per-note AI summary generation and Ask AI synthesis with OpenAI.

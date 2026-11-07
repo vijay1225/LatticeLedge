@@ -90,6 +90,13 @@ export function App() {
         if (parsed.modelName === 'gemini-2.5-flash') {
           parsed.modelName = 'gemini-3.8-flash';
         }
+        if (!parsed.apiKey) {
+          if (parsed.provider === 'openai') {
+            parsed.apiKey = localStorage.getItem('LL_OPENAI_API_KEY') || '';
+          } else {
+            parsed.apiKey = localStorage.getItem('LL_GEMINI_API_KEY') || '';
+          }
+        }
         return parsed;
       }
     } catch {}
@@ -530,7 +537,7 @@ export function App() {
     if (!target) return;
 
     if (!hasGeminiKey) {
-      setSummaryError('Gemini API key is required. Please enter your API key in Settings.');
+      setSummaryError(`${aiConfig.provider === 'openai' ? 'OpenAI' : 'Gemini'} API key is required. Please enter your API key in Settings.`);
       setCurrentMode('settings');
       return;
     }
@@ -552,7 +559,7 @@ export function App() {
         tags: combinedTags
       });
     } catch (err: any) {
-      setSummaryError(err?.message || 'Failed to generate summary with Gemini API.');
+      setSummaryError(err?.message || 'Failed to generate summary with AI API.');
     } finally {
       setIsSummaryLoading(false);
     }
