@@ -260,10 +260,38 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [historyIndex, history, isFocusMode, currentMode]);
 
+  const handleEnsurePageExists = (title: string): Note | undefined => {
+    const cleanTitle = title.trim();
+    if (!cleanTitle || cleanTitle.toLowerCase() === 'pagename' || cleanTitle.toLowerCase() === 'page name') {
+      return undefined;
+    }
+    const existing = notes.find(n => n.title.toLowerCase() === cleanTitle.toLowerCase());
+    if (existing) return existing;
+
+    const newPage: Note = {
+      id: `wiki-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      type: 'wiki',
+      title: cleanTitle,
+      content: `# ${cleanTitle}\n\nStart writing notes about ${cleanTitle}...`,
+      tags: ['#Draft'],
+      links: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    setNotes(prev => [newPage, ...prev]);
+    saveNoteToSql(newPage).catch(e => console.warn('[SQLite] save error:', e));
+    return newPage;
+  };
+
   const navigateToNote = (titleOrId: string) => {
-    let target = notes.find(n => n.id === titleOrId);
+    const clean = titleOrId.trim();
+    if (!clean || clean.toLowerCase() === 'pagename' || clean.toLowerCase() === 'page name') {
+      return;
+    }
+
+    let target = notes.find(n => n.id === clean);
     if (!target) {
-      target = notes.find(n => n.title.toLowerCase() === titleOrId.toLowerCase());
+      target = notes.find(n => n.title.toLowerCase() === clean.toLowerCase());
     }
 
     if (target) {
@@ -278,14 +306,15 @@ export function App() {
       const newNote: Note = {
         id: `wiki-${Date.now()}`,
         type: 'wiki',
-        title: titleOrId,
-        content: `# ${titleOrId}\n\nStart writing notes about ${titleOrId}...`,
+        title: clean,
+        content: `# ${clean}\n\nStart writing notes about ${clean}...`,
         tags: ['#New'],
         links: [],
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
       setNotes(prev => [newNote, ...prev]);
+      saveNoteToSql(newNote).catch(e => console.warn('[SQLite] save error:', e));
       setActiveNoteId(newNote.id);
       setCurrentMode('notes');
 
@@ -654,6 +683,7 @@ export function App() {
                   onRefreshSummary={() => handleRefreshAISummary(activeNote.id)}
                   isSummaryLoading={isSummaryLoading}
                   onNavigateToNote={navigateToNote}
+                  onEnsurePageExists={handleEnsurePageExists}
                   onNewPage={() => handleCreateNewWikiPage()}
                   onDeletePage={handleDeleteWikiPage}
                   onTagClick={() => setCurrentMode('search')}

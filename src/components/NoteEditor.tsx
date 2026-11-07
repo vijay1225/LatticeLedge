@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   Bold, 
   Italic, 
@@ -43,6 +43,7 @@ import { AISummaryCard } from './AISummaryCard';
 import { findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
 import { CustomCodeBlockNode, CustomImageNode, CustomVideoNode } from './editor/editorExtensions';
 import { InsertMediaModal } from './editor/InsertMediaModal';
+import { WikiLinkSuggestionPopup } from './editor/WikiLinkSuggestionPopup';
 import { saveAsset, getYoutubeEmbedUrl, isVideoEmbedUrl, isYoutubeShort } from '../services/assetService';
 
 interface NoteEditorProps {
@@ -52,6 +53,7 @@ interface NoteEditorProps {
   onRefreshSummary: () => void;
   isSummaryLoading: boolean;
   onNavigateToNote: (titleOrId: string) => void;
+  onEnsurePageExists?: (title: string) => Note | undefined;
   onNewPage?: () => void;
   onTagClick?: (tag: string) => void;
   isFocusMode?: boolean;
@@ -71,6 +73,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onRefreshSummary,
   isSummaryLoading,
   onNavigateToNote,
+  onEnsurePageExists,
   onNewPage,
   onTagClick,
   isFocusMode,
@@ -198,6 +201,119 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   // Compute contextual suggestions (quick notes related to this page)
   const relatedSuggestions = findRelatedQuickNotes(note, allNotes);
+
+  // Autocomplete state for [[Wiki Links]]
+  const [wikiSuggestion, setWikiSuggestion] = useState<{
+    isOpen: boolean;
+    query: string;
+    startPos: number;
+    endPos: number;
+    coords: { left: number; top: number; bottom: number } | null;
+    selectedIndex: number;
+  }>({
+    isOpen: false,
+    query: '',
+    startPos: 0,
+    endPos: 0,
+    coords: null,
+    selectedIndex: 0
+  });
+
+  const wikiSuggestionRef = useRef(wikiSuggestion);
+  wikiSuggestionRef.current = wikiSuggestion;
+
+  // Filter available wiki pages for suggestion dropdown
+  const wikiPages = allNotes.filter(n => n.type === 'wiki' && n.id !== note.id);
+  const cleanQuery = wikiSuggestion.query.trim().toLowerCase();
+  const hasExactMatch = wikiPages.some(n => n.title.toLowerCase() === cleanQuery);
+  const matchingPages = cleanQuery
+    ? wikiPages.filter(n => n.title.toLowerCase().includes(cleanQuery))
+    : wikiPages;
+  const shouldShowCreateNew = cleanQuery.length > 0 && !hasExactMatch && cleanQuery !== 'pagename' && cleanQuery !== 'page name';
+  const totalItemsCount = matchingPages.length + (shouldShowCreateNew ? 1 : 0);
+
+  const totalItemsCountRef = useRef(totalItemsCount);
+  totalItemsCountRef.current = totalItemsCount;
+
+  const matchingPagesRef = useRef(matchingPages);
+  matchingPagesRef.current = matchingPages;
+
+  const shouldShowCreateNewRef = useRef(shouldShowCreateNew);
+  shouldShowCreateNewRef.current = shouldShowCreateNew;
+
+  // Apply selected wiki page or create new
+  const applyWikiSuggestion = (pageTitle: string) => {
+    if (!editor) return;
+    const cleanTitle = pageTitle.trim();
+    if (!cleanTitle) return;
+
+    const { startPos, endPos } = wikiSuggestionRef.current;
+
+    // If new page, ensure it is created in SQLite and vault
+    const exists = allNotes.some(n => n.title.toLowerCase() === cleanTitle.toLowerCase());
+    if (!exists && cleanTitle.toLowerCase() !== 'pagename' && cleanTitle.toLowerCase() !== 'page name') {
+      onEnsurePageExists?.(cleanTitle);
+    }
+
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from: startPos, to: endPos })
+      .insertContent(`[[${cleanTitle}]] `)
+      .run();
+
+    setWikiSuggestion(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // Inspect editor text to check if [[ is being typed
+  const checkWikiSuggestion = (editorInstance: any) => {
+    if (!editorInstance) return;
+    const { state } = editorInstance;
+    const { from, to } = state.selection;
+
+    if (from !== to) {
+      if (wikiSuggestionRef.current.isOpen) {
+        setWikiSuggestion(prev => ({ ...prev, isOpen: false }));
+      }
+      return;
+    }
+
+    const lookback = Math.max(0, from - 80);
+    const textBefore = state.doc.textBetween(lookback, from, '\n', '\0');
+
+    // Match [[query at the end of textBefore
+    const match = textBefore.match(/\[\[([^\]\n]*)$/);
+    if (match) {
+      const query = match[1];
+      const startPos = from - match[0].length;
+      const endPos = from;
+
+      try {
+        const coords = editorInstance.view.coordsAtPos(from);
+        setWikiSuggestion({
+          isOpen: true,
+          query,
+          startPos,
+          endPos,
+          coords: { left: coords.left, top: coords.top, bottom: coords.bottom },
+          selectedIndex: 0
+        });
+      } catch {
+        setWikiSuggestion(prev => ({
+          ...prev,
+          isOpen: true,
+          query,
+          startPos,
+          endPos,
+          selectedIndex: 0
+        }));
+      }
+    } else {
+      if (wikiSuggestionRef.current.isOpen) {
+        setWikiSuggestion(prev => ({ ...prev, isOpen: false }));
+      }
+    }
+  };
 
   // Initialize TipTap Live In-Place WYSIWYG Editor
   const editor = useEditor({
@@ -345,12 +461,84 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           }
         }
         return false;
+      },
+      handleKeyDown: (_view, event) => {
+        if (wikiSuggestionRef.current.isOpen) {
+          const total = totalItemsCountRef.current;
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (total > 0) {
+              setWikiSuggestion(prev => ({
+                ...prev,
+                selectedIndex: (prev.selectedIndex + 1) % total
+              }));
+            }
+            return true;
+          }
+
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (total > 0) {
+              setWikiSuggestion(prev => ({
+                ...prev,
+                selectedIndex: (prev.selectedIndex - 1 + total) % total
+              }));
+            }
+            return true;
+          }
+
+          if (event.key === 'Enter' || event.key === 'Tab') {
+            event.preventDefault();
+            const currIdx = wikiSuggestionRef.current.selectedIndex;
+            const matches = matchingPagesRef.current;
+            if (currIdx < matches.length) {
+              applyWikiSuggestion(matches[currIdx].title);
+            } else if (shouldShowCreateNewRef.current) {
+              applyWikiSuggestion(wikiSuggestionRef.current.query.trim());
+            }
+            return true;
+          }
+
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            setWikiSuggestion(prev => ({ ...prev, isOpen: false }));
+            return true;
+          }
+        }
+        return false;
       }
     },
     onUpdate: ({ editor }) => {
+      const { state } = editor;
+      const { from } = state.selection;
+      const lookback = Math.max(0, from - 120);
+      const textBefore = state.doc.textBetween(lookback, from, '\n', '\0');
+
+      // Check if user just typed closing ]]
+      const closedMatch = textBefore.match(/\[\[([^\]\n]+)\]\]$/);
+      if (closedMatch) {
+        const rawTitle = closedMatch[1].trim();
+        if (
+          rawTitle &&
+          rawTitle.toLowerCase() !== 'pagename' &&
+          rawTitle.toLowerCase() !== 'page name'
+        ) {
+          const exists = allNotes.some(n => n.title.toLowerCase() === rawTitle.toLowerCase());
+          if (!exists) {
+            onEnsurePageExists?.(rawTitle);
+          }
+        }
+        setWikiSuggestion(prev => ({ ...prev, isOpen: false }));
+      } else {
+        checkWikiSuggestion(editor);
+      }
+
       // Extract clean Markdown directly from the formatted editor and trigger debounced auto-save
       const markdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
       triggerChange({ content: markdown });
+    },
+    onSelectionUpdate: ({ editor }) => {
+      checkWikiSuggestion(editor);
     }
   });
 
@@ -424,7 +612,30 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   const insertWikiLink = () => {
     if (!editor) return;
-    editor.chain().focus().insertContent('[[Page Name]]').run();
+
+    const { state } = editor;
+    const { from, to } = state.selection;
+
+    // Case 1: If user highlighted text, wrap with [[ ... ]]
+    if (from !== to) {
+      const selectedText = state.doc.textBetween(from, to, ' ').trim();
+      if (selectedText) {
+        editor.chain().focus().insertContent(`[[${selectedText}]] `).run();
+        const exists = allNotes.some(n => n.title.toLowerCase() === selectedText.toLowerCase());
+        if (!exists && selectedText.toLowerCase() !== 'pagename' && selectedText.toLowerCase() !== 'page name') {
+          onEnsurePageExists?.(selectedText);
+        }
+        return;
+      }
+    }
+
+    // Case 2: Insert [[ and trigger autocomplete popup immediately
+    editor.chain().focus().insertContent('[[').run();
+    setTimeout(() => {
+      if (editor) {
+        checkWikiSuggestion(editor);
+      }
+    }, 10);
   };
 
   const handleLinkQuickNote = (qNote: Note) => {
@@ -955,6 +1166,18 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         onClose={() => setMediaModal(prev => ({ ...prev, isOpen: false }))}
         onInsertImage={handleInsertImage}
         onInsertVideo={handleInsertVideo}
+      />
+
+      {/* Wiki-Link Autocomplete Suggestion Popup */}
+      <WikiLinkSuggestionPopup
+        isOpen={wikiSuggestion.isOpen}
+        query={wikiSuggestion.query}
+        coords={wikiSuggestion.coords}
+        allNotes={allNotes}
+        currentNoteId={note.id}
+        selectedIndex={wikiSuggestion.selectedIndex}
+        onSelect={applyWikiSuggestion}
+        onClose={() => setWikiSuggestion(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

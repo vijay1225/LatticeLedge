@@ -327,6 +327,29 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 51/51 automated unit tests passing across all 7 test suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.79MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Interactive `[[` Page Autocomplete Popup & Clean Page Creation Engine**:
+    - **Eliminated Default `[[pagename]]` Friction**:
+      - Removed the legacy behavior where clicking the link button inserted a hardcoded `[[pagename]]` placeholder that created unwanted pages named "pagename".
+      - Safeguarded `navigateToNote` and `handleEnsurePageExists` against creating junk notes titled `'pagename'` or `'page name'`.
+    - **Interactive Floating Autocomplete Popup (`WikiLinkSuggestionPopup.tsx`)**:
+      - Appears in real-time right below the typing caret whenever the user types `[[` followed by optional search characters.
+      - Dynamically calculates screen coordinates using ProseMirror `editor.view.coordsAtPos(from)`, clamping within viewport bounds and auto-flipping above caret if near the bottom of the screen.
+      - Filters all existing Wiki Pages in real-time as the user types letters.
+      - Keyboard navigation: `ArrowUp`, `ArrowDown`, `Enter`, `Tab`, and `Escape` are intercepted and handled cleanly without inserting unwanted newlines.
+      - Touch & Mobile Friendly: Uses `onMouseDown` with `e.preventDefault()` to prevent mobile keyboards or input focus from blurring when tapping items.
+    - **Smart "+ Create New Page: [query]" Option**:
+      - When typing a page title that doesn't exist, the popup dynamically displays an emerald-accented `+ Create new page: "[query]"` option.
+      - Selecting it automatically completes the link `[[Query]]` and registers the evergreen page in SQLite and state.
+    - **Automatic Silent Page Creation on `]]` Typing**:
+      - When typing `[[New Page Name]]`, finishing `]]` automatically detects if the note title already exists.
+      - If it does not exist (and is not placeholder text), it silently triggers `onEnsurePageExists(title)`: creates the evergreen page in SQLite and updates state without abruptly navigating the user away from their current typing flow.
+    - **Upgraded Toolbar Link Button**:
+      - Clicking the `[[link]]` button with selected text wraps the selection into `[[selected text]]`.
+      - Clicking it without selection inserts `[[` and immediately opens the interactive suggestion popup ready for typing.
+    - **Verified & Built**:
+      - 58/58 automated unit tests passing across all 8 test suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
+      - Fresh native Android APK: `LatticeLedger.apk`.
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Use 1-tap quick sync or automatic SQLite vault folder synchronization across devices.
+  - [ ] Type `[[` in any note to test the autocomplete dropdown and page creation.
