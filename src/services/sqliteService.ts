@@ -2,6 +2,7 @@ import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import { Note } from '../types';
 import { HARRY_POTTER_SEED_NOTES } from './harryPotterSeed';
 import { saveVaultDbToFolder, loadVaultDbFromFolder, getVaultSyncState } from './vaultSyncService';
+import { extractWikiLinks } from '../utils/wikiLinks';
 
 const DB_INDEXEDDB_NAME = 'LatticeLedgerSqliteDB';
 const DB_STORE_NAME = 'sqlite_file_store';
@@ -177,13 +178,17 @@ function insertNotesBatch(db: Database, notes: Note[]) {
 
   try {
     for (const n of notes) {
+      const cleanContent = (n.content || '').replace(/\\+\[\\+\[/g, '[[').replace(/\\+\]\\+\]/g, ']]');
+      const extractedLinks = extractWikiLinks(cleanContent);
+      const finalLinks = extractedLinks.length > 0 ? extractedLinks : (n.links || []);
+
       stmt.run([
         n.id,
         n.type,
         n.title,
-        n.content,
+        cleanContent,
         JSON.stringify(n.tags || []),
-        JSON.stringify(n.links || []),
+        JSON.stringify(finalLinks),
         n.summary ? JSON.stringify(n.summary) : null,
         n.isPinned ? 1 : 0,
         n.createdAt || Date.now(),
@@ -232,13 +237,18 @@ export async function getAllNotesFromSql(): Promise<Note[]> {
     try { links = JSON.parse(r[5] as string); } catch {}
     try { summary = r[6] ? JSON.parse(r[6] as string) : undefined; } catch {}
 
+    const rawContent = (r[3] as string) || '';
+    const cleanContent = rawContent.replace(/\\+\[\\+\[/g, '[[').replace(/\\+\]\\+\]/g, ']]');
+    const extractedLinks = extractWikiLinks(cleanContent);
+    const finalLinks = extractedLinks.length > 0 ? extractedLinks : links;
+
     return {
       id: r[0] as string,
       type: r[1] as ('wiki' | 'quick'),
-      title: r[2] as string,
-      content: r[3] as string,
+      title: r[2] as string || (r[1] === 'wiki' ? 'Untitled Page' : 'Quick Note'),
+      content: cleanContent,
       tags,
-      links,
+      links: finalLinks,
       summary,
       isPinned: Boolean(r[7]),
       createdAt: Number(r[8]),

@@ -2,13 +2,19 @@ import { Note } from '../types';
 
 /**
  * Extracts all [[Wiki Link]] titles from markdown/text content.
+ * Handles standard [[Page Name]] as well as escaped variants \[\[Page Name\]\].
  */
 export function extractWikiLinks(content: string): string[] {
   if (!content) return [];
+  // Normalize escaped brackets from markdown serializers (e.g. \[\[ -> [[ and \]\] -> ]])
+  const normalized = content
+    .replace(/\\+\[\\+\[/g, '[[')
+    .replace(/\\+\]\\+\]/g, ']]');
+
   const regex = /\[\[(.*?)\]\]/g;
   const links: string[] = [];
   let match;
-  while ((match = regex.exec(content)) !== null) {
+  while ((match = regex.exec(normalized)) !== null) {
     const title = match[1].trim();
     if (title && !links.includes(title)) {
       links.push(title);
@@ -30,8 +36,15 @@ export function findBacklinks(targetTitle: string, allNotes: Note[]): Note[] {
     // A note cannot be a backlink to itself
     if (noteTitle === normalizedTarget) return false;
     
-    // Check if target is in outgoing links
-    return (note.links || []).some(link => typeof link === 'string' && link.toLowerCase().trim() === normalizedTarget);
+    // Check if target is in outgoing links array
+    const inLinks = (note.links || []).some(
+      link => typeof link === 'string' && link.toLowerCase().trim() === normalizedTarget
+    );
+    if (inLinks) return true;
+
+    // Direct fallback: check if target is mentioned via [[wiki-link]] in raw content
+    const extracted = extractWikiLinks(note.content || '');
+    return extracted.some(link => link.toLowerCase().trim() === normalizedTarget);
   });
 }
 

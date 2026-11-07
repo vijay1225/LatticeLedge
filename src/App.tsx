@@ -147,7 +147,16 @@ export function App() {
           loadDemoShowcaseNotes().catch(() => {});
         }
         const hasKey = isGeminiKeyConfigured(aiConfig);
-        const sanitized = hasKey ? finalNotes : finalNotes.map(n => ({ ...n, summary: undefined }));
+        const sanitized = finalNotes.map(n => {
+          const cleanContent = (n.content || '').replace(/\\+\[\\+\[/g, '[[').replace(/\\+\]\\+\]/g, ']]');
+          const cleanLinks = extractWikiLinks(cleanContent);
+          return {
+            ...n,
+            content: cleanContent,
+            links: cleanLinks.length > 0 ? cleanLinks : (n.links || []),
+            summary: hasKey ? n.summary : undefined
+          };
+        });
         handleNotesUpdated(sanitized);
       }
     }).catch(err => {
@@ -352,9 +361,19 @@ export function App() {
     setNotes(prev => prev.map(note => {
       if (note.id !== id) return note;
 
-      const updated = { ...note, ...partial, updatedAt: Date.now() };
-      if (partial.content !== undefined) {
-        updated.links = extractWikiLinks(partial.content);
+      const cleanContent = partial.content !== undefined
+        ? partial.content.replace(/\\+\[\\+\[/g, '[[').replace(/\\+\]\\+\]/g, ']]')
+        : note.content;
+
+      const updated = {
+        ...note,
+        ...partial,
+        content: cleanContent,
+        updatedAt: Date.now()
+      };
+
+      if (partial.content !== undefined || partial.title !== undefined) {
+        updated.links = extractWikiLinks(cleanContent);
       }
       saveNoteToSql(updated).catch(e => console.warn('[SQLite] save error:', e));
       return updated;

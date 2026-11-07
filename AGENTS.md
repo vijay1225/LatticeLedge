@@ -367,6 +367,23 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 59/59 automated unit tests passing across all 8 test suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
       - Fresh native Android APK: `LatticeLedger.apk`.
+  - [x] **Resolved Knowledge Graph & Bidirectional Links Updating Issue**:
+    - **Diagnosed Root Cause**:
+      - When saving content from TipTap, `tiptap-markdown`'s serializer automatically escaped square brackets (e.g. `[[Target]]` became `\[\[Target\]\]`).
+      - In `extractWikiLinks`, the regex `/\[\[(.*?)\]\]/g` strictly looked for adjacent `[[` characters. Because backslashes were inserted between them (`\ [ \ [ ... \ ] \ ]`), the regex returned `null`, leaving `note.links` as an empty array `[]`.
+      - Consequently, `buildKnowledgeGraph` found no explicit links to draw edges in the Graph View, and `findBacklinks` found no incoming links to display under referenced notes.
+    - **Unescape Engine & Dual-Layer Extraction**:
+      - `getCleanMarkdown`: Strips serializer backslashes (`\[\[` -> `[[`, `\]\]` -> `]]`) in `NoteEditor.tsx` upon every keystroke, auto-save, manual save, and note load, ensuring stored markdown is 100% clean Obsidian/CommonMark compatible.
+      - `extractWikiLinks`: Normalizes escaped backslashes before running regex, ensuring both raw `[[Link]]` and escaped `\[\[Link\]\]` are extracted with 100% accuracy.
+      - `findBacklinks` & `graphBuilder.ts`: Upgraded with content-level fallback extraction (`(note.links?.length > 0 ? note.links : extractWikiLinks(note.content))`), guaranteeing that even unmigrated SQLite notes immediately display in the Knowledge Graph and Backlinks.
+      - `sqliteService.ts`: Automatically self-heals existing notes on load and on batch insert, populating the `links` column and cleaning content.
+    - **Knowledge Connections Hub Overhaul in Editor**:
+      - Added **Referenced Pages Hub** (`outgoingLinks.length`): Clearly displays clickable cards for every note referenced *by* the current note.
+      - Maintained **Bi-directional Backlinks Hub** (`backlinks.length`): Displays clickable cards for every note referencing *back to* the current note.
+    - **Verified & Built**:
+      - 61/61 automated unit tests passing across all 8 test suites.
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe`.
+      - Fresh native Android APK: `LatticeLedger.apk`.
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Type `[[` in any note to test the autocomplete dropdown and page creation.

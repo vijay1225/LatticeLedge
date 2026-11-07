@@ -1,4 +1,5 @@
 import { Note, KnowledgeGraphData, KnowledgeGraphNode, KnowledgeGraphEdge } from '../types';
+import { extractWikiLinks } from './wikiLinks';
 
 export function buildKnowledgeGraph(notes: Note[]): KnowledgeGraphData {
   const nodes: KnowledgeGraphNode[] = [];
@@ -34,7 +35,11 @@ export function buildKnowledgeGraph(notes: Note[]): KnowledgeGraphData {
     const sourceNode = nodeMap.get(note.id);
     if (!sourceNode) continue;
 
-    for (const linkTitle of (note.links || [])) {
+    const allLinks = (note.links && note.links.length > 0)
+      ? note.links
+      : extractWikiLinks(note.content || '');
+
+    for (const linkTitle of allLinks) {
       if (!linkTitle || typeof linkTitle !== 'string') continue;
       const targetNode = nodeMap.get(linkTitle.toLowerCase().trim());
       if (targetNode && targetNode.id !== sourceNode.id) {

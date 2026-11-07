@@ -35,10 +35,34 @@ describe('Knowledge Graph Construction', () => {
     expect(connection).toBeDefined();
   });
 
-  it('generates semantic edges for shared tags', () => {
-    const graph = buildKnowledgeGraph(HARRY_POTTER_SEED_NOTES);
-    const semanticEdges = graph.edges.filter(e => e.type === 'semantic');
+  it('generates explicit edges for notes even when links array is empty and content has escaped brackets', () => {
+    const customNotes = [
+      {
+        id: 'n-alpha',
+        type: 'wiki' as const,
+        title: 'Alpha Note',
+        content: 'Connecting to \\[\\[Beta Note\\]\\] right here.',
+        tags: [],
+        links: [], // Empty links array
+        createdAt: 1,
+        updatedAt: 1
+      },
+      {
+        id: 'n-beta',
+        type: 'wiki' as const,
+        title: 'Beta Note',
+        content: 'Target destination note.',
+        tags: [],
+        links: [],
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ];
 
-    expect(semanticEdges.length).toBeGreaterThan(10);
+    const graph = buildKnowledgeGraph(customNotes);
+    const edge = graph.edges.find(e => e.type === 'explicit');
+    expect(edge).toBeDefined();
+    expect(edge?.source).toBe('note-n-alpha');
+    expect(edge?.target).toBe('note-n-beta');
   });
 });

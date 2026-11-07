@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { 
   Bold, 
   Italic, 
@@ -40,7 +40,7 @@ import { Markdown } from 'tiptap-markdown';
 
 import { Note } from '../types';
 import { AISummaryCard } from './AISummaryCard';
-import { findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
+import { findBacklinks, findRelatedQuickNotes, extractWikiLinks } from '../utils/wikiLinks';
 import { CustomCodeBlockNode, CustomImageNode, CustomVideoNode } from './editor/editorExtensions';
 import { InsertMediaModal } from './editor/InsertMediaModal';
 import { WikiLinkSuggestionPopup } from './editor/WikiLinkSuggestionPopup';
@@ -65,6 +65,16 @@ interface NoteEditorProps {
   onDeletePage?: (id: string) => void;
   isOnline?: boolean;
 }
+
+/**
+ * Strips backslashes added by tiptap-markdown serializer to preserve clean [[Wiki Links]].
+ */
+const getCleanMarkdown = (raw: string): string => {
+  if (!raw) return '';
+  return raw
+    .replace(/\\+\[\\+\[/g, '[[')
+    .replace(/\\+\]\\+\]/g, ']]');
+};
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({
   note,
@@ -156,7 +166,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const handleManualSave = () => {
     if (!editor) return;
     setSaveStatus('saving');
-    const markdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
+    const rawMarkdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
+    const markdown = getCleanMarkdown(rawMarkdown);
     pendingChangesRef.current.content = markdown;
     pendingChangesRef.current.title = localTitle;
     flushPendingSave();
@@ -198,6 +209,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   // Compute backlinks (notes that point to this note)
   const backlinks = findBacklinks(note.title, allNotes);
+
+  // Outgoing referenced pages (pages linked from this note)
+  const outgoingLinks = useMemo(() => {
+    const rawLinks = (note.links && note.links.length > 0)
+      ? note.links
+      : extractWikiLinks(note.content || '');
+    return Array.from(new Set(rawLinks));
+  }, [note.links, note.content]);
 
   // Compute contextual suggestions (quick notes related to this page)
   const relatedSuggestions = findRelatedQuickNotes(note, allNotes);
@@ -552,7 +571,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       }
 
       // Extract clean Markdown directly from the formatted editor and trigger debounced auto-save
-      const markdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
+      const rawMarkdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
+      const markdown = getCleanMarkdown(rawMarkdown);
       triggerChange({ content: markdown });
     },
     onSelectionUpdate: ({ editor }) => {
@@ -574,7 +594,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   // Sync editor content when switching between notes
   useEffect(() => {
     if (editor && note) {
-      const currentMarkdown = (editor.storage as any).markdown?.getMarkdown() || '';
+      const currentMarkdown = getCleanMarkdown((editor.storage as any).markdown?.getMarkdown() || '');
       if (currentMarkdown.trim() !== note.content.trim()) {
         editor.commands.setContent(note.content);
       }
@@ -1139,8 +1159,59 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         <EditorContent editor={editor} className="w-full h-auto block" />
       </div>
 
-      {/* BI-DIRECTIONAL BACKLINKS HUB: Shows parent and referring notes */}
-      <div className="w-full mt-10 pt-6 border-t-2 border-zinc-800/90 space-y-4 block clear-both">
+      {/* KNOWLEDGE CONNECTIONS HUB: Outgoing Referenced Pages & Inbound Bi-directional Backlinks */}
+      <div className="w-full mt-10 pt-6 border-t-2 border-zinc-800/90 space-y-6 block clear-both">
+        {/* 1. OUTGOING / REFERENCED PAGES (Links created in this note) */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              <ArrowUpRight className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Referenced Pages ({outgoingLinks.length})</span>
+            </div>
+            <span className="text-[11px] text-zinc-500">Pages linked from this note</span>
+          </div>
+
+          {outgoingLinks.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {outgoingLinks.map((targetTitle) => {
+                const targetNote = (allNotes || []).find(
+                  n => n && (n.title || '').toLowerCase().trim() === targetTitle.toLowerCase().trim()
+                );
+                return (
+                  <button
+                    key={targetTitle}
+                    type="button"
+                    onClick={() => {
+                      if (targetNote) {
+                        onNavigateToNote(targetNote.id);
+                      } else {
+                        onEnsurePageExists?.(targetTitle);
+                        onNavigateToNote(targetTitle);
+                      }
+                    }}
+                    className="text-left p-3 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-indigo-500/40 transition-all group"
+                  >
+                    <div className="flex items-center justify-between text-xs text-zinc-200 group-hover:text-indigo-300 font-medium mb-1">
+                      <span className="truncate">{targetTitle}</span>
+                      <ArrowUpRight className="w-3 h-3 text-zinc-500 group-hover:text-indigo-400 shrink-0" />
+                    </div>
+                    <p className="text-[11px] text-zinc-500 line-clamp-2 leading-relaxed">
+                      {targetNote
+                        ? (targetNote.content || '').replace(/[#*`\\]/g, '').slice(0, 100)
+                        : 'Click to create and open page...'}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-3 rounded-lg bg-zinc-900/30 border border-zinc-800/40 text-xs text-zinc-500">
+              No outgoing links yet. Type <code className="text-zinc-300 font-mono">[[Page Name]]</code> anywhere in this note to link to another page.
+            </div>
+          )}
+        </div>
+
+        {/* 2. BI-DIRECTIONAL BACKLINKS (Notes that reference this page) */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300 uppercase tracking-wider">
@@ -1164,14 +1235,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                     <ArrowUpRight className="w-3 h-3 text-zinc-500 group-hover:text-emerald-400 shrink-0" />
                   </div>
                   <p className="text-[11px] text-zinc-500 line-clamp-2 leading-relaxed">
-                    {bNote.content.replace(/[#*`]/g, '').slice(0, 100)}
+                    {(bNote.content || '').replace(/[#*`\\]/g, '').slice(0, 100)}
                   </p>
                 </button>
               ))}
             </div>
           ) : (
             <div className="p-3 rounded-lg bg-zinc-900/30 border border-zinc-800/40 text-xs text-zinc-500">
-              No other notes link to this page yet. Type <code className="text-zinc-300 font-mono">[[{note.title}]]</code> in any note to link.
+              No other notes link to this page yet. Type <code className="text-zinc-300 font-mono">[[{note.title}]]</code> in any other note to link back here.
             </div>
           )}
         </div>
