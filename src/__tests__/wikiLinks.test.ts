@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractWikiLinks, findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
+import { extractWikiLinks, extractTags, findBacklinks, findRelatedQuickNotes } from '../utils/wikiLinks';
 import { HARRY_POTTER_SEED_NOTES } from '../services/harryPotterSeed';
 
 describe('Wiki-Links and Backlinks', () => {
@@ -76,5 +76,49 @@ describe('Wiki-Links and Backlinks', () => {
       const hasDiadem = suggestedContents.some(c => c.includes('Ravenclaw\'s Diadem'));
       expect(hasDiary || hasDiadem).toBe(true);
     }
+  });
+
+  describe('extractTags', () => {
+    it('extracts hashtags from note content and title', () => {
+      const tags = extractTags('Working on #QuantumSpells and #Lore today.', 'Spellcraft #Magic');
+      expect(tags).toContain('#Magic');
+      expect(tags).toContain('#QuantumSpells');
+      expect(tags).toContain('#Lore');
+    });
+
+    it('strictly ignores markdown headings such as # Heading and ## Subheading', () => {
+      const markdown = '# My Title\n\n## Subheading\n\n### Another Section\n\nContent with #RealTag here.';
+      const tags = extractTags(markdown);
+      expect(tags).toEqual(['#RealTag']);
+      expect(tags).not.toContain('#My');
+      expect(tags).not.toContain('#Subheading');
+      expect(tags).not.toContain('#Another');
+    });
+
+    it('ignores code blocks and comments inside code', () => {
+      const content = '```python\n# This is a python comment\ndef foo(): pass\n```\n`inline #code` and #ValidTag';
+      const tags = extractTags(content);
+      expect(tags).toEqual(['#ValidTag']);
+    });
+
+    it('ignores markdown link url anchors and html hex colors', () => {
+      const content = 'Check out [Documentation](https://site.com#section) and <span style="color: #ffffff">colored</span> #KeepThisTag';
+      const tags = extractTags(content);
+      expect(tags).toEqual(['#KeepThisTag']);
+      expect(tags).not.toContain('#section');
+      expect(tags).not.toContain('#ffffff');
+    });
+
+    it('returns empty array when note has no hashtags, preventing unwanted #Draft tags', () => {
+      const content = '# Untitled Page\n\nStart writing notes about your new topic...';
+      const tags = extractTags(content, 'Untitled Page');
+      expect(tags).toEqual([]);
+    });
+
+    it('deduplicates tags case-insensitively while preserving original casing', () => {
+      const content = 'Mentions #Hogwarts and later #hogwarts and #HOGWARTS';
+      const tags = extractTags(content);
+      expect(tags).toEqual(['#Hogwarts']);
+    });
   });
 });

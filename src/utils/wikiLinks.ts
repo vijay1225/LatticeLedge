@@ -24,6 +24,61 @@ export function extractWikiLinks(content: string): string[] {
 }
 
 /**
+ * Extracts hashtags from note content and title (e.g. #Project, #Hogwarts, #lore/spells).
+ * Strictly ignores:
+ * - Markdown headings (# Heading, ## Heading)
+ * - Code blocks (```...``` and `...`)
+ * - URLs and markdown links ([text](url#anchor))
+ * - HTML tags and attributes (<div style="...">)
+ */
+export function extractTags(content: string, title?: string): string[] {
+  const combined = `${title || ''}\n\n${content || ''}`;
+  if (!combined.trim()) return [];
+
+  // 1. Remove fenced code blocks (```...```) and inline code (`...`)
+  let text = combined
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`\n]+`/g, ' ');
+
+  // 2. Remove markdown links [text](url) to avoid matching URL fragments
+  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+
+  // 3. Remove HTML tags (<div ...>) to avoid matching hex colors or attributes
+  text = text.replace(/<[^>]*>/g, ' ');
+
+  // 4. Remove escaped characters
+  text = text.replace(/\\/g, '');
+
+  // 5. Match #tag: must be preceded by start-of-line or whitespace/boundary (not & or alphanumeric)
+  // Must start with a letter (avoids markdown headings '# ' which have space, and avoids pure numbers #123)
+  const tagRegex = /(?:^|[^\w#&])#([a-zA-Z\p{L}][\w\p{L}\-\/]*)/gu;
+  const tags: string[] = [];
+  const seenLower = new Set<string>();
+
+  let match;
+  while ((match = tagRegex.exec(text)) !== null) {
+    let raw = match[1];
+    // Trim trailing slash or hyphen if any
+    raw = raw.replace(/[\-\/]+$/, '');
+    if (!raw) continue;
+
+    // Filter out common hex colors (e.g. #ffffff, #000000, or 6-char hex with numbers like #1a2b3c)
+    if (/^[0-9a-fA-F]{6}$/i.test(raw) && (/\d/.test(raw) || raw.toLowerCase() === 'ffffff' || raw.toLowerCase() === '000000')) {
+      continue;
+    }
+
+    const tagWithHash = `#${raw}`;
+    const lower = tagWithHash.toLowerCase();
+    if (!seenLower.has(lower)) {
+      seenLower.add(lower);
+      tags.push(tagWithHash);
+    }
+  }
+
+  return tags;
+}
+
+/**
  * Finds all notes that link back to the given note title.
  */
 export function findBacklinks(targetTitle: string, allNotes: Note[]): Note[] {

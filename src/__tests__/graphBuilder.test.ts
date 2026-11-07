@@ -132,4 +132,19 @@ describe('Knowledge Graph Construction', () => {
       expect(dist).toBeGreaterThan(30);
     }
   });
+
+  it('does not create phantom tag nodes or false semantic connections when notes have no tags', () => {
+    const freshNotes = [
+      { id: 'fresh-1', type: 'wiki' as const, title: 'Page One', content: 'Notes about page one', tags: [], links: [], createdAt: 1, updatedAt: 1 },
+      { id: 'fresh-2', type: 'wiki' as const, title: 'Page Two', content: 'Notes about page two', tags: [], links: [], createdAt: 1, updatedAt: 1 },
+      { id: 'fresh-3', type: 'wiki' as const, title: 'Page Three', content: 'Notes about page three', tags: [], links: [], createdAt: 1, updatedAt: 1 }
+    ];
+
+    const graph = buildKnowledgeGraph(freshNotes);
+    // Should have 3 note nodes only, zero tag nodes, zero edges
+    expect(graph.nodes.length).toBe(3);
+    expect(graph.nodes.every(n => n.type === 'wiki')).toBe(true);
+    expect(graph.edges.length).toBe(0);
+    expect(graph.nodes.some(n => n.label.toLowerCase().includes('draft'))).toBe(false);
+  });
 });

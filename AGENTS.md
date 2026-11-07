@@ -478,7 +478,26 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 62/62 automated unit tests passing across all suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Eliminated Phantom `#Draft` / `#New` Tags & Dynamic Tag Synchronization**:
+    - **Diagnosed Root Cause of Graph Ruin and Stuck Draft Tags**:
+      - `handleCreateNewWikiPage` and `handleEnsurePageExists` stamped new wiki notes with hardcoded `tags: ['#Draft']`, while `navigateToNote` stamped `tags: ['#New']`.
+      - In `handleUpdateNote`, updating content recalculated `links` via `extractWikiLinks(cleanContent)` but completely ignored `tags`, meaning `#Draft` was never removed even after typing and saving real content.
+      - In `graphBuilder.ts`, tag nodes create semantic edges connecting all notes sharing the same tag. Because every page was stamped with `#Draft`, `#Draft` acted as a universal false hub linking every note to every other note in the 2D Knowledge Graph.
+    - **Dynamic Tag Extraction (`extractTags`)**:
+      - Added `extractTags(content, title)` in `src/utils/wikiLinks.ts`:
+        - Extracts hashtags (`#Tag`, `#QuantumSpells`, `#lore/sub`) while strictly ignoring markdown headings (`# Heading`, `## Subheading`), fenced/inline code blocks and comments, markdown link anchor fragments (`[text](url#anchor)`), and HTML attributes/hex colors (`#ffffff`).
+        - Deduplicates case-insensitively and returns empty array `[]` when no hashtags are written.
+    - **Dynamic Update on Note Edit & Save**:
+      - In `handleUpdateNote`, editing content or title dynamically updates `updated.tags` using `extractTags(cleanContent, cleanTitle)` combined with any AI-generated summary tags, while strictly stripping obsolete `#Draft` / `#New` tags.
+      - `handleCreateNewWikiPage`, `handleEnsurePageExists`, and `navigateToNote` now initialize notes with `extractTags(...)` or `[]`, never with `#Draft` or `#New`.
+      - `handleAddQuickNote` extracts actual `#tags` or defaults to `[]` instead of forcing a `#Quick` tag node.
+    - **Permanent Database Sanitization on Load**:
+      - In `getAllNotesFromSql` (`sqliteService.ts`) and on initial load in `App.tsx`, existing legacy records are sanitized to strip `#Draft` and `#New` if not explicitly present in the note's text, and cleaned tags are saved back to SQLite so the database file is permanently cleaned.
+    - **Verified & Built**:
+      - 69/69 automated unit tests passing across all 8 suites (`wikiLinks`, `graphBuilder`, `sqliteService`, `vaultSyncService`, `aiService`, `assetService`, `wikiLinkAutocomplete`, `markdownViewer`).
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.80MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Write notes on a new page and verify smooth typing without any page jumping.
-  - [ ] Click the vault button in the sidebar or Settings and verify smooth return navigation.
+  - [ ] Create a new page and verify it no longer has `#Draft` or `#New`.
+  - [ ] Check Knowledge Graph to verify clean, authentic clustering without any false `#draft` hub.

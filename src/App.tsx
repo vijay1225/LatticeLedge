@@ -8,7 +8,7 @@ import {
 import { HARRY_POTTER_SEED_NOTES } from './services/harryPotterSeed';
 import { buildKnowledgeGraph } from './utils/graphBuilder';
 import { generateNoteSummary, isGeminiKeyConfigured } from './services/aiService';
-import { extractWikiLinks } from './utils/wikiLinks';
+import { extractWikiLinks, extractTags } from './utils/wikiLinks';
 import { 
   getAllNotesFromSql, 
   saveNoteToSql, 
@@ -208,13 +208,32 @@ export function App() {
         const sanitized = finalNotes.map(n => {
           const cleanContent = (n.content || '').replace(/\\+\[\\+\[/g, '[[').replace(/\\+\]\\+\]/g, ']]');
           const cleanLinks = extractWikiLinks(cleanContent);
+          const rawTags = Array.isArray(n.tags) ? n.tags : [];
+          const cleanTags = rawTags.filter(t => {
+            const lower = (t || '').toLowerCase().trim();
+            if (lower === '#draft' || lower === '#new' || lower === 'draft' || lower === 'new') {
+              const text = `${n.title || ''} ${cleanContent}`.toLowerCase();
+              return text.includes('#draft') || text.includes('#new');
+            }
+            return true;
+          });
           return {
             ...n,
             content: cleanContent,
             links: cleanLinks.length > 0 ? cleanLinks : (n.links || []),
+            tags: cleanTags,
             summary: hasKey ? n.summary : undefined
           };
         });
+
+        // Persist sanitization back to SQLite if legacy #Draft or #New tags were stripped
+        sanitized.forEach((n, idx) => {
+          const orig = finalNotes[idx];
+          if (orig && JSON.stringify(orig.tags || []) !== JSON.stringify(n.tags || [])) {
+            saveNoteToSql(n).catch(() => {});
+          }
+        });
+
         handleNotesUpdated(sanitized);
       }
     }).catch(err => {
@@ -299,12 +318,14 @@ export function App() {
     const existing = notes.find(n => (n.title || '').toLowerCase() === cleanTitle.toLowerCase());
     if (existing) return existing;
 
+    const initialTags = extractTags(cleanTitle);
+
     const newPage: Note = {
       id: `wiki-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       type: 'wiki',
       title: cleanTitle,
       content: `# ${cleanTitle}\n\nStart writing notes about ${cleanTitle}...`,
-      tags: ['#Draft'],
+      tags: initialTags,
       links: [],
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -334,12 +355,13 @@ export function App() {
       setHistory(newHistory);
       setHistoryIndex(newHistory.length - 1);
     } else {
+      const initialTags = extractTags(clean);
       const newNote: Note = {
         id: `wiki-${Date.now()}`,
         type: 'wiki',
         title: clean,
         content: `# ${clean}\n\nStart writing notes about ${clean}...`,
-        tags: ['#New'],
+        tags: initialTags,
         links: [],
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -385,11 +407,36 @@ export function App() {
       const cleanContent = partial.content !== undefined
         ? partial.content.replace(/\\+\[\\+\[/g, '[[').replace(/\\+\]\\+\]/g, ']]')
         : note.content;
+      const cleanTitle = partial.title !== undefined ? partial.title : note.title;
+
+      // Dynamically determine updated tags
+      let updatedTags = note.tags || [];
+      if (partial.tags !== undefined) {
+        updatedTags = partial.tags;
+      } else if (partial.content !== undefined || partial.title !== undefined) {
+        // Re-extract tags dynamically from updated content and title
+        const extracted = extractTags(cleanContent, cleanTitle);
+        // Retain valid tags from existing note/summary, but purge phantom #Draft or #New
+        const summaryTags = (note.summary?.tags || []).filter(t => {
+          const lower = (t || '').toLowerCase().trim();
+          return lower !== '#draft' && lower !== '#new';
+        });
+        const combined = Array.from(new Set([...extracted, ...summaryTags]));
+        updatedTags = combined.filter(t => {
+          const lower = (t || '').toLowerCase().trim();
+          if (lower === '#draft' || lower === '#new' || lower === 'draft' || lower === 'new') {
+            return extracted.some(et => et.toLowerCase() === lower);
+          }
+          return true;
+        });
+      }
 
       const updated = {
         ...note,
         ...partial,
+        title: cleanTitle,
         content: cleanContent,
+        tags: updatedTags,
         updatedAt: Date.now()
       };
 
@@ -404,12 +451,13 @@ export function App() {
   const handleCreateNewWikiPage = (customTitle?: string, customContent?: string) => {
     const title = customTitle?.trim() || 'Untitled Page';
     const content = customContent !== undefined ? customContent : '';
+    const initialTags = extractTags(content, title);
     const newPage: Note = {
       id: `wiki-${Date.now()}`,
       type: 'wiki',
       title,
       content,
-      tags: ['#Draft'],
+      tags: initialTags,
       links: extractWikiLinks(content),
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -426,7 +474,7 @@ export function App() {
   };
 
   const handleAddQuickNote = (content: string) => {
-    const tags = Array.from(new Set(content.match(/#\w+/g) || ['#Quick']));
+    const tags = extractTags(content);
     const links = extractWikiLinks(content);
     const newQuickNote: Note = {
       id: `quick-${Date.now()}`,
@@ -491,7 +539,18 @@ export function App() {
     setSummaryError(null);
     try {
       const summary = await generateNoteSummary(target, aiConfig);
-      handleUpdateNote(id, { summary });
+      const cleanSummaryTags = (summary.tags || []).filter(t => {
+        const lower = (t || '').toLowerCase().trim();
+        return lower !== '#draft' && lower !== '#new';
+      });
+      const combinedTags = Array.from(new Set([...(target.tags || []), ...cleanSummaryTags])).filter(t => {
+        const lower = (t || '').toLowerCase().trim();
+        return lower !== '#draft' && lower !== '#new';
+      });
+      handleUpdateNote(id, { 
+        summary: { ...summary, tags: cleanSummaryTags },
+        tags: combinedTags
+      });
     } catch (err: any) {
       setSummaryError(err?.message || 'Failed to generate summary with Gemini API.');
     } finally {

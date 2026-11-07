@@ -310,12 +310,22 @@ export async function getAllNotesFromSql(): Promise<Note[]> {
     const extractedLinks = extractWikiLinks(cleanContent);
     const finalLinks = extractedLinks.length > 0 ? extractedLinks : links;
 
+    // Sanitize phantom #Draft or #New tags from legacy records if not present in content/title
+    const cleanTags = tags.filter(t => {
+      const lower = (t || '').toLowerCase().trim();
+      if (lower === '#draft' || lower === '#new' || lower === 'draft' || lower === 'new') {
+        const text = `${r[2] || ''} ${cleanContent}`.toLowerCase();
+        return text.includes('#draft') || text.includes('#new');
+      }
+      return true;
+    });
+
     return {
       id: r[0] as string,
       type: r[1] as ('wiki' | 'quick'),
       title: r[2] as string || (r[1] === 'wiki' ? 'Untitled Page' : 'Quick Note'),
       content: cleanContent,
-      tags,
+      tags: cleanTags,
       links: finalLinks,
       summary,
       isPinned: Boolean(r[7]),
