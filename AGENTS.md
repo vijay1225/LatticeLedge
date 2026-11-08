@@ -577,20 +577,24 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - Added instant title auto-save on input `onBlur` and `onKeyDown` (`Enter`).
       - Added explicit flush in `onBackToPages()` so clicking "← Pages" commits the title before unmounting.
       - Added automatic title extraction from `# Heading` if user types a top-level heading in an untitled note.
-    - **Ultra-Simplified Vault Storage Settings & Single-Button Folder Selection**:
-      - Completely removed all manual device path inputs, presets chips, database vacuum, reload buttons, and confusing forms per user request.
-      - Simplified to strictly **ONE single button** in Settings: **"Select Vault Folder"** (displaying the current folder path).
-      - Fixed the mobile folder-reverting bug: previously, background polling re-read old storage keys or legacy fallback paths and reverted to the old folder; now setMobileVaultFolder() synchronously updates VAULT_FOLDER_STORAGE_KEY and VAULT_FOLDER_NAME_KEY, and background polling strictly checks the newly selected folder.
-      - Blindly reads lattice_vault.db from the selected folder if it exists, or creates a clean empty vault if not, permanently staying bound to that folder.
+    - **Native Android System Folder Picker & Manage All Files Storage Access**:
+      - Replaced all text-prompt path inputs with a native system folder chooser (`ACTION_OPEN_DOCUMENT_TREE`) via a dedicated in-app native Capacitor plugin (`NativeVaultPickerPlugin.java`).
+      - Added `MANAGE_EXTERNAL_STORAGE` permission and `requestLegacyExternalStorage="true"` in `AndroidManifest.xml` allowing LatticeLedger to access any folder anywhere on device storage (e.g. `Download/Notes`, root `LatticeLedger`, `Documents/LatticeLedger`, or custom external directories), exactly like Obsidian, Logseq, and FolderSync.
+      - 1-Tap "Select Vault Folder": tapping the button on mobile directly pops up Android's native system Files / Document Manager. The user navigates anywhere and taps "Use this folder".
+      - Automatic Resume vs Clean Slate:
+        - If `lattice_vault.db` already exists in the selected folder, the app immediately reads the database, imports existing notes, and resumes knowledge management.
+        - If the selected folder is empty, the app initializes a clean empty vault, writes `lattice_vault.db` and creates the `assets/` folder, starting from a fresh clean slate.
+      - Fully cross-platform: Desktop uses native OS folder dialog; Mobile uses native Android SAF folder picker.
+      - Background FolderSync Hot-Reloading: `NativeVaultPicker.checkVaultFile()` monitors `mtime` and `size` every 2.5 seconds, instantly hot-reloading changes downloaded from cloud sync without restart.
     - **Verified & Built**:
       - 82/82 unit tests passing across all 8 test suites.
       - Fresh native Android APK: LatticeLedger.apk (7.84MB).
       - Fresh standalone Windows Desktop executable: LatticeLedger-Desktop.exe (124.8MB).
 
 - [ ] **Next Steps**:
-  - [ ] User installs LatticeLedger.apk on Android phone and launches LatticeLedger-Desktop.exe on Windows.
-  - [ ] Tap "Select Vault Folder" in Settings to switch the vault folder cleanly with a single button.
-  - [ ] Verify pages title saving and FolderSync syncing without app reverting to old folders.
+  - [ ] User installs fresh LatticeLedger.apk on phone.
+  - [ ] Tap "Select Vault Folder" in Settings -> Android native File Manager pops up -> tap any folder on device and tap "Use this folder".
+  - [ ] Confirm notes resume if existing .db is present or start clean if empty.
 
 ---
 

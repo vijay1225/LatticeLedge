@@ -1,5 +1,5 @@
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { isElectron, isCapacitorNative, getVaultSyncState } from './vaultSyncService';
+import { isElectron, isCapacitorNative, getVaultSyncState, NativeVaultPicker } from './vaultSyncService';
 
 const ASSETS_IDB_NAME = 'LatticeLedgerAssetsDB';
 const ASSETS_STORE_NAME = 'assets_store';
@@ -141,12 +141,20 @@ export async function saveAsset(
     else if (isCapacitorNative() && typeof window !== 'undefined') {
       try {
         const base64Data = uint8ArrayToBase64(bytes);
-        await Filesystem.writeFile({
-          path: `${syncState.folderPath}/${assetPath}`,
-          data: base64Data,
-          directory: Directory.Documents,
-          recursive: true
-        });
+        try {
+          await NativeVaultPicker.writeAssetFile({
+            folderPath: syncState.folderPath,
+            assetPath,
+            data: base64Data
+          });
+        } catch {
+          await Filesystem.writeFile({
+            path: `${syncState.folderPath}/${assetPath}`,
+            data: base64Data,
+            directory: Directory.Documents,
+            recursive: true
+          });
+        }
       } catch (e) {
         console.warn('[AssetService] Capacitor asset write error:', e);
       }
@@ -222,6 +230,21 @@ export async function resolveAssetUrl(src: string): Promise<string> {
 
   // 5. Try to load from Capacitor Android disk
   if (isCapacitorNative() && syncState.folderPath && typeof window !== 'undefined') {
+    try {
+      const assetRes = await NativeVaultPicker.readAssetFile({
+        folderPath: syncState.folderPath,
+        assetPath: normalized
+      });
+      if (assetRes && assetRes.data) {
+        const bytes = base64ToUint8Array(assetRes.data);
+        const mimeType = inferMimeType(normalized);
+        const blob = new Blob([bytes as any], { type: mimeType });
+        const blobUrl = URL.createObjectURL(blob);
+        resolvedUrlCache.set(src, blobUrl);
+        return blobUrl;
+      }
+    } catch {}
+
     try {
       const res = await Filesystem.readFile({
         path: `${syncState.folderPath}/${normalized}`,

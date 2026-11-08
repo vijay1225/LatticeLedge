@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Note } from '../types';
 import { 
@@ -7,6 +7,20 @@ import {
   getAllNotesFromSql,
   createEmptySqliteVault
 } from './sqliteService';
+
+export interface NativeVaultPickerPlugin {
+  pickFolder(): Promise<{ path: string; displayName: string; treeUri?: string }>;
+  checkPermission(): Promise<{ granted: boolean }>;
+  requestPermission(): Promise<{ granted: boolean }>;
+  checkVaultFile(options: { folderPath: string; fileName?: string }): Promise<{ exists: boolean; mtime: number; size: number }>;
+  readVaultFile(options: { folderPath: string; fileName?: string }): Promise<{ data: string | null; mtime?: number; size?: number }>;
+  writeVaultFile(options: { folderPath: string; fileName?: string; data: string }): Promise<{ success: boolean; mtime?: number; size?: number }>;
+  ensureAssetsDir(options: { folderPath: string }): Promise<{ success: boolean }>;
+  readAssetFile(options: { folderPath: string; assetPath: string }): Promise<{ data: string | null }>;
+  writeAssetFile(options: { folderPath: string; assetPath: string; data: string }): Promise<{ success: boolean }>;
+}
+
+export const NativeVaultPicker = registerPlugin<NativeVaultPickerPlugin>('NativeVaultPicker');
 
 export interface VaultSyncState {
   isConfigured: boolean;
@@ -241,28 +255,33 @@ let isCheckingMobileUpdates = false;
 let lastSelfWriteTimestamp = 0;
 
 /**
- * Normalizes an Android relative path inside Documents directory so it never duplicates "Documents"
- * Examples:
- *  "Documents/LatticeLedger" -> "LatticeLedger"
- *  "internalstorage/documents/LatticeLedger" -> "LatticeLedger"
- *  "LatticeLedger" -> "LatticeLedger"
+ * Normalizes an Android path (preserving custom folders across storage)
  */
 export function normalizeAndroidRelativePath(rawPath?: string | null): string {
   let p = (rawPath || '').trim().replace(/\\/g, '/');
   p = p.replace(/^\/+|\/+$/g, '');
-  p = p.replace(/^(storage\/emulated\/0|internalstorage|internal storage)\//i, '');
-  p = p.replace(/^(documents?)\//i, '');
-  p = p.replace(/^\/+/, '');
   return p || 'LatticeLedger';
 }
 
 /**
- * Reads vault file from Android Documents directory.
+ * Reads vault file from Android storage.
  */
-async function readMobileVaultFile(subFolder: string): Promise<Uint8Array | null> {
+async function readMobileVaultFile(folderPath: string): Promise<Uint8Array | null> {
+  if (isCapacitorNative()) {
+    try {
+      const res = await NativeVaultPicker.readVaultFile({
+        folderPath,
+        fileName: DEFAULT_VAULT_FILE
+      });
+      if (res && res.data) {
+        return base64ToUint8Array(res.data);
+      }
+    } catch {}
+  }
+
   try {
     const res = await Filesystem.readFile({
-      path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
+      path: `${folderPath}/${DEFAULT_VAULT_FILE}`,
       directory: Directory.Documents
     });
     if (res && res.data) {
@@ -281,16 +300,40 @@ export async function checkMobileVaultForExternalUpdates(): Promise<boolean> {
   if (platform !== 'capacitor') return false;
 
   const folderPath = getStoredItem(VAULT_FOLDER_STORAGE_KEY) || 'Documents/LatticeLedger';
-  const subFolder = normalizeAndroidRelativePath(folderPath);
+
   try {
     isCheckingMobileUpdates = true;
-    const stat = await Filesystem.stat({
-      path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
-      directory: Directory.Documents
-    });
+    let mtime = 0;
+    let size = 0;
+    let exists = false;
 
-    const mtime = stat.mtime || 0;
-    const size = stat.size || 0;
+    if (isCapacitorNative()) {
+      try {
+        const stat = await NativeVaultPicker.checkVaultFile({
+          folderPath,
+          fileName: DEFAULT_VAULT_FILE
+        });
+        if (stat && stat.exists) {
+          mtime = stat.mtime || 0;
+          size = stat.size || 0;
+          exists = true;
+        }
+      } catch {}
+    }
+
+    if (!exists) {
+      try {
+        const stat = await Filesystem.stat({
+          path: `${folderPath}/${DEFAULT_VAULT_FILE}`,
+          directory: Directory.Documents
+        });
+        mtime = stat.mtime || 0;
+        size = stat.size || 0;
+        exists = true;
+      } catch {}
+    }
+
+    if (!exists) return false;
 
     // Ignore if modified by our own app within the last 2.5 seconds
     const isRecentSelfWrite = Date.now() - lastSelfWriteTimestamp < 2500;
@@ -349,11 +392,11 @@ export async function initVaultSync(onExternalChange?: (notes: Note[]) => void):
   else if (platform === 'capacitor') {
     const savedPath = getStoredItem(VAULT_FOLDER_STORAGE_KEY) || 'Documents/LatticeLedger';
     setStoredItem(VAULT_FOLDER_STORAGE_KEY, savedPath);
-    const sub = normalizeAndroidRelativePath(savedPath);
-    setStoredItem(VAULT_FOLDER_NAME_KEY, `Documents/${sub}`);
+    const savedName = getStoredItem(VAULT_FOLDER_NAME_KEY) || savedPath.split('/').filter(Boolean).pop() || 'LatticeLedger';
+    setStoredItem(VAULT_FOLDER_NAME_KEY, savedName);
 
     // Try loading latest vault file on startup if exists
-    readMobileVaultFile(sub).then(async (fileBytes) => {
+    readMobileVaultFile(savedPath).then(async (fileBytes) => {
       if (fileBytes && fileBytes.length > 0) {
         try {
           const notes = await importSqliteDatabaseFile(fileBytes);
@@ -549,7 +592,32 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
 
     // C. CAPACITOR ANDROID NATIVE STORAGE
     if (platform === 'capacitor') {
-      const targetPath = customMobilePath || getStoredItem(VAULT_FOLDER_STORAGE_KEY) || 'Documents/LatticeLedger';
+      if (customMobilePath) {
+        return await setMobileVaultFolder(customMobilePath);
+      }
+
+      if (isCapacitorNative()) {
+        try {
+          const perm = await NativeVaultPicker.checkPermission();
+          if (!perm.granted) {
+            await NativeVaultPicker.requestPermission();
+          }
+        } catch (permErr) {
+          console.warn('[VaultSync] Permission check error:', permErr);
+        }
+
+        const folderRes = await NativeVaultPicker.pickFolder();
+        if (!folderRes || !folderRes.path) {
+          return { success: false, error: 'No folder selected' };
+        }
+
+        const folderPath = folderRes.path;
+        const folderName = folderRes.displayName || folderPath.split('/').filter(Boolean).pop() || 'LatticeLedger';
+
+        return await setMobileVaultFolder(folderPath, folderName);
+      }
+
+      const targetPath = getStoredItem(VAULT_FOLDER_STORAGE_KEY) || 'Documents/LatticeLedger';
       return await setMobileVaultFolder(targetPath);
     }
 
@@ -566,17 +634,22 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
 /**
  * Configure and bind a specific folder on Android mobile storage.
  */
-export async function setMobileVaultFolder(customPath: string): Promise<VaultFolderResult> {
-  const rawPath = customPath.trim().replace(/^[/\\]+|[/\\]+$/g, '') || 'Documents/LatticeLedger';
-  const subFolder = normalizeAndroidRelativePath(rawPath);
-  const displayPath = `Documents/${subFolder}`;
-  setStoredItem(VAULT_FOLDER_STORAGE_KEY, displayPath);
-  setStoredItem(VAULT_FOLDER_NAME_KEY, displayPath);
+export async function setMobileVaultFolder(customPath: string, customName?: string): Promise<VaultFolderResult> {
+  const folderPath = customPath.trim();
+  const folderName = customName || folderPath.split('/').filter(Boolean).pop() || folderPath;
+
+  setStoredItem(VAULT_FOLDER_STORAGE_KEY, folderPath);
+  setStoredItem(VAULT_FOLDER_NAME_KEY, folderName);
 
   // Ensure assets/ folder exists
+  if (isCapacitorNative()) {
+    try {
+      await NativeVaultPicker.ensureAssetsDir({ folderPath });
+    } catch {}
+  }
   try {
     await Filesystem.mkdir({
-      path: `${subFolder}/assets`,
+      path: `${folderPath}/assets`,
       directory: Directory.Documents,
       recursive: true
     });
@@ -585,7 +658,7 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
   let loadedNotes: Note[] | undefined = undefined;
   let isFresh = false;
 
-  const existingBytes = await readMobileVaultFile(subFolder);
+  const existingBytes = await readMobileVaultFile(folderPath);
   if (existingBytes && existingBytes.length > 0) {
     try {
       loadedNotes = await importSqliteDatabaseFile(existingBytes);
@@ -602,15 +675,36 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
       isFresh = true;
       const emptyBinary = await getSqliteDatabaseBinary();
       const base64Data = uint8ArrayToBase64(emptyBinary);
-      await Filesystem.writeFile({
-        path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
-        data: base64Data,
-        directory: Directory.Documents,
-        recursive: true
-      });
-      lastSelfWriteTimestamp = Date.now();
-      lastSyncTimestamp = Date.now();
-      lastCheckedMtime = Date.now();
+
+      let written = false;
+      if (isCapacitorNative()) {
+        try {
+          const res = await NativeVaultPicker.writeVaultFile({
+            folderPath,
+            fileName: DEFAULT_VAULT_FILE,
+            data: base64Data
+          });
+          if (res && res.success) {
+            lastSelfWriteTimestamp = Date.now();
+            lastSyncTimestamp = res.mtime || Date.now();
+            lastCheckedMtime = res.mtime || Date.now();
+            lastCheckedSize = res.size || emptyBinary.length;
+            written = true;
+          }
+        } catch {}
+      }
+
+      if (!written) {
+        await Filesystem.writeFile({
+          path: `${folderPath}/${DEFAULT_VAULT_FILE}`,
+          data: base64Data,
+          directory: Directory.Documents,
+          recursive: true
+        });
+        lastSelfWriteTimestamp = Date.now();
+        lastSyncTimestamp = Date.now();
+        lastCheckedMtime = Date.now();
+      }
     } catch (writeErr: any) {
       console.warn('[VaultSync] Could not write fresh file to new mobile folder:', writeErr?.message || writeErr);
     }
@@ -619,8 +713,8 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
   notifyStateChanged();
   return {
     success: true,
-    folderPath: displayPath,
-    folderName: displayPath,
+    folderPath,
+    folderName,
     loadedNotes,
     isFresh
   };
@@ -669,20 +763,41 @@ export async function saveVaultDbToFolder(bytes: Uint8Array): Promise<boolean> {
 
     // 3. Android Capacitor
     if (platform === 'capacitor') {
-      const subFolder = normalizeAndroidRelativePath(folderPath);
       const base64Data = uint8ArrayToBase64(bytes);
+      let written = false;
 
-      await Filesystem.writeFile({
-        path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
-        data: base64Data,
-        directory: Directory.Documents,
-        recursive: true
-      });
+      if (isCapacitorNative() && folderPath) {
+        try {
+          const res = await NativeVaultPicker.writeVaultFile({
+            folderPath,
+            fileName: DEFAULT_VAULT_FILE,
+            data: base64Data
+          });
+          if (res && res.success) {
+            lastSelfWriteTimestamp = Date.now();
+            lastSyncTimestamp = res.mtime || Date.now();
+            lastCheckedMtime = res.mtime || Date.now();
+            lastCheckedSize = res.size || bytes.length;
+            written = true;
+          }
+        } catch (e) {
+          console.warn('[VaultSync] Native writeVaultFile error, falling back:', e);
+        }
+      }
 
-      lastSelfWriteTimestamp = Date.now();
-      lastSyncTimestamp = Date.now();
-      lastCheckedMtime = Date.now();
-      lastCheckedSize = bytes.length;
+      if (!written) {
+        await Filesystem.writeFile({
+          path: `${folderPath}/${DEFAULT_VAULT_FILE}`,
+          data: base64Data,
+          directory: Directory.Documents,
+          recursive: true
+        });
+        lastSelfWriteTimestamp = Date.now();
+        lastSyncTimestamp = Date.now();
+        lastCheckedMtime = Date.now();
+        lastCheckedSize = bytes.length;
+      }
+
       isSyncing = false;
       notifyStateChanged();
       return true;
@@ -721,9 +836,8 @@ export async function loadVaultDbFromFolder(): Promise<Uint8Array | null> {
       return new Uint8Array(arrayBuffer);
     }
 
-    if (platform === 'capacitor') {
-      const subFolder = normalizeAndroidRelativePath(folderPath);
-      const bytes = await readMobileVaultFile(subFolder);
+    if (platform === 'capacitor' && folderPath) {
+      const bytes = await readMobileVaultFile(folderPath);
       if (bytes && bytes.length > 0) {
         lastSyncTimestamp = Date.now();
         return bytes;

@@ -34,7 +34,6 @@ import {
 } from '../services/aiService';
 import {
   chooseVaultFolder,
-  setMobileVaultFolder,
   subscribeVaultSyncState,
   VaultSyncState,
   getVaultSyncState
@@ -360,51 +359,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Vault Folder Selection
   const handleSelectFolder = async () => {
     setIsBindingFolder(true);
-    setImportStatus('Selecting vault folder...');
+    setImportStatus('Opening folder picker...');
 
     try {
-      if (syncState.platform === 'capacitor') {
-        const current = syncState.folderPath || 'Documents/LatticeLedger';
-        const entered = window.prompt('Enter vault folder path inside Documents (e.g. LatticeLedger or Notes):', current);
-        if (!entered || !entered.trim() || entered.trim() === current) {
-          setIsBindingFolder(false);
-          setImportStatus(null);
-          return;
+      const res = await chooseVaultFolder();
+      if (res.success) {
+        if (res.isFresh && onNotesUpdated) {
+          onNotesUpdated([]);
+          setImportStatus(`Created fresh vault in "${res.folderName || res.folderPath}". Ready for new notes!`);
+        } else if (res.loadedNotes && onNotesUpdated) {
+          onNotesUpdated(res.loadedNotes);
+          setImportStatus(`Switched vault to "${res.folderName || res.folderPath}" (${res.loadedNotes.length} notes loaded).`);
+        } else {
+          setImportStatus(`Connected to "${res.folderName || res.folderPath}".`);
         }
-
-        const res = await setMobileVaultFolder(entered.trim());
-        if (res.success) {
-          if (res.isFresh && onNotesUpdated) {
-            onNotesUpdated([]);
-            setImportStatus(`Created fresh vault in "${res.folderPath}". Ready for new notes!`);
-          } else if (res.loadedNotes && onNotesUpdated) {
-            onNotesUpdated(res.loadedNotes);
-            setImportStatus(`Switched vault to "${res.folderPath}" (${res.loadedNotes.length} notes loaded).`);
-          } else {
-            setImportStatus(`Connected to "${res.folderPath}".`);
-          }
-        } else if (res.error) {
-          setImportStatus(`Folder error: ${res.error}`);
-        }
+      } else if (res.error && !res.error.toLowerCase().includes('cancel')) {
+        setImportStatus(`Folder notice: ${res.error}`);
       } else {
-        // Desktop (Electron) and Browser
-        const res = await chooseVaultFolder();
-        if (res.success) {
-          if (res.isFresh && onNotesUpdated) {
-            onNotesUpdated([]);
-            setImportStatus(`Created fresh vault in "${res.folderName || res.folderPath}". Ready for new notes!`);
-          } else if (res.loadedNotes && onNotesUpdated) {
-            onNotesUpdated(res.loadedNotes);
-            setImportStatus(`Switched vault to "${res.folderName || res.folderPath}" (${res.loadedNotes.length} notes loaded).`);
-          } else {
-            setImportStatus(`Connected to "${res.folderName || res.folderPath}".`);
-          }
-        } else if (res.error && res.error !== 'Folder selection canceled') {
-          setImportStatus(`Folder notice: ${res.error}`);
-        }
+        setImportStatus(null);
       }
     } catch (err: any) {
-      setImportStatus(`Failed to select folder: ${err.message}`);
+      if (err?.message && !err.message.toLowerCase().includes('cancel')) {
+        setImportStatus(`Failed to select folder: ${err.message}`);
+      } else {
+        setImportStatus(null);
+      }
     } finally {
       setIsBindingFolder(false);
       setTimeout(() => setImportStatus(null), 4000);
