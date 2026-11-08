@@ -257,10 +257,9 @@ export function normalizeAndroidRelativePath(rawPath?: string | null): string {
 }
 
 /**
- * Reads vault file from Android Documents directory, with fallback migration for legacy paths.
+ * Reads vault file from Android Documents directory.
  */
 async function readMobileVaultFile(subFolder: string): Promise<Uint8Array | null> {
-  // 1. Standard correct path: "LatticeLedger/lattice_vault.db" inside Documents
   try {
     const res = await Filesystem.readFile({
       path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
@@ -270,29 +269,6 @@ async function readMobileVaultFile(subFolder: string): Promise<Uint8Array | null
       return typeof res.data === 'string' ? base64ToUint8Array(res.data) : (res.data as any);
     }
   } catch {}
-
-  // 2. Fallback check for legacy path: "Documents/LatticeLedger/lattice_vault.db" inside Documents
-  try {
-    const legacyPath = `Documents/${subFolder}/${DEFAULT_VAULT_FILE}`;
-    const legacyRes = await Filesystem.readFile({
-      path: legacyPath,
-      directory: Directory.Documents
-    });
-    if (legacyRes && legacyRes.data) {
-      const bytes = typeof legacyRes.data === 'string' ? base64ToUint8Array(legacyRes.data) : (legacyRes.data as any);
-      // Automatically migrate to the normalized path so FolderSync sees it!
-      try {
-        await Filesystem.writeFile({
-          path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
-          data: typeof legacyRes.data === 'string' ? legacyRes.data : uint8ArrayToBase64(bytes),
-          directory: Directory.Documents,
-          recursive: true
-        });
-      } catch {}
-      return bytes;
-    }
-  } catch {}
-
   return null;
 }
 
@@ -308,20 +284,10 @@ export async function checkMobileVaultForExternalUpdates(): Promise<boolean> {
   const subFolder = normalizeAndroidRelativePath(folderPath);
   try {
     isCheckingMobileUpdates = true;
-    let stat: any = null;
-    try {
-      stat = await Filesystem.stat({
-        path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
-        directory: Directory.Documents
-      });
-    } catch {
-      try {
-        stat = await Filesystem.stat({
-          path: `Documents/${subFolder}/${DEFAULT_VAULT_FILE}`,
-          directory: Directory.Documents
-        });
-      } catch {}
-    }
+    const stat = await Filesystem.stat({
+      path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
+      directory: Directory.Documents
+    });
 
     const mtime = stat.mtime || 0;
     const size = stat.size || 0;

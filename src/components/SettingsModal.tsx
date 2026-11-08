@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Key, 
   Cpu, 
@@ -8,7 +8,6 @@ import {
   Save, 
   ExternalLink, 
   Sparkles, 
-  Database,
   Zap,
   RefreshCw,
   Sliders,
@@ -18,7 +17,6 @@ import {
   Loader2, 
   Folder, 
   FolderOpen, 
-  Unlink, 
   Palette, 
   Moon, 
   Sun, 
@@ -27,7 +25,6 @@ import {
   ChevronLeft 
 } from 'lucide-react';
 import { AIProviderConfig, Note, GeminiModelInfo, AppTheme } from '../types';
-import { optimizeSqliteDatabase, getSqliteDatabaseBinary, importSqliteDatabaseFile } from '../services/sqliteService';
 import { 
   sanitizeApiKey, 
   fetchAvailableGeminiModels, 
@@ -37,12 +34,10 @@ import {
 } from '../services/aiService';
 import {
   chooseVaultFolder,
+  setMobileVaultFolder,
   subscribeVaultSyncState,
   VaultSyncState,
-  disconnectVaultFolder,
-  getVaultSyncState,
-  saveVaultDbToFolder,
-  pullVaultDbFromFolder
+  getVaultSyncState
 } from '../services/vaultSyncService';
 
 interface SettingsModalProps {
@@ -61,7 +56,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   config,
   onSaveConfig,
   onResetSeedData,
-  notes = [],
+  notes: _notes = [],
   onNotesUpdated,
   theme = 'dark',
   onThemeChange,
@@ -108,7 +103,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Vault Sync State
   const [syncState, setSyncState] = useState<VaultSyncState>(getVaultSyncState());
   const [isBindingFolder, setIsBindingFolder] = useState(false);
-  const mobileFileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     return subscribeVaultSyncState(setSyncState);
   }, []);
@@ -363,113 +357,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // Vault Folder Selection & Management
-  const handleMobileFilePick = () => {
-    mobileFileInputRef.current?.click();
-  };
-
-  const handleMobileFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsBindingFolder(true);
-    setImportStatus(`Loading vault from "${file.name}"...`);
-    try {
-      const buffer = await file.arrayBuffer();
-      const importedNotes = await importSqliteDatabaseFile(buffer);
-      if (onNotesUpdated) {
-        onNotesUpdated(importedNotes);
-      }
-      try {
-        await saveVaultDbToFolder(new Uint8Array(buffer));
-      } catch {}
-      setImportStatus(`Successfully loaded ${importedNotes.length} notes from "${file.name}"!`);
-    } catch (err: any) {
-      setImportStatus(`Failed to load file: ${err?.message || err}`);
-    } finally {
-      setIsBindingFolder(false);
-      setTimeout(() => setImportStatus(null), 5000);
-      e.target.value = '';
-    }
-  };
-
-  const handleReloadFromFolder = async () => {
-    setIsBindingFolder(true);
-    setImportStatus('Reloading from Documents/LatticeLedger...');
-    try {
-      const res = await pullVaultDbFromFolder();
-      if (res.success && res.notes) {
-        if (onNotesUpdated) {
-          onNotesUpdated(res.notes);
-        }
-        setImportStatus(res.message);
-      } else {
-        setImportStatus(res.message || 'Could not find lattice_vault.db in folder.');
-      }
-    } catch (err: any) {
-      setImportStatus(`Reload failed: ${err?.message || err}`);
-    } finally {
-      setIsBindingFolder(false);
-      setTimeout(() => setImportStatus(null), 5000);
-    }
-  };
-
-  const handleChooseFolder = async () => {
-    if (syncState.platform === 'capacitor') {
-      handleMobileFilePick();
-      return;
-    }
-
+  // Vault Folder Selection
+  const handleSelectFolder = async () => {
     setIsBindingFolder(true);
     setImportStatus('Selecting vault folder...');
+
     try {
-      const res = await chooseVaultFolder();
-      if (res.success) {
-        if (res.isFresh) {
-          if (onNotesUpdated) {
-            onNotesUpdated([]);
-          }
-          setImportStatus(`Selected empty folder "${res.folderName || res.folderPath}". Created fresh vault (lattice_vault.db & assets/) - Ready for new notes!`);
-        } else if (res.loadedNotes && onNotesUpdated) {
-          onNotesUpdated(res.loadedNotes);
-          setImportStatus(`Resumed vault from "${res.folderName || res.folderPath}" (${res.loadedNotes.length} notes loaded).`);
-        } else {
-          setImportStatus(`Connected to folder: "${res.folderName || res.folderPath}".`);
+      if (syncState.platform === 'capacitor') {
+        const current = syncState.folderPath || 'Documents/LatticeLedger';
+        const entered = window.prompt('Enter vault folder path inside Documents (e.g. LatticeLedger or Notes):', current);
+        if (!entered || !entered.trim() || entered.trim() === current) {
+          setIsBindingFolder(false);
+          setImportStatus(null);
+          return;
         }
-      } else if (res.error && res.error !== 'Folder selection canceled') {
-        setImportStatus(`Folder selection notice: ${res.error}`);
+
+        const res = await setMobileVaultFolder(entered.trim());
+        if (res.success) {
+          if (res.isFresh && onNotesUpdated) {
+            onNotesUpdated([]);
+            setImportStatus(`Created fresh vault in "${res.folderPath}". Ready for new notes!`);
+          } else if (res.loadedNotes && onNotesUpdated) {
+            onNotesUpdated(res.loadedNotes);
+            setImportStatus(`Switched vault to "${res.folderPath}" (${res.loadedNotes.length} notes loaded).`);
+          } else {
+            setImportStatus(`Connected to "${res.folderPath}".`);
+          }
+        } else if (res.error) {
+          setImportStatus(`Folder error: ${res.error}`);
+        }
+      } else {
+        // Desktop (Electron) and Browser
+        const res = await chooseVaultFolder();
+        if (res.success) {
+          if (res.isFresh && onNotesUpdated) {
+            onNotesUpdated([]);
+            setImportStatus(`Created fresh vault in "${res.folderName || res.folderPath}". Ready for new notes!`);
+          } else if (res.loadedNotes && onNotesUpdated) {
+            onNotesUpdated(res.loadedNotes);
+            setImportStatus(`Switched vault to "${res.folderName || res.folderPath}" (${res.loadedNotes.length} notes loaded).`);
+          } else {
+            setImportStatus(`Connected to "${res.folderName || res.folderPath}".`);
+          }
+        } else if (res.error && res.error !== 'Folder selection canceled') {
+          setImportStatus(`Folder notice: ${res.error}`);
+        }
       }
     } catch (err: any) {
       setImportStatus(`Failed to select folder: ${err.message}`);
     } finally {
       setIsBindingFolder(false);
-      setTimeout(() => setImportStatus(null), 6000);
-    }
-  };
-
-  const handleDisconnectFolder = async () => {
-    await disconnectVaultFolder();
-    setImportStatus('Reset to default local storage.');
-    setTimeout(() => setImportStatus(null), 4000);
-  };
-
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [optimizeMessage, setOptimizeMessage] = useState<string | null>(null);
-
-  const handleOptimizeDb = async () => {
-    setIsOptimizing(true);
-    setOptimizeMessage('Compacting SQLite database (VACUUM)...');
-    try {
-      const res = await optimizeSqliteDatabase();
-      const binary = await getSqliteDatabaseBinary();
-      await saveVaultDbToFolder(binary);
-      const afterKb = (res.afterBytes / 1024).toFixed(1);
-      const freedKb = (res.freedBytes / 1024).toFixed(1);
-      setOptimizeMessage(`Compaction complete! Database size: ${afterKb} KB (${freedKb} KB reclaimed)`);
-    } catch (err: any) {
-      setOptimizeMessage(`Compaction error: ${err.message}`);
-    } finally {
-      setIsOptimizing(false);
-      setTimeout(() => setOptimizeMessage(null), 5000);
+      setTimeout(() => setImportStatus(null), 4000);
     }
   };
 
@@ -927,151 +865,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* 2. SECOND SECTION: Vault Storage Location */}
-        <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-4">
+        {/* Vault Folder Section */}
+        <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 font-medium text-zinc-200">
+            <div className="flex items-center gap-2 font-medium text-zinc-200 text-xs">
               <Folder className="w-4 h-4 text-indigo-400" />
-              <span>Vault Storage Location</span>
+              <span>Vault Folder</span>
             </div>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
-              syncState.isConfigured
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : 'bg-zinc-800 text-zinc-400 border border-zinc-700/60'
-            }`}>
-              {syncState.isConfigured ? '🟢 Active Vault' : 'Default Storage'}
+            <span className="text-[11px] font-mono text-indigo-300 bg-zinc-950 px-2.5 py-1 rounded border border-zinc-800 truncate max-w-[240px]">
+              {syncState.folderPath || 'Documents/LatticeLedger'}
             </span>
           </div>
 
-          <p className="text-[11px] text-zinc-400 leading-relaxed">
-            All notes, pages, and media files are stored directly in your chosen folder as <code>lattice_vault.db</code> and an <code>assets/</code> subfolder.
-          </p>
-
-          {/* Real-time Folder Binding Card */}
-          <div className="p-3.5 rounded-lg bg-zinc-950 border border-zinc-800/90 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-medium text-zinc-200 text-xs">
-                <FolderOpen className="w-4 h-4 text-indigo-400" />
-                <span>Vault Folder</span>
-              </div>
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
-                syncState.isConfigured
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-zinc-800 text-zinc-400 border border-zinc-700/60'
-              }`}>
-                {syncState.isConfigured ? '🟢 Custom Folder' : '⚪ Default Storage'}
-              </span>
-            </div>
-
-            {/* Real-time Folder Binding Card */}
-            <div className="space-y-2.5 p-3 rounded-lg bg-zinc-900/80 border border-indigo-500/30">
-              <div className="space-y-1">
-                <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-                  <span>Selected Vault Folder ({syncState.platform === 'electron' ? 'Desktop Local' : syncState.platform === 'capacitor' ? 'Android Device' : 'Local Storage'})</span>
-                  <span className="font-mono text-indigo-400 font-semibold">{notes.length} notes</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-zinc-950 px-2.5 py-1.5 rounded border border-zinc-800 overflow-x-auto break-all">
-                  <Folder className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                  <span>{syncState.folderPath || syncState.folderName || 'Documents/LatticeLedger'}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1.5 text-zinc-300">
-                    <Database className="w-3.5 h-3.5 text-indigo-400" />
-                    <code>lattice_vault.db</code>
-                  </span>
-                  <span className="flex items-center gap-1.5 text-zinc-300">
-                    <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-                    <code>assets/</code>
-                  </span>
-                </div>
-                {syncState.lastSyncedAt && (
-                  <span className="text-[10px] text-zinc-500 font-mono">
-                    Last saved: {new Date(syncState.lastSyncedAt).toLocaleTimeString()}
-                  </span>
-                )}
-              </div>
-
-              {/* Hidden File Input for Native File/Folder System Chooser Popup */}
-              <input
-                ref={mobileFileInputRef}
-                type="file"
-                accept=".db,.sqlite,application/x-sqlite3,*/*"
-                className="hidden"
-                onChange={handleMobileFileSelected}
-              />
-
-              <div className="flex items-center gap-2 pt-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleChooseFolder}
-                  disabled={isBindingFolder}
-                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
-                  title="Choose folder or database file"
-                >
-                  {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
-                  <span>{syncState.platform === 'capacitor' ? 'Select Vault Folder / .db' : 'Choose Vault Folder'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleReloadFromFolder}
-                  disabled={isBindingFolder}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 disabled:opacity-50"
-                  title="Reload latest notes from folder"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isBindingFolder ? 'animate-spin' : ''}`} />
-                  <span>Reload from Folder</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDisconnectFolder}
-                  className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 ml-auto"
-                  title="Disconnect custom folder and return to default local storage"
-                >
-                  <Unlink className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Reset to Default</span>
-                </button>
-              </div>
-            </div>
-
-
-            {/* Database Maintenance & Size Management */}
-            <div className="pt-3 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div>
-                <div className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Database Size Optimization (VACUUM)</span>
-                </div>
-                <p className="text-[10px] text-zinc-400 mt-0.5">
-                  Defragments SQLite indexes and reclaims free space from deleted notes, keeping <code>lattice_vault.db</code> compact for instant FolderSync transfers.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleOptimizeDb}
-                disabled={isOptimizing}
-                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 border border-zinc-700 transition-colors shrink-0 disabled:opacity-50"
-              >
-                {isOptimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" /> : <Sparkles className="w-3.5 h-3.5 text-indigo-400" />}
-                <span>Compact & Optimize</span>
-              </button>
-            </div>
-
-            {optimizeMessage && (
-              <div className="text-[11px] font-medium p-2 rounded bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 animate-in fade-in flex items-center gap-1.5">
-                <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                <span>{optimizeMessage}</span>
-              </div>
-            )}
-
-            {/* Smart Resume hint */}
-            <p className="text-[10px] text-zinc-500 leading-normal pt-2 border-t border-zinc-800/60">
-              💡 <strong>Smart Resume:</strong> If the selected folder is empty, LatticeLedger creates a fresh <code>lattice_vault.db</code> and <code>assets/</code> folder starting from a clean slate. If it already contains notes, your knowledge graph will resume immediately.
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={handleSelectFolder}
+            disabled={isBindingFolder}
+            className="w-full py-2.5 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-50"
+          >
+            {isBindingFolder ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <FolderOpen className="w-4 h-4" />}
+            <span>Select Vault Folder</span>
+          </button>
 
           {importStatus && (
             <div className="text-[11px] font-medium p-2.5 rounded bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 animate-in fade-in">

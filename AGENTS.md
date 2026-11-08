@@ -577,18 +577,20 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - Added instant title auto-save on input `onBlur` and `onKeyDown` (`Enter`).
       - Added explicit flush in `onBackToPages()` so clicking "← Pages" commits the title before unmounting.
       - Added automatic title extraction from `# Heading` if user types a top-level heading in an untitled note.
-    - **Ultra-Simplified Vault Storage Settings**:
-      - Completely removed all manual device path inputs, presets chips, and confusing multi-step forms per user request.
-      - Simplified to a single intuitive **"Select Vault Folder"** button (which opens native folder chooser on desktop, or native system file picker on mobile).
-      - Added 1-tap **"Reload from Folder"** button.
-      - Blindly reads `lattice_vault.db` if it exists in the selected location, or creates a clean empty vault if not.
+    - **Ultra-Simplified Vault Storage Settings & Single-Button Folder Selection**:
+      - Completely removed all manual device path inputs, presets chips, database vacuum, reload buttons, and confusing forms per user request.
+      - Simplified to strictly **ONE single button** in Settings: **"Select Vault Folder"** (displaying the current folder path).
+      - Fixed the mobile folder-reverting bug: previously, background polling re-read old storage keys or legacy fallback paths and reverted to the old folder; now setMobileVaultFolder() synchronously updates VAULT_FOLDER_STORAGE_KEY and VAULT_FOLDER_NAME_KEY, and background polling strictly checks the newly selected folder.
+      - Blindly reads lattice_vault.db from the selected folder if it exists, or creates a clean empty vault if not, permanently staying bound to that folder.
     - **Verified & Built**:
       - 82/82 unit tests passing across all 8 test suites.
-      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
-      - Fresh standalone Windows Desktop portable executable: `release/LatticeLedger 0.1.0.exe` (124.8MB).
+      - Fresh native Android APK: LatticeLedger.apk (7.84MB).
+      - Fresh standalone Windows Desktop executable: LatticeLedger-Desktop.exe (124.8MB).
 
 - [ ] **Next Steps**:
-  - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
-  - [ ] Open Settings -> AI & Intelligence -> switch to "OpenAI (GPT)" provider.
-  - [ ] Enter OpenAI API key (`sk-...`), test and verify key, and select model (e.g. `gpt-4o-mini`).
-  - [ ] Test per-note AI summary generation and Ask AI synthesis with OpenAI.
+  - [ ] User installs LatticeLedger.apk on Android phone and launches LatticeLedger-Desktop.exe on Windows.
+  - [ ] Tap "Select Vault Folder" in Settings to switch the vault folder cleanly with a single button.
+  - [ ] Verify pages title saving and FolderSync syncing without app reverting to old folders.
+
+---
+
