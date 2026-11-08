@@ -235,6 +235,52 @@ export function subscribeExternalVaultUpdates(listener: (notes: Note[]) => void)
 
 let isInitialized = false;
 
+let lastCheckedMtime = 0;
+let lastCheckedSize = 0;
+let isCheckingMobileUpdates = false;
+let lastSelfWriteTimestamp = 0;
+
+/**
+ * Checks if lattice_vault.db has been updated externally on Android (e.g. by FolderSync or cloud sync tool).
+ */
+export async function checkMobileVaultForExternalUpdates(): Promise<boolean> {
+  if (isCheckingMobileUpdates) return false;
+  const platform = getPlatformType();
+  if (platform !== 'capacitor') return false;
+
+  const folderPath = getStoredItem(VAULT_FOLDER_STORAGE_KEY) || 'Documents/LatticeLedger';
+  try {
+    isCheckingMobileUpdates = true;
+    const stat = await Filesystem.stat({
+      path: `${folderPath}/${DEFAULT_VAULT_FILE}`,
+      directory: Directory.Documents
+    });
+
+    const mtime = stat.mtime || 0;
+    const size = stat.size || 0;
+
+    // Ignore if modified by our own app within the last 2.5 seconds
+    const isRecentSelfWrite = Date.now() - lastSelfWriteTimestamp < 2500;
+    if (!isRecentSelfWrite && lastCheckedMtime > 0) {
+      if (mtime > lastCheckedMtime || (size !== lastCheckedSize && mtime >= lastCheckedMtime)) {
+        console.log('[VaultSync] External update detected in mobile folder (FolderSync / 3rd party):', { mtime, size });
+        lastCheckedMtime = mtime;
+        lastCheckedSize = size;
+        await reloadVaultFromFolder();
+        return true;
+      }
+    }
+
+    lastCheckedMtime = mtime;
+    lastCheckedSize = size;
+  } catch (e) {
+    // File might not exist yet or unconfigured
+  } finally {
+    isCheckingMobileUpdates = false;
+  }
+  return false;
+}
+
 export async function initVaultSync(onExternalChange?: (notes: Note[]) => void): Promise<void> {
   if (onExternalChange) {
     externalUpdateListeners.push(onExternalChange);

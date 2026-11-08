@@ -20,7 +20,8 @@ import {
   initVaultSync, 
   subscribeVaultSyncState, 
   VaultSyncState,
-  chooseVaultFolder
+  chooseVaultFolder,
+  pullVaultDbFromFolder
 } from './services/vaultSyncService';
 
 import { Sidebar } from './components/Sidebar';
@@ -259,6 +260,14 @@ export function App() {
     });
     return subscribeVaultSyncState(setVaultSyncState);
   }, []);
+
+  const handleReloadVault = async () => {
+    const res = await pullVaultDbFromFolder();
+    if (res.success && res.notes) {
+      handleNotesUpdated(res.notes, false);
+    }
+    return res;
+  };
 
   const handleChangeVaultFolder = async () => {
     const res = await chooseVaultFolder();
@@ -736,6 +745,7 @@ export function App() {
               onNewPage={() => handleCreateNewWikiPage()}
               onDeletePage={handleDeleteWikiPage}
               onLoadDemoPages={handleLoadDemoNotes}
+              onRefreshVault={handleReloadVault}
               onTagClick={() => {
                 setCurrentMode('search');
               }}

@@ -546,6 +546,24 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (249.8MB).
 
+  - [x] **Instant Mobile Database Auto-Refresh, Pull-To-Refresh & Database Compaction (VACUUM)**:
+    - **Automatic External Update Detection on Mobile**:
+      - Added `checkMobileVaultForExternalUpdates()` in `vaultSyncService.ts` tracking `stat.mtime` and `stat.size` on `Documents/LatticeLedger/lattice_vault.db`.
+      - Instantly detects file updates when returning from background/FolderSync via `visibilitychange` and window `focus` listeners.
+      - Active 3-second smart polling in foreground automatically hot-reloading updated notes without restarting the app.
+      - Self-write debounce prevention to avoid echo-reload loops.
+    - **Touch Pull-To-Refresh & 1-Click Reload in PagesView**:
+      - Implemented smooth touch pull-to-refresh on mobile with rubber-band friction, visual spinning indicator ("Pull down to reload vault" -> "Release to reload vault"), and reload toast.
+      - Added prominent 1-click **"Reload Vault"** button in `PagesView.tsx` header toolbar.
+    - **Long-Term SQLite Scale & Compaction Engine (VACUUM)**:
+      - Implemented `optimizeSqliteDatabase()` in `sqliteService.ts` running SQLite `VACUUM` to reclaim unused space, defragment indexes, and compact binary size.
+      - Added **"Compact & Optimize (VACUUM)"** in SettingsModal, automatically saving the compacted `lattice_vault.db` to the bound folder.
+      - Media separation: attachments stored in `assets/` subfolder, ensuring `lattice_vault.db` remains tiny (1-5MB) for sub-second FolderSync transfers.
+    - **Verified & Built**:
+      - 82/82 unit tests passing across all 8 test suites.
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+      - Fresh standalone Windows Desktop portable executable: `LatticeLedger-Desktop.exe` (124.8MB).
+
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Open Settings -> AI & Intelligence -> switch to "OpenAI (GPT)" provider.

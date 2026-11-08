@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   FileText, 
   Plus, 
@@ -10,7 +10,9 @@ import {
   X,
   Tag,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw,
+  Check
 } from 'lucide-react';
 import { Note } from '../types';
 
@@ -21,6 +23,7 @@ interface PagesViewProps {
   onDeletePage?: (pageId: string) => void;
   onTagClick?: (tag: string) => void;
   onLoadDemoPages?: () => void;
+  onRefreshVault?: () => Promise<{ success: boolean; message: string; count?: number } | void>;
 }
 
 export const PagesView: React.FC<PagesViewProps> = ({
@@ -29,10 +32,70 @@ export const PagesView: React.FC<PagesViewProps> = ({
   onNewPage,
   onDeletePage,
   onTagClick,
-  onLoadDemoPages
+  onLoadDemoPages,
+  onRefreshVault
 }) => {
   const [filterQuery, setFilterQuery] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshBanner, setRefreshBanner] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (containerRef.current && containerRef.current.scrollTop <= 0) {
+      setTouchStartY(e.touches[0].clientY);
+    } else {
+      setTouchStartY(null);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY === null || isRefreshing) return;
+    if (containerRef.current && containerRef.current.scrollTop > 0) {
+      setPullDistance(0);
+      return;
+    }
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartY;
+    if (diff > 0) {
+      // Smooth rubber-band resistance
+      const dist = Math.min(diff * 0.4, 75);
+      setPullDistance(dist);
+    } else {
+      setPullDistance(0);
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (pullDistance >= 50 && onRefreshVault && !isRefreshing) {
+      await triggerRefresh();
+    }
+    setPullDistance(0);
+    setTouchStartY(null);
+  };
+
+  const triggerRefresh = async () => {
+    if (isRefreshing || !onRefreshVault) return;
+    setIsRefreshing(true);
+    try {
+      const res = await onRefreshVault();
+      if (res && res.message) {
+        setRefreshBanner(res.message);
+      } else {
+        setRefreshBanner('Vault notes reloaded from database!');
+      }
+      setTimeout(() => setRefreshBanner(null), 3000);
+    } catch (e: any) {
+      setRefreshBanner(`Reload notice: ${e.message}`);
+      setTimeout(() => setRefreshBanner(null), 3000);
+    } finally {
+      setIsRefreshing(false);
+      setPullDistance(0);
+    }
+  };
+
 
   const filteredPages = pages.filter(p => {
     if (!filterQuery.trim()) return true;
@@ -49,7 +112,40 @@ export const PagesView: React.FC<PagesViewProps> = ({
   });
 
   return (
-    <div className="flex-1 h-full overflow-y-auto px-4 sm:px-8 lg:px-12 py-6 max-w-5xl mx-auto w-full text-xs select-text pb-28 md:pb-16">
+    <div 
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="flex-1 h-full overflow-y-auto px-4 sm:px-8 lg:px-12 py-6 max-w-5xl mx-auto w-full text-xs select-text pb-28 md:pb-16 overscroll-contain relative"
+    >
+            {/* Pull-To-Refresh Indicator (Mobile Touch & Slide Down) */}
+      <div 
+        className="overflow-hidden transition-all duration-200 ease-out flex items-center justify-center text-xs font-medium text-zinc-300"
+        style={{
+          height: isRefreshing ? 44 : pullDistance > 0 ? pullDistance : 0,
+          opacity: isRefreshing || pullDistance > 10 ? 1 : 0
+        }}
+      >
+        <div className="flex items-center gap-2 py-1.5 px-3 rounded-full bg-zinc-900 border border-indigo-500/40 text-indigo-300 shadow-md">
+          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-400' : pullDistance >= 50 ? 'rotate-180 text-emerald-400' : 'text-zinc-400'} transition-transform`} />
+          <span>
+            {isRefreshing 
+              ? 'Reloading notes from database...' 
+              : pullDistance >= 50 
+              ? 'Release to reload vault' 
+              : 'Pull down to reload vault'}
+          </span>
+        </div>
+      </div>
+
+      {refreshBanner && (
+        <div className="mb-4 p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span>{refreshBanner}</span>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-zinc-800/80 mb-6">
         <div>
@@ -87,6 +183,20 @@ export const PagesView: React.FC<PagesViewProps> = ({
               </button>
             )}
           </div>
+
+                    {/* 1-Click Reload Vault button */}
+          {onRefreshVault && (
+            <button
+              type="button"
+              onClick={triggerRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-xs font-medium transition-all active:scale-95 shrink-0"
+              title="Reload latest notes from lattice_vault.db"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Reloading...' : 'Reload Vault'}</span>
+            </button>
+          )}
 
           {/* Demo Pages Quick Action */}
           {onLoadDemoPages && (

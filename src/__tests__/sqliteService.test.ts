@@ -8,7 +8,8 @@ import {
   importSqliteDatabaseFile,
   replaceAllNotesInSql,
   resetSqliteToSeed,
-  createEmptySqliteVault
+  createEmptySqliteVault,
+  optimizeSqliteDatabase
 } from '../services/sqliteService';
 import { Note } from '../types';
 
@@ -63,6 +64,15 @@ describe('SQLite Database Service', () => {
     const notesAfter = await getAllNotesFromSql();
     expect(notesAfter.length).toBe(countBefore - 1);
     expect(notesAfter.find(n => n.id === 'wiki-harry-potter')).toBeUndefined();
+  });
+
+
+  it('optimizes and compacts database using SQLite VACUUM', async () => {
+    const res = await optimizeSqliteDatabase();
+    expect(res).toBeDefined();
+    expect(res.beforeBytes).toBeGreaterThan(0);
+    expect(res.afterBytes).toBeGreaterThan(0);
+    expect(typeof res.freedBytes).toBe('number');
   });
 
   it('exports SQLite database as valid binary blob and Uint8Array', async () => {

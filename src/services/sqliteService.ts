@@ -401,6 +401,27 @@ export async function replaceAllNotesInSql(newNotes: Note[]): Promise<Note[]> {
 /**
  * Export the raw SQLite binary Uint8Array bytes directly.
  */
+/**
+ * Run SQLite VACUUM to reclaim free space, defragment indexes, and compact the database.
+ */
+export async function optimizeSqliteDatabase(): Promise<{ beforeBytes: number; afterBytes: number; freedBytes: number }> {
+  const db = await getSqliteDatabase();
+  const beforeBinary = await getSqliteDatabaseBinary();
+  const beforeBytes = beforeBinary.length;
+
+  db.exec('VACUUM;');
+  await persistDatabase();
+
+  const afterBinary = await getSqliteDatabaseBinary();
+  const afterBytes = afterBinary.length;
+
+  return {
+    beforeBytes,
+    afterBytes,
+    freedBytes: Math.max(0, beforeBytes - afterBytes)
+  };
+}
+
 export async function getSqliteDatabaseBinary(): Promise<Uint8Array> {
   const db = await getSqliteDatabase();
   return db.export();

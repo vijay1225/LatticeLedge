@@ -27,6 +27,7 @@ import {
   ChevronLeft 
 } from 'lucide-react';
 import { AIProviderConfig, Note, GeminiModelInfo, AppTheme } from '../types';
+import { optimizeSqliteDatabase, getSqliteDatabaseBinary } from '../services/sqliteService';
 import { 
   sanitizeApiKey, 
   fetchAvailableGeminiModels, 
@@ -40,7 +41,8 @@ import {
   subscribeVaultSyncState,
   VaultSyncState,
   disconnectVaultFolder,
-  getVaultSyncState
+  getVaultSyncState,
+  saveVaultDbToFolder
 } from '../services/vaultSyncService';
 
 interface SettingsModalProps {
@@ -435,6 +437,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     await disconnectVaultFolder();
     setImportStatus('Reset to default local storage.');
     setTimeout(() => setImportStatus(null), 4000);
+  };
+
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizeMessage, setOptimizeMessage] = useState<string | null>(null);
+
+  const handleOptimizeDb = async () => {
+    setIsOptimizing(true);
+    setOptimizeMessage('Compacting SQLite database (VACUUM)...');
+    try {
+      const res = await optimizeSqliteDatabase();
+      const binary = await getSqliteDatabaseBinary();
+      await saveVaultDbToFolder(binary);
+      const afterKb = (res.afterBytes / 1024).toFixed(1);
+      const freedKb = (res.freedBytes / 1024).toFixed(1);
+      setOptimizeMessage(`Compaction complete! Database size: ${afterKb} KB (${freedKb} KB reclaimed)`);
+    } catch (err: any) {
+      setOptimizeMessage(`Compaction error: ${err.message}`);
+    } finally {
+      setIsOptimizing(false);
+      setTimeout(() => setOptimizeMessage(null), 5000);
+    }
   };
 
   const recommendedModels = availableModels.filter(m => m.isRecommended);
@@ -1056,6 +1079,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                 </div>
               )
+            )}
+
+
+            {/* Database Maintenance & Size Management */}
+            <div className="pt-3 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div>
+                <div className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Database Size Optimization (VACUUM)</span>
+                </div>
+                <p className="text-[10px] text-zinc-400 mt-0.5">
+                  Defragments SQLite indexes and reclaims free space from deleted notes, keeping <code>lattice_vault.db</code> compact for instant FolderSync transfers.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOptimizeDb}
+                disabled={isOptimizing}
+                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 border border-zinc-700 transition-colors shrink-0 disabled:opacity-50"
+              >
+                {isOptimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" /> : <Sparkles className="w-3.5 h-3.5 text-indigo-400" />}
+                <span>Compact & Optimize</span>
+              </button>
+            </div>
+
+            {optimizeMessage && (
+              <div className="text-[11px] font-medium p-2 rounded bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 animate-in fade-in flex items-center gap-1.5">
+                <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span>{optimizeMessage}</span>
+              </div>
             )}
 
             {/* Smart Resume hint */}
