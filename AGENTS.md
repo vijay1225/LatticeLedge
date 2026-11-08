@@ -559,10 +559,21 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - Implemented `optimizeSqliteDatabase()` in `sqliteService.ts` running SQLite `VACUUM` to reclaim unused space, defragment indexes, and compact binary size.
       - Added **"Compact & Optimize (VACUUM)"** in SettingsModal, automatically saving the compacted `lattice_vault.db` to the bound folder.
       - Media separation: attachments stored in `assets/` subfolder, ensuring `lattice_vault.db` remains tiny (1-5MB) for sub-second FolderSync transfers.
+    - **Android Path Normalization & Continuous Hot-Reload Engine**:
+      - Diagnosed and fixed root cause why cloud files synced by FolderSync were not reflected: Capacitor's `Directory.Documents` was receiving path `"Documents/LatticeLedger"`, which resolved to the duplicated path `/storage/emulated/0/Documents/Documents/LatticeLedger/lattice_vault.db`!
+      - Implemented `normalizeAndroidRelativePath()` stripping duplicate leading `Documents/`, ensuring exact resolution to `/storage/emulated/0/Documents/LatticeLedger/lattice_vault.db`.
+      - Added automatic legacy path fallback and migration in `readMobileVaultFile()`.
+      - Connected mobile background file watching in `initVaultSync()`: 2-second polling of `mtime` and `size`, plus instant checks on app resume (`visibilitychange`) and window focus, hot-reloading updated notes into SQLite and UI automatically.
+      - Added startup vault load on mobile: if `Documents/LatticeLedger/lattice_vault.db` exists on disk when the app opens, it automatically imports the latest file.
+    - **Streamlined Mobile Settings UI & Native File Chooser Popup**:
+      - Removed the complex manual path input form and preset clutter by default.
+      - Added **"Pick .db File Popup"** button: instantly opens Android's native system file chooser (SAF / Files app) so the user can select `lattice_vault.db` directly from any folder with zero typing.
+      - Added **"Reload from Folder"** button: 1-tap instant reload from `Documents/LatticeLedger/lattice_vault.db`.
+      - Kept an optional "Path" toggle button for advanced users who want to customize the subfolder.
     - **Verified & Built**:
       - 82/82 unit tests passing across all 8 test suites.
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
-      - Fresh standalone Windows Desktop portable executable: `LatticeLedger-Desktop.exe` (124.8MB).
+      - Fresh standalone Windows Desktop portable executable: `release/LatticeLedger 0.1.0.exe` (124.8MB).
 
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.

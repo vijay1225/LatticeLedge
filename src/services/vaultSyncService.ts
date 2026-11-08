@@ -241,6 +241,62 @@ let isCheckingMobileUpdates = false;
 let lastSelfWriteTimestamp = 0;
 
 /**
+ * Normalizes an Android relative path inside Documents directory so it never duplicates "Documents"
+ * Examples:
+ *  "Documents/LatticeLedger" -> "LatticeLedger"
+ *  "internalstorage/documents/LatticeLedger" -> "LatticeLedger"
+ *  "LatticeLedger" -> "LatticeLedger"
+ */
+export function normalizeAndroidRelativePath(rawPath?: string | null): string {
+  let p = (rawPath || '').trim().replace(/\\/g, '/');
+  p = p.replace(/^\/+|\/+$/g, '');
+  p = p.replace(/^(storage\/emulated\/0|internalstorage|internal storage)\//i, '');
+  p = p.replace(/^(documents?)\//i, '');
+  p = p.replace(/^\/+/, '');
+  return p || 'LatticeLedger';
+}
+
+/**
+ * Reads vault file from Android Documents directory, with fallback migration for legacy paths.
+ */
+async function readMobileVaultFile(subFolder: string): Promise<Uint8Array | null> {
+  // 1. Standard correct path: "LatticeLedger/lattice_vault.db" inside Documents
+  try {
+    const res = await Filesystem.readFile({
+      path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
+      directory: Directory.Documents
+    });
+    if (res && res.data) {
+      return typeof res.data === 'string' ? base64ToUint8Array(res.data) : (res.data as any);
+    }
+  } catch {}
+
+  // 2. Fallback check for legacy path: "Documents/LatticeLedger/lattice_vault.db" inside Documents
+  try {
+    const legacyPath = `Documents/${subFolder}/${DEFAULT_VAULT_FILE}`;
+    const legacyRes = await Filesystem.readFile({
+      path: legacyPath,
+      directory: Directory.Documents
+    });
+    if (legacyRes && legacyRes.data) {
+      const bytes = typeof legacyRes.data === 'string' ? base64ToUint8Array(legacyRes.data) : (legacyRes.data as any);
+      // Automatically migrate to the normalized path so FolderSync sees it!
+      try {
+        await Filesystem.writeFile({
+          path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
+          data: typeof legacyRes.data === 'string' ? legacyRes.data : uint8ArrayToBase64(bytes),
+          directory: Directory.Documents,
+          recursive: true
+        });
+      } catch {}
+      return bytes;
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
  * Checks if lattice_vault.db has been updated externally on Android (e.g. by FolderSync or cloud sync tool).
  */
 export async function checkMobileVaultForExternalUpdates(): Promise<boolean> {
@@ -249,12 +305,23 @@ export async function checkMobileVaultForExternalUpdates(): Promise<boolean> {
   if (platform !== 'capacitor') return false;
 
   const folderPath = getStoredItem(VAULT_FOLDER_STORAGE_KEY) || 'Documents/LatticeLedger';
+  const subFolder = normalizeAndroidRelativePath(folderPath);
   try {
     isCheckingMobileUpdates = true;
-    const stat = await Filesystem.stat({
-      path: `${folderPath}/${DEFAULT_VAULT_FILE}`,
-      directory: Directory.Documents
-    });
+    let stat: any = null;
+    try {
+      stat = await Filesystem.stat({
+        path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
+        directory: Directory.Documents
+      });
+    } catch {
+      try {
+        stat = await Filesystem.stat({
+          path: `Documents/${subFolder}/${DEFAULT_VAULT_FILE}`,
+          directory: Directory.Documents
+        });
+      } catch {}
+    }
 
     const mtime = stat.mtime || 0;
     const size = stat.size || 0;
@@ -314,9 +381,41 @@ export async function initVaultSync(onExternalChange?: (notes: Note[]) => void):
 
   // 2. Android Capacitor Setup
   else if (platform === 'capacitor') {
-    const savedPath = getStoredItem(VAULT_FOLDER_STORAGE_KEY);
-    if (savedPath) {
-      setStoredItem(VAULT_FOLDER_NAME_KEY, savedPath.split(/[/\\]/).pop() || savedPath);
+    const savedPath = getStoredItem(VAULT_FOLDER_STORAGE_KEY) || 'Documents/LatticeLedger';
+    setStoredItem(VAULT_FOLDER_STORAGE_KEY, savedPath);
+    const sub = normalizeAndroidRelativePath(savedPath);
+    setStoredItem(VAULT_FOLDER_NAME_KEY, `Documents/${sub}`);
+
+    // Try loading latest vault file on startup if exists
+    readMobileVaultFile(sub).then(async (fileBytes) => {
+      if (fileBytes && fileBytes.length > 0) {
+        try {
+          const notes = await importSqliteDatabaseFile(fileBytes);
+          lastSyncTimestamp = Date.now();
+          if (onExternalChange && notes && notes.length > 0) {
+            onExternalChange(notes);
+          }
+        } catch (e) {
+          console.warn('[VaultSync] Startup mobile load error:', e);
+        }
+      }
+    }).catch(() => {});
+
+    // Active continuous background poll on Android (every 2 seconds)
+    setInterval(async () => {
+      await checkMobileVaultForExternalUpdates();
+    }, 2000);
+
+    // Immediate check on focus and app resume
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', () => {
+        checkMobileVaultForExternalUpdates().catch(() => {});
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          checkMobileVaultForExternalUpdates().catch(() => {});
+        }
+      });
     }
   }
 
@@ -502,14 +601,16 @@ export async function chooseVaultFolder(customMobilePath?: string): Promise<Vaul
  * Configure and bind a specific folder on Android mobile storage.
  */
 export async function setMobileVaultFolder(customPath: string): Promise<VaultFolderResult> {
-  const cleanPath = customPath.trim().replace(/^[/\\]+|[/\\]+$/g, '') || 'Documents/LatticeLedger';
-  setStoredItem(VAULT_FOLDER_STORAGE_KEY, cleanPath);
-  setStoredItem(VAULT_FOLDER_NAME_KEY, cleanPath.split(/[/\\]/).pop() || cleanPath);
+  const rawPath = customPath.trim().replace(/^[/\\]+|[/\\]+$/g, '') || 'Documents/LatticeLedger';
+  const subFolder = normalizeAndroidRelativePath(rawPath);
+  const displayPath = `Documents/${subFolder}`;
+  setStoredItem(VAULT_FOLDER_STORAGE_KEY, displayPath);
+  setStoredItem(VAULT_FOLDER_NAME_KEY, displayPath);
 
   // Ensure assets/ folder exists
   try {
     await Filesystem.mkdir({
-      path: `${cleanPath}/assets`,
+      path: `${subFolder}/assets`,
       directory: Directory.Documents,
       recursive: true
     });
@@ -518,23 +619,17 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
   let loadedNotes: Note[] | undefined = undefined;
   let isFresh = false;
 
-  try {
-    const stat = await Filesystem.stat({
-      path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
-      directory: Directory.Documents
-    });
-    if (stat) {
-      const res = await Filesystem.readFile({
-        path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
-        directory: Directory.Documents
-      });
-      if (res.data) {
-        const raw = typeof res.data === 'string' ? base64ToUint8Array(res.data) : (res.data as any);
-        loadedNotes = await importSqliteDatabaseFile(raw);
-        lastSyncTimestamp = Date.now();
-      }
+  const existingBytes = await readMobileVaultFile(subFolder);
+  if (existingBytes && existingBytes.length > 0) {
+    try {
+      loadedNotes = await importSqliteDatabaseFile(existingBytes);
+      lastSyncTimestamp = Date.now();
+      lastCheckedMtime = Date.now();
+      lastCheckedSize = existingBytes.length;
+    } catch (e) {
+      console.warn('[VaultSync] Could not import existing mobile vault:', e);
     }
-  } catch {
+  } else {
     // File doesn't exist in folder: Create fresh empty repo (do not copy old notes)!
     try {
       loadedNotes = await createEmptySqliteVault();
@@ -542,12 +637,14 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
       const emptyBinary = await getSqliteDatabaseBinary();
       const base64Data = uint8ArrayToBase64(emptyBinary);
       await Filesystem.writeFile({
-        path: `${cleanPath}/${DEFAULT_VAULT_FILE}`,
+        path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
         data: base64Data,
         directory: Directory.Documents,
         recursive: true
       });
+      lastSelfWriteTimestamp = Date.now();
       lastSyncTimestamp = Date.now();
+      lastCheckedMtime = Date.now();
     } catch (writeErr: any) {
       console.warn('[VaultSync] Could not write fresh file to new mobile folder:', writeErr?.message || writeErr);
     }
@@ -556,8 +653,8 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
   notifyStateChanged();
   return {
     success: true,
-    folderPath: cleanPath,
-    folderName: cleanPath,
+    folderPath: displayPath,
+    folderName: displayPath,
     loadedNotes,
     isFresh
   };
@@ -606,17 +703,20 @@ export async function saveVaultDbToFolder(bytes: Uint8Array): Promise<boolean> {
 
     // 3. Android Capacitor
     if (platform === 'capacitor') {
-      const relativeFolder = folderPath || 'Documents/LatticeLedger';
+      const subFolder = normalizeAndroidRelativePath(folderPath);
       const base64Data = uint8ArrayToBase64(bytes);
 
       await Filesystem.writeFile({
-        path: `${relativeFolder}/${DEFAULT_VAULT_FILE}`,
+        path: `${subFolder}/${DEFAULT_VAULT_FILE}`,
         data: base64Data,
         directory: Directory.Documents,
         recursive: true
       });
 
+      lastSelfWriteTimestamp = Date.now();
       lastSyncTimestamp = Date.now();
+      lastCheckedMtime = Date.now();
+      lastCheckedSize = bytes.length;
       isSyncing = false;
       notifyStateChanged();
       return true;
@@ -656,14 +756,11 @@ export async function loadVaultDbFromFolder(): Promise<Uint8Array | null> {
     }
 
     if (platform === 'capacitor') {
-      const relativeFolder = folderPath || 'Documents/LatticeLedger';
-      const res = await Filesystem.readFile({
-        path: `${relativeFolder}/${DEFAULT_VAULT_FILE}`,
-        directory: Directory.Documents
-      });
-      if (res && res.data) {
+      const subFolder = normalizeAndroidRelativePath(folderPath);
+      const bytes = await readMobileVaultFile(subFolder);
+      if (bytes && bytes.length > 0) {
         lastSyncTimestamp = Date.now();
-        return typeof res.data === 'string' ? base64ToUint8Array(res.data) : (res.data as any);
+        return bytes;
       }
     }
 

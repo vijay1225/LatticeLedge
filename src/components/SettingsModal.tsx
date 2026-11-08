@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Key, 
   Cpu, 
@@ -27,7 +27,7 @@ import {
   ChevronLeft 
 } from 'lucide-react';
 import { AIProviderConfig, Note, GeminiModelInfo, AppTheme } from '../types';
-import { optimizeSqliteDatabase, getSqliteDatabaseBinary } from '../services/sqliteService';
+import { optimizeSqliteDatabase, getSqliteDatabaseBinary, importSqliteDatabaseFile } from '../services/sqliteService';
 import { 
   sanitizeApiKey, 
   fetchAvailableGeminiModels, 
@@ -42,7 +42,8 @@ import {
   VaultSyncState,
   disconnectVaultFolder,
   getVaultSyncState,
-  saveVaultDbToFolder
+  saveVaultDbToFolder,
+  pullVaultDbFromFolder
 } from '../services/vaultSyncService';
 
 interface SettingsModalProps {
@@ -110,6 +111,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isBindingFolder, setIsBindingFolder] = useState(false);
   const [isEditingMobilePath, setIsEditingMobilePath] = useState(false);
   const [mobilePathInput, setMobilePathInput] = useState(getVaultSyncState().folderPath || 'Documents/LatticeLedger');
+  const mobileFileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     return subscribeVaultSyncState((state) => {
       setSyncState(state);
@@ -370,9 +372,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   // Vault Folder Selection & Management
+  const handleMobileFilePick = () => {
+    mobileFileInputRef.current?.click();
+  };
+
+  const handleMobileFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsBindingFolder(true);
+    setImportStatus(`Loading vault from "${file.name}"...`);
+    try {
+      const buffer = await file.arrayBuffer();
+      const importedNotes = await importSqliteDatabaseFile(buffer);
+      if (onNotesUpdated) {
+        onNotesUpdated(importedNotes);
+      }
+      try {
+        await saveVaultDbToFolder(new Uint8Array(buffer));
+      } catch {}
+      setImportStatus(`Successfully loaded ${importedNotes.length} notes from "${file.name}"!`);
+    } catch (err: any) {
+      setImportStatus(`Failed to load file: ${err?.message || err}`);
+    } finally {
+      setIsBindingFolder(false);
+      setTimeout(() => setImportStatus(null), 5000);
+      e.target.value = '';
+    }
+  };
+
+  const handleReloadFromFolder = async () => {
+    setIsBindingFolder(true);
+    setImportStatus('Reloading from Documents/LatticeLedger...');
+    try {
+      const res = await pullVaultDbFromFolder();
+      if (res.success && res.notes) {
+        if (onNotesUpdated) {
+          onNotesUpdated(res.notes);
+        }
+        setImportStatus(res.message);
+      } else {
+        setImportStatus(res.message || 'Could not find lattice_vault.db in folder.');
+      }
+    } catch (err: any) {
+      setImportStatus(`Reload failed: ${err?.message || err}`);
+    } finally {
+      setIsBindingFolder(false);
+      setTimeout(() => setImportStatus(null), 5000);
+    }
+  };
+
   const handleChooseFolder = async () => {
     if (syncState.platform === 'capacitor') {
-      setIsEditingMobilePath(true);
+      handleMobileFilePick();
       return;
     }
 
@@ -1035,26 +1086,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 pt-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={handleChooseFolder}
-                    disabled={isBindingFolder}
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
-                  >
-                    {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
-                    <span>Change Vault Folder</span>
-                  </button>
+                {/* Hidden File Input for Mobile SAF System Chooser Popup */}
+                <input
+                  ref={mobileFileInputRef}
+                  type="file"
+                  accept=".db,.sqlite,application/x-sqlite3,*/*"
+                  className="hidden"
+                  onChange={handleMobileFileSelected}
+                />
 
-                  <button
-                    type="button"
-                    onClick={handleDisconnectFolder}
-                    className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 ml-auto"
-                    title="Disconnect custom folder and return to default local storage"
-                  >
-                    <Unlink className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Reset to Default</span>
-                  </button>
+                <div className="flex items-center gap-2 pt-2 flex-wrap">
+                  {syncState.platform === 'capacitor' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleMobileFilePick}
+                        disabled={isBindingFolder}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
+                        title="Open native file picker to select lattice_vault.db directly"
+                      >
+                        {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
+                        <span>Pick .db File Popup</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleReloadFromFolder}
+                        disabled={isBindingFolder}
+                        className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 disabled:opacity-50"
+                        title="Reload immediately from Documents/LatticeLedger"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isBindingFolder ? 'animate-spin' : ''}`} />
+                        <span>Reload from Folder</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingMobilePath(!isEditingMobilePath)}
+                        className="px-2 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 text-xs font-mono transition-colors border border-zinc-700/60"
+                        title="Change device subfolder path"
+                      >
+                        <span>Path</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleChooseFolder}
+                        disabled={isBindingFolder}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
+                      >
+                        {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
+                        <span>Change Vault Folder</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDisconnectFolder}
+                        className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 ml-auto"
+                        title="Disconnect custom folder and return to default local storage"
+                      >
+                        <Unlink className="w-3.5 h-3.5 text-zinc-400" />
+                        <span>Reset to Default</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
