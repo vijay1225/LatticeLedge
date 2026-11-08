@@ -570,6 +570,18 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - Added **"Pick .db File Popup"** button: instantly opens Android's native system file chooser (SAF / Files app) so the user can select `lattice_vault.db` directly from any folder with zero typing.
       - Added **"Reload from Folder"** button: 1-tap instant reload from `Documents/LatticeLedger/lattice_vault.db`.
       - Kept an optional "Path" toggle button for advanced users who want to customize the subfolder.
+    - **Resolved Page Title Auto-Save Bug**:
+      - Root-caused issue where editing page titles left pages as "Untitled Page" in the Pages list: `flushPendingSave()` previously only captured content changes during typing and lacked an immediate flush when clicking away or navigating back.
+      - Implemented `localTitleRef` tracking the latest title in real-time.
+      - Updated `flushPendingSave()` to always compare `localTitleRef.current` against `note.title` and persist any title changes to SQLite.
+      - Added instant title auto-save on input `onBlur` and `onKeyDown` (`Enter`).
+      - Added explicit flush in `onBackToPages()` so clicking "← Pages" commits the title before unmounting.
+      - Added automatic title extraction from `# Heading` if user types a top-level heading in an untitled note.
+    - **Ultra-Simplified Vault Storage Settings**:
+      - Completely removed all manual device path inputs, presets chips, and confusing multi-step forms per user request.
+      - Simplified to a single intuitive **"Select Vault Folder"** button (which opens native folder chooser on desktop, or native system file picker on mobile).
+      - Added 1-tap **"Reload from Folder"** button.
+      - Blindly reads `lattice_vault.db` if it exists in the selected location, or creates a clean empty vault if not.
     - **Verified & Built**:
       - 82/82 unit tests passing across all 8 test suites.
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).

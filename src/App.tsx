@@ -423,7 +423,9 @@ export function App() {
       const cleanContent = partial.content !== undefined
         ? partial.content.replace(/\\+\[\\+\[/g, '[[').replace(/\\+\]\\+\]/g, ']]')
         : note.content;
-      const cleanTitle = partial.title !== undefined ? partial.title : note.title;
+      const cleanTitle = partial.title !== undefined 
+        ? (partial.title.trim() || 'Untitled Page') 
+        : note.title;
 
       // Dynamically determine updated tags
       let updatedTags = note.tags || [];

@@ -102,10 +102,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [justSaved, setJustSaved] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string>('');
   const [localTitle, setLocalTitle] = useState(note.title);
+  const localTitleRef = React.useRef(note.title);
 
   useEffect(() => {
     setLocalTitle(note.title);
-  }, [note.id]);
+    localTitleRef.current = note.title;
+  }, [note.id, note.title]);
 
   // Auto-Save Toggle (persisted in localStorage, defaults to true)
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState<boolean>(() => {
@@ -134,6 +136,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
+    }
+    const currentTitle = (localTitleRef.current !== undefined ? localTitleRef.current : localTitle).trim();
+    if (currentTitle && currentTitle !== note.title) {
+      pendingChangesRef.current.title = currentTitle;
     }
     if (Object.keys(pendingChangesRef.current).length > 0) {
       onUpdateNote(pendingChangesRef.current);
@@ -606,6 +612,19 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       // Extract clean Markdown directly from the formatted editor and trigger debounced auto-save
       const rawMarkdown = (editor.storage as any).markdown?.getMarkdown() || editor.getText();
       const markdown = getCleanMarkdown(rawMarkdown);
+
+      // Auto-extract title if currently untitled and first line is a top-level heading (# Heading)
+      if (localTitleRef.current === 'Untitled Page' || localTitleRef.current === 'Untitled' || !localTitleRef.current.trim()) {
+        const headingMatch = rawMarkdown.match(/^#\s+([^\n]+)/);
+        if (headingMatch && headingMatch[1].trim()) {
+          const autoTitle = headingMatch[1].trim();
+          setLocalTitle(autoTitle);
+          localTitleRef.current = autoTitle;
+          triggerChange({ title: autoTitle, content: markdown });
+          return;
+        }
+      }
+
       triggerChange({ content: markdown });
     },
     onSelectionUpdate: ({ editor }) => {
@@ -759,7 +778,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       {onBackToPages && (
         <div className="mb-2.5 flex items-center gap-1.5 text-xs text-zinc-500">
           <button
-            onClick={onBackToPages}
+            type="button"
+            onClick={() => {
+              flushPendingSave();
+              onBackToPages();
+            }}
             className="flex items-center gap-1 text-zinc-400 hover:text-indigo-300 font-medium transition-colors"
             title="Return to Pages list"
           >
@@ -767,7 +790,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             <span>Pages</span>
           </button>
           <span className="text-zinc-700">/</span>
-          <span className="text-zinc-400 truncate max-w-[260px]">{note.title || 'Untitled'}</span>
+          <span className="text-zinc-400 truncate max-w-[260px]">{localTitle || note.title || 'Untitled'}</span>
         </div>
       )}
 
@@ -778,8 +801,28 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             type="text"
             value={localTitle}
             onChange={(e) => {
-              setLocalTitle(e.target.value);
-              triggerChange({ title: e.target.value });
+              const val = e.target.value;
+              setLocalTitle(val);
+              localTitleRef.current = val;
+              triggerChange({ title: val });
+            }}
+            onBlur={() => {
+              const trimmed = (localTitleRef.current || '').trim() || 'Untitled Page';
+              setLocalTitle(trimmed);
+              localTitleRef.current = trimmed;
+              triggerChange({ title: trimmed });
+              flushPendingSave();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const trimmed = (localTitleRef.current || '').trim() || 'Untitled Page';
+                setLocalTitle(trimmed);
+                localTitleRef.current = trimmed;
+                triggerChange({ title: trimmed });
+                flushPendingSave();
+                editor?.commands.focus('start');
+              }
             }}
             placeholder="Untitled Page..."
             className="w-full text-2xl lg:text-3xl font-bold bg-transparent text-zinc-100 placeholder-zinc-700 focus:outline-none tracking-tight border-none p-0"

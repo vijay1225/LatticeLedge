@@ -37,7 +37,6 @@ import {
 } from '../services/aiService';
 import {
   chooseVaultFolder,
-  setMobileVaultFolder,
   subscribeVaultSyncState,
   VaultSyncState,
   disconnectVaultFolder,
@@ -109,16 +108,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Vault Sync State
   const [syncState, setSyncState] = useState<VaultSyncState>(getVaultSyncState());
   const [isBindingFolder, setIsBindingFolder] = useState(false);
-  const [isEditingMobilePath, setIsEditingMobilePath] = useState(false);
-  const [mobilePathInput, setMobilePathInput] = useState(getVaultSyncState().folderPath || 'Documents/LatticeLedger');
   const mobileFileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    return subscribeVaultSyncState((state) => {
-      setSyncState(state);
-      if (state.folderPath) {
-        setMobilePathInput(state.folderPath);
-      }
-    });
+    return subscribeVaultSyncState(setSyncState);
   }, []);
 
   // Check if current model exists in availableModels; if not and it's deprecated gemini-2.5-flash, upgrade
@@ -451,36 +443,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } finally {
       setIsBindingFolder(false);
       setTimeout(() => setImportStatus(null), 6000);
-    }
-  };
-
-  const handleSaveMobileFolder = async (customPath?: string) => {
-    const pathToUse = (customPath || mobilePathInput || 'Documents/LatticeLedger').trim();
-    setIsBindingFolder(true);
-    setImportStatus(`Configuring mobile vault folder: "${pathToUse}"...`);
-    try {
-      const res = await setMobileVaultFolder(pathToUse);
-      if (res.success) {
-        if (res.isFresh) {
-          if (onNotesUpdated) {
-            onNotesUpdated([]);
-          }
-          setImportStatus(`Created fresh vault in "${res.folderPath}" with assets/ folder. Ready for new notes!`);
-        } else if (res.loadedNotes && onNotesUpdated) {
-          onNotesUpdated(res.loadedNotes);
-          setImportStatus(`Resumed vault from "${res.folderPath}" (${res.loadedNotes.length} notes loaded).`);
-        } else {
-          setImportStatus(`Connected to "${res.folderPath}".`);
-        }
-        setIsEditingMobilePath(false);
-      } else {
-        setImportStatus(`Failed to configure folder: ${res.error}`);
-      }
-    } catch (err: any) {
-      setImportStatus(`Mobile folder error: ${err.message}`);
-    } finally {
-      setIsBindingFolder(false);
-      setTimeout(() => setImportStatus(null), 5000);
     }
   };
 
@@ -1000,183 +962,80 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </span>
             </div>
 
-            {/* Mobile Folder Path Editor */}
-            {isEditingMobilePath && (
-              <div className="p-3 rounded-lg bg-zinc-900 border border-indigo-500/40 space-y-2.5 animate-in fade-in">
-                <div className="text-[11px] font-medium text-zinc-200 flex items-center justify-between">
-                  <span>Configure Device Folder Path:</span>
-                  <span className="text-[10px] text-zinc-500 font-normal">Internal Storage / Documents</span>
+            {/* Real-time Folder Binding Card */}
+            <div className="space-y-2.5 p-3 rounded-lg bg-zinc-900/80 border border-indigo-500/30">
+              <div className="space-y-1">
+                <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider flex items-center justify-between">
+                  <span>Selected Vault Folder ({syncState.platform === 'electron' ? 'Desktop Local' : syncState.platform === 'capacitor' ? 'Android Device' : 'Local Storage'})</span>
+                  <span className="font-mono text-indigo-400 font-semibold">{notes.length} notes</span>
                 </div>
-                <input
-                  type="text"
-                  value={mobilePathInput}
-                  onChange={(e) => setMobilePathInput(e.target.value)}
-                  placeholder="e.g. Documents/LatticeLedger or Documents/Notes"
-                  className="w-full px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs font-mono focus:outline-none focus:border-indigo-500"
-                />
-                
-                {/* Preset Chips */}
-                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                  <span className="text-[10px] text-zinc-500">Presets:</span>
-                  {[
-                    'Documents/LatticeLedger',
-                    'Documents/Notes',
-                    'Download/LatticeLedger'
-                  ].map(preset => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setMobilePathInput(preset)}
-                      className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 transition-colors"
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleSaveMobileFolder()}
-                    disabled={isBindingFolder}
-                    className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm"
-                  >
-                    {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                    <span>Save & Bind Folder</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingMobilePath(false)}
-                    className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs"
-                  >
-                    Cancel
-                  </button>
+                <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-zinc-950 px-2.5 py-1.5 rounded border border-zinc-800 overflow-x-auto break-all">
+                  <Folder className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span>{syncState.folderPath || syncState.folderName || 'Documents/LatticeLedger'}</span>
                 </div>
               </div>
-            )}
 
-            {syncState.isConfigured ? (
-              <div className="space-y-2.5 p-3 rounded-lg bg-zinc-900/80 border border-indigo-500/30">
-                <div className="space-y-1">
-                  <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-                    <span>Selected Vault Folder ({syncState.platform === 'electron' ? 'Desktop Local' : syncState.platform === 'capacitor' ? 'Android Device' : 'Local Storage'})</span>
-                    <span className="font-mono text-indigo-400 font-semibold">{notes.length} notes</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-zinc-950 px-2.5 py-1.5 rounded border border-zinc-800 overflow-x-auto break-all">
-                    <Folder className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                    <span>{syncState.folderPath || syncState.folderName}</span>
-                  </div>
+              <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1.5 text-zinc-300">
+                    <Database className="w-3.5 h-3.5 text-indigo-400" />
+                    <code>lattice_vault.db</code>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-zinc-300">
+                    <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+                    <code>assets/</code>
+                  </span>
                 </div>
-
-                <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1.5 text-zinc-300">
-                      <Database className="w-3.5 h-3.5 text-indigo-400" />
-                      <code>lattice_vault.db</code>
-                    </span>
-                    <span className="flex items-center gap-1.5 text-zinc-300">
-                      <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-                      <code>assets/</code>
-                    </span>
-                  </div>
-                  {syncState.lastSyncedAt && (
-                    <span className="text-[10px] text-zinc-500 font-mono">
-                      Last saved: {new Date(syncState.lastSyncedAt).toLocaleTimeString()}
-                    </span>
-                  )}
-                </div>
-
-                {/* Hidden File Input for Mobile SAF System Chooser Popup */}
-                <input
-                  ref={mobileFileInputRef}
-                  type="file"
-                  accept=".db,.sqlite,application/x-sqlite3,*/*"
-                  className="hidden"
-                  onChange={handleMobileFileSelected}
-                />
-
-                <div className="flex items-center gap-2 pt-2 flex-wrap">
-                  {syncState.platform === 'capacitor' ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleMobileFilePick}
-                        disabled={isBindingFolder}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
-                        title="Open native file picker to select lattice_vault.db directly"
-                      >
-                        {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
-                        <span>Pick .db File Popup</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleReloadFromFolder}
-                        disabled={isBindingFolder}
-                        className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 disabled:opacity-50"
-                        title="Reload immediately from Documents/LatticeLedger"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isBindingFolder ? 'animate-spin' : ''}`} />
-                        <span>Reload from Folder</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingMobilePath(!isEditingMobilePath)}
-                        className="px-2 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 text-xs font-mono transition-colors border border-zinc-700/60"
-                        title="Change device subfolder path"
-                      >
-                        <span>Path</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleChooseFolder}
-                        disabled={isBindingFolder}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
-                      >
-                        {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
-                        <span>Change Vault Folder</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleDisconnectFolder}
-                        className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 ml-auto"
-                        title="Disconnect custom folder and return to default local storage"
-                      >
-                        <Unlink className="w-3.5 h-3.5 text-zinc-400" />
-                        <span>Reset to Default</span>
-                      </button>
-                    </>
-                  )}
-                </div>
+                {syncState.lastSyncedAt && (
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    Last saved: {new Date(syncState.lastSyncedAt).toLocaleTimeString()}
+                  </span>
+                )}
               </div>
-            ) : (
-              !isEditingMobilePath && (
-                <div className="space-y-3">
-                  <p className="text-[11px] text-zinc-400 leading-relaxed">
-                    Currently using <strong>default local storage</strong>. Choose any folder on your device to store your notes and media files.
-                  </p>
 
-                  <button
-                    type="button"
-                    onClick={handleChooseFolder}
-                    disabled={isBindingFolder}
-                    className="w-full py-2.5 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-md"
-                  >
-                    {isBindingFolder ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                    ) : (
-                      <FolderOpen className="w-4 h-4" />
-                    )}
-                    <span>{syncState.platform === 'capacitor' ? 'Configure Device Vault Folder' : 'Choose Vault Folder'}</span>
-                  </button>
-                </div>
-              )
-            )}
+              {/* Hidden File Input for Native File/Folder System Chooser Popup */}
+              <input
+                ref={mobileFileInputRef}
+                type="file"
+                accept=".db,.sqlite,application/x-sqlite3,*/*"
+                className="hidden"
+                onChange={handleMobileFileSelected}
+              />
+
+              <div className="flex items-center gap-2 pt-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleChooseFolder}
+                  disabled={isBindingFolder}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
+                  title="Choose folder or database file"
+                >
+                  {isBindingFolder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
+                  <span>{syncState.platform === 'capacitor' ? 'Select Vault Folder / .db' : 'Choose Vault Folder'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReloadFromFolder}
+                  disabled={isBindingFolder}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 disabled:opacity-50"
+                  title="Reload latest notes from folder"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isBindingFolder ? 'animate-spin' : ''}`} />
+                  <span>Reload from Folder</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDisconnectFolder}
+                  className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-700 ml-auto"
+                  title="Disconnect custom folder and return to default local storage"
+                >
+                  <Unlink className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Reset to Default</span>
+                </button>
+              </div>
+            </div>
 
 
             {/* Database Maintenance & Size Management */}
