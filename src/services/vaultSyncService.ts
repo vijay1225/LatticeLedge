@@ -3,8 +3,6 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Note } from '../types';
 import { 
   importSqliteDatabaseFile, 
-  exportSqliteDatabaseBlob, 
-  downloadSqliteDatabaseFile,
   getSqliteDatabaseBinary,
   getAllNotesFromSql,
   createEmptySqliteVault
@@ -516,43 +514,6 @@ export async function setMobileVaultFolder(customPath: string): Promise<VaultFol
     folderName: cleanPath,
     loadedNotes,
     isFresh
-  };
-}
-
-/**
- * 1-Tap Google Drive Export & Sharing on Android / Desktop.
- * On Android, opens the native Share sheet with "Save to Drive" / "Google Drive".
- * On Desktop / Browser, downloads the file.
- */
-export async function shareVaultDatabaseFile(): Promise<{ success: boolean; method: 'share' | 'download'; message?: string }> {
-  try {
-    const blob = await exportSqliteDatabaseBlob();
-    const file = new File([blob], DEFAULT_VAULT_FILE, { type: 'application/x-sqlite3' });
-    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        title: DEFAULT_VAULT_FILE,
-        text: 'LatticeLedger SQLite Database Vault for Google Drive',
-        files: [file]
-      });
-      return {
-        success: true,
-        method: 'share',
-        message: 'Share menu opened! Select "Save to Drive" to save lattice_vault.db directly into your Google Drive folder.'
-      };
-    }
-  } catch (err: any) {
-    if (err.name === 'AbortError') {
-      return { success: false, method: 'share', message: 'Share canceled.' };
-    }
-    console.warn('[VaultSync] Web share not available or failed:', err);
-  }
-
-  // Fallback to direct download
-  await downloadSqliteDatabaseFile();
-  return {
-    success: true,
-    method: 'download',
-    message: 'Downloaded lattice_vault.db! Save this file to your Google Drive folder.'
   };
 }
 

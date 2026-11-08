@@ -529,6 +529,23 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
     - **Comprehensive Test Suite & Parity Verification**:
       - 82/82 automated unit tests passing across all 8 test suites (including 15 tests in `aiService.test.ts` covering both Gemini and OpenAI verification, summary generation, model discovery, and error handling).
       - Rebuilt native standalone Android APK (`LatticeLedger.apk`, 7.84MB) and Windows Desktop application (`LatticeLedger-Desktop.exe`, 124.80MB).
+  - [x] **Streamlined Local-First Vault Folder Storage & AI Workflows (Removed All Drive & 1-Tap Options)**:
+    - **Removed All Drive & 1-Tap Cloud Sync Options**:
+      - Completely removed all Google Drive API v3 OAuth flows, cloud options, and 1-tap share functions (`shareVaultDatabaseFile`).
+      - Cleaned up preset paths and labels to strictly reflect local storage (e.g. `Documents/LatticeLedger`, `Documents/Notes`, `Download/LatticeLedger`).
+    - **Pure Local-First Vault Folder Management**:
+      - **Desktop**: 1-click native folder picker (`Choose Vault Folder` / `Change Vault Folder`) binding directly to any local directory on the PC.
+      - **Android**: Configurable local device storage path (`Documents/LatticeLedger`).
+      - All notes, media, and data are saved directly to `lattice_vault.db` and `assets/` on the device.
+      - Full compatibility with third-party folder sync utilities (like **FolderSync**, Syncthing, or local file backups) with zero cloud vendor lock-in.
+    - **Uncompromised AI Architecture (Gemini, OpenAI, Claude, Ollama)**:
+      - Direct client-side BYOK connection for Google Gemini and OpenAI on both Windows Desktop and Android APK.
+      - Per-note AI summaries strictly capped to <= 4 lines, two-stage Ask AI synthesis with clickable citations, and live dynamic model discovery.
+    - **Verified & Built**:
+      - 81/81 unit tests passing across all 8 test suites.
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (249.8MB).
+
 - [ ] **Next Steps**:
   - [ ] User runs `LatticeLedger-Desktop.exe` on Windows and installs `LatticeLedger.apk` on Android phone.
   - [ ] Open Settings -> AI & Intelligence -> switch to "OpenAI (GPT)" provider.

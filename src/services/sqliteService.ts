@@ -407,7 +407,7 @@ export async function getSqliteDatabaseBinary(): Promise<Uint8Array> {
 }
 
 /**
- * Export the raw SQLite binary database file (.db) for Google Drive.
+ * Export the raw SQLite binary database file (.db) for local backup.
  */
 export async function exportSqliteDatabaseBlob(): Promise<Blob> {
   const binary = await getSqliteDatabaseBinary();
@@ -430,7 +430,7 @@ export async function downloadSqliteDatabaseFile(): Promise<void> {
 }
 
 /**
- * Import a raw SQLite database file (.db or .sqlite) from Google Drive.
+ * Import a raw SQLite database file (.db or .sqlite) from local backup file.
  */
 export async function importSqliteDatabaseFile(fileOrBuffer: ArrayBuffer | Uint8Array): Promise<Note[]> {
   await getSqliteDatabase();

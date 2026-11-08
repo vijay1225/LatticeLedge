@@ -937,7 +937,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="text"
                   value={mobilePathInput}
                   onChange={(e) => setMobilePathInput(e.target.value)}
-                  placeholder="e.g. Documents/LatticeLedger or Documents/GoogleDrive"
+                  placeholder="e.g. Documents/LatticeLedger or Documents/Notes"
                   className="w-full px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs font-mono focus:outline-none focus:border-indigo-500"
                 />
                 
@@ -946,7 +946,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span className="text-[10px] text-zinc-500">Presets:</span>
                   {[
                     'Documents/LatticeLedger',
-                    'Documents/GoogleDrive',
+                    'Documents/Notes',
                     'Download/LatticeLedger'
                   ].map(preset => (
                     <button

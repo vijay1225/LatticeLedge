@@ -244,7 +244,7 @@ Use callouts to highlight tips, warnings, important rules, or notes with distinc
 > Warning callout. Ensure you do not delete your \`assets/\` folder, as notes reference images stored there.
 
 > [!CAUTION]
-> High-risk warning. Always back up your \`lattice_vault.db\` before wiping your device or changing Google Drive accounts.
+> High-risk warning. Always back up your \`lattice_vault.db\` before wiping your device or switching storage folders.
 
 ---
 
@@ -255,7 +255,7 @@ Check off items directly in the live TipTap WYSIWYG editor:
 - [x] Test code block 1-click copy in [[Code Snippets & Algorithms Demo]]
 - [x] Zoom into character portraits in [[Media & Video Embeds Gallery]]
 - [ ] Connect ideas together using \`[[wiki-links]]\`
-- [ ] Bind vault folder to Google Drive in Settings
+- [ ] Choose local vault folder in Settings
 
 ---
 

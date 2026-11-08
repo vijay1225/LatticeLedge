@@ -1,7 +1,7 @@
 import { Note } from '../types';
 
 /**
- * Serializes the entire vault into a clean JSON file for Google Drive / backup.
+ * Serializes the entire vault into a clean JSON file for local backup / backup.
  */
 export function exportVaultToJson(notes: Note[]): string {
   const payload = {
@@ -14,7 +14,7 @@ export function exportVaultToJson(notes: Note[]): string {
 }
 
 /**
- * Validates and parses notes imported from a Google Drive / local file backup.
+ * Validates and parses notes imported from a local file backup.
  */
 export function importVaultFromJson(rawJson: string): { success: boolean; notes?: Note[]; error?: string } {
   try {
@@ -65,7 +65,7 @@ export function formatNoteAsMarkdown(note: Note): string {
 }
 
 /**
- * Triggers a browser/device download of the vault backup for Google Drive.
+ * Triggers a browser/device download of the vault backup for local backup.
  */
 export function downloadVaultBackup(notes: Note[]) {
   const jsonContent = exportVaultToJson(notes);
