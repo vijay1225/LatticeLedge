@@ -7,12 +7,14 @@ interface MobileBottomNavProps {
   onSelectMode: (mode: ViewMode) => void;
   onOpenSearch?: () => void;
   onOpenQuickCapture: () => void;
+  onPrefetchGraph?: () => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   currentMode,
   onSelectMode,
-  onOpenQuickCapture
+  onOpenQuickCapture,
+  onPrefetchGraph
 }) => {
   return (
     <>
@@ -74,6 +76,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         {/* 5. Graph */}
         <button
           onClick={() => onSelectMode('graph')}
+          onTouchStart={onPrefetchGraph}
+          onMouseEnter={onPrefetchGraph}
           className={`flex flex-col items-center py-1 px-2 rounded text-[10px] transition-colors ${
             currentMode === 'graph' ? 'text-emerald-400 font-semibold' : 'text-zinc-500'
           }`}

@@ -36,6 +36,7 @@ interface SidebarProps {
   onChangeVaultFolder?: () => void;
   theme?: AppTheme;
   onThemeChange?: (theme: AppTheme) => void;
+  onPrefetchGraph?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -53,7 +54,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   syncFolderName,
   onChangeVaultFolder,
   theme = 'dark',
-  onThemeChange
+  onThemeChange,
+  onPrefetchGraph
 }) => {
   return (
     <aside className="w-56 border-r border-zinc-800/80 bg-zinc-950 flex flex-col h-full shrink-0 select-none text-xs">
@@ -197,6 +199,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* 4. Graph */}
         <button
           onClick={() => onSelectMode('graph')}
+          onMouseEnter={onPrefetchGraph}
+          onFocus={onPrefetchGraph}
           className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg font-medium transition-colors ${
             currentMode === 'graph'
               ? 'bg-zinc-850 text-zinc-100 font-semibold border border-zinc-700/60 shadow-sm'

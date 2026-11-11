@@ -3,7 +3,8 @@ import {
   Note, 
   ViewMode, 
   AIProviderConfig,
-  AppTheme 
+  AppTheme,
+  KnowledgeGraphData
 } from './types';
 import { HARRY_POTTER_SEED_NOTES } from './services/harryPotterSeed';
 import { buildKnowledgeGraph } from './utils/graphBuilder';
@@ -35,10 +36,11 @@ import { RightPane } from './components/RightPane';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Lazy-load Knowledge Graph (including heavy D3 physics engine) on demand
-const KnowledgeGraphView = React.lazy(() => 
-  import('./components/KnowledgeGraphView').then(m => ({ default: m.KnowledgeGraphView }))
-);
+// Modular Knowledge Graph pre-loader for background prefetching
+const loadKnowledgeGraphModule = () => 
+  import('./components/KnowledgeGraphView').then(m => ({ default: m.KnowledgeGraphView }));
+
+const KnowledgeGraphView = React.lazy(loadKnowledgeGraphModule);
 
 import { 
   FileText, 
@@ -678,13 +680,49 @@ export function App() {
     [notes, activeNoteId, wikiNotes]
   );
 
-  // Strictly compute heavy D3 graph data ONLY when in graph mode
-  const graphData = useMemo(() => {
-    if (currentMode !== 'graph') {
-      return { nodes: [], edges: [] };
+  // Prefetch Knowledge Graph & D3 module in background during idle time
+  const handlePrefetchGraph = React.useCallback(() => {
+    loadKnowledgeGraphModule().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if ('requestIdleCallback' in window) {
+        const handle = (window as any).requestIdleCallback(handlePrefetchGraph, { timeout: 2500 });
+        return () => (window as any).cancelIdleCallback?.(handle);
+      } else {
+        const timer = setTimeout(handlePrefetchGraph, 1200);
+        return () => clearTimeout(timer);
+      }
     }
-    return buildKnowledgeGraph(notes);
-  }, [notes, currentMode]);
+  }, [handlePrefetchGraph]);
+
+  // Pre-warm graph data in the background so it is instantly ready before user clicks Graph
+  const [warmedGraphData, setWarmedGraphData] = useState<KnowledgeGraphData | null>(null);
+
+  useEffect(() => {
+    const warmData = () => {
+      setWarmedGraphData(buildKnowledgeGraph(notes));
+    };
+
+    if (typeof window !== 'undefined') {
+      if ('requestIdleCallback' in window) {
+        const handle = (window as any).requestIdleCallback(warmData, { timeout: 3000 });
+        return () => (window as any).cancelIdleCallback?.(handle);
+      } else {
+        const timer = setTimeout(warmData, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [notes]);
+
+  // Compute graph data immediately if in graph mode, or use pre-warmed background data
+  const graphData = useMemo(() => {
+    if (currentMode === 'graph') {
+      return buildKnowledgeGraph(notes);
+    }
+    return warmedGraphData || { nodes: [], edges: [] };
+  }, [notes, currentMode, warmedGraphData]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-zinc-800 selection:text-zinc-50">
@@ -709,6 +747,7 @@ export function App() {
                 onChangeVaultFolder={handleChangeVaultFolder}
                 theme={theme}
                 onThemeChange={setTheme}
+                onPrefetchGraph={handlePrefetchGraph}
               />
             </div>
           ) : (
@@ -968,6 +1007,7 @@ export function App() {
       <MobileBottomNav
         currentMode={currentMode}
         onSelectMode={setCurrentMode}
+        onPrefetchGraph={handlePrefetchGraph}
         onOpenQuickCapture={() => {
           setNewNoteModalType(currentMode === 'quick' ? 'quick' : 'wiki');
           setIsQuickCaptureOpen(true);
