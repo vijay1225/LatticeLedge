@@ -295,6 +295,14 @@
   margin: 2rem 0;
 }
 
+/* TipTap Journal Continuous Canvas Styling */
+.tiptap-journal-canvas .tiptap.ProseMirror {
+  min-height: 90px;
+  padding: 0.25rem 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
 .tiptap.ProseMirror img {
   border-radius: 0.75rem;
   max-width: 100%;

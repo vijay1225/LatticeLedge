@@ -625,6 +625,22 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 85/85 automated unit tests passing across all 8 test suites.
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.81MB, portable single-file executable).
+  - [x] **Realtime In-Place Markdown Journals & Continuous Canvas (Dates Separated by Lines)**:
+    - **Realtime WYSIWYG TipTap Markdown in Journals**:
+      - Replaced raw textareas and edit mode toggles with live in-place TipTap markdown editors for every date.
+      - Format headings (`# `, `## `), checklists (`- [ ]`, `- [x]`), bullet lists (`- `), code blocks, and blockquotes directly on the live canvas in real time.
+      - Checkboxes are interactively toggleable directly in the live editor, updating markdown state and persisting to SQLite.
+      - Full interactive `[[Wiki Links]]` integration: typing `[[` opens the floating autocomplete popup with arrow key navigation, auto-completes target titles, and automatically provisions new pages if they don't exist.
+      - Clicking `[[Wiki Links]]` inside the editor immediately navigates to destination notes via caret hit-testing.
+      - Debounced auto-save (600ms) persists edits directly to SQLite, with safety flushes on blur, unmount, and window unload.
+    - **Continuous Canvas with Minimal Line Dividers**:
+      - Removed isolated card boxes, shadows, and heavy backgrounds.
+      - Daily stream flows naturally as a continuous writing canvas: dates are separated strictly by clean `<hr>` dividing lines (`border-t border-zinc-800/80`).
+      - Reverse-chronological order (Today at top, followed by previous dates) with quick "Today" jump and "Select Date" picker.
+    - **Verified & Built**:
+      - 88/88 automated unit tests passing across all 9 test suites (added `src/__tests__/journalsView.test.tsx`).
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.81MB).
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
 
 - [ ] **Next Steps**:
   - [ ] User tests the updated APK and Desktop app.

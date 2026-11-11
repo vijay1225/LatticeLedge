@@ -807,6 +807,7 @@ export function App() {
               onSaveJournal={handleSaveJournal}
               onDeleteJournal={handleDeleteJournal}
               onNavigateToNote={navigateToNote}
+              onEnsurePageExists={handleEnsurePageExists}
               onTagClick={() => setCurrentMode('search')}
               allWikiPages={wikiNotes}
               allQuickNotes={quickNotes}
