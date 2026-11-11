@@ -1,5 +1,6 @@
 import React from 'react';
 import { 
+  Calendar,
   FileText, 
   Zap, 
   Network, 
@@ -28,6 +29,7 @@ interface SidebarProps {
   onGoForward: () => void;
   notesCount: number;
   quickNotesCount: number;
+  journalsCount?: number;
   onToggleCollapse?: () => void;
   syncConfigured?: boolean;
   syncFolderName?: string;
@@ -45,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onGoForward,
   notesCount,
   quickNotesCount,
+  journalsCount = 0,
   onToggleCollapse,
   syncConfigured = false,
   syncFolderName,
@@ -105,7 +108,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Workspace
         </div>
 
-        {/* 1. Pages */}
+        {/* 1. Journals (Logseq-style daily stream) */}
+        <button
+          onClick={() => onSelectMode('journals')}
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg font-medium transition-colors ${
+            currentMode === 'journals'
+              ? 'bg-zinc-850 text-zinc-100 font-semibold border border-zinc-700/60 shadow-sm'
+              : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 border border-transparent'
+          }`}
+          title="Daily Journals & Logs (Logseq style)"
+        >
+          <div className="flex items-center gap-2">
+            <Calendar className={`w-4 h-4 ${
+              currentMode === 'journals' ? 'text-emerald-400' : 'text-zinc-500'
+            }`} />
+            <span>Journals</span>
+          </div>
+          {journalsCount > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 font-mono border border-zinc-800">
+              {journalsCount}
+            </span>
+          )}
+        </button>
+
+        {/* 2. Pages */}
         <button
           onClick={() => onSelectMode('pages')}
           className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg font-medium transition-colors ${

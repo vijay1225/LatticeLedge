@@ -794,9 +794,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
       )}
 
-      {/* Title Bar */}
-      <div className="mb-3 flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
+      {/* Title & Action Bar */}
+      <div className="mb-3 flex flex-col md:flex-row md:items-start justify-between gap-3 md:gap-4">
+        <div className="flex-1 w-full min-w-0">
           <input
             type="text"
             value={localTitle}
@@ -861,7 +861,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
 
         {/* Header Controls: Live Save Status, Auto-save Toggle, Save Button, Delete, Full Width & Focus Mode */}
-        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-start md:justify-end">
           {/* Stationary Save Status Indicator: Fixed in toolbar, eliminates note bouncing */}
           <div className="flex items-center px-2 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] font-medium shrink-0 h-[26px]">
             {saveStatus === 'saving' ? (

@@ -1,4 +1,4 @@
-export type NoteType = 'wiki' | 'quick';
+export type NoteType = 'wiki' | 'quick' | 'journal';
 
 export interface AISummary {
   tldr: string[];
@@ -25,7 +25,7 @@ export interface Note {
 export interface KnowledgeGraphNode {
   id: string;
   label: string;
-  type: 'wiki' | 'quick' | 'tag';
+  type: 'wiki' | 'quick' | 'tag' | 'journal';
   noteId?: string;
   size: number;
   color: string;
@@ -59,7 +59,7 @@ export interface GeminiModelInfo {
   isRecommended?: boolean;
 }
 
-export type ViewMode = 'pages' | 'notes' | 'quick' | 'search' | 'graph' | 'settings';
+export type ViewMode = 'journals' | 'pages' | 'notes' | 'quick' | 'search' | 'graph' | 'settings';
 export type SearchTab = 'instant' | 'ask-ai';
 export type AppTheme = 'dark' | 'slate' | 'sepia' | 'light';
 

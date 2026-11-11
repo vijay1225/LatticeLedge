@@ -25,14 +25,14 @@ export const AISummaryCard: React.FC<AISummaryCardProps> = ({
 
   const handleCopy = () => {
     if (!summary) return;
-    const text = `AI Summary: ${summary.tldr.slice(0, 3).join(' ')} ${summary.tags.join(' ')}`;
+    const text = `AI Summary: ${summary.tldr.join(' ')} ${summary.tags.join(' ')}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
 
-  // Strictly cap takeaways to 2-3 points so total card is never more than 4 lines
-  const takeaways = (summary?.tldr || []).slice(0, 3);
+  // Proportional takeaways: renders full concise or comprehensive points
+  const takeaways = summary?.tldr || [];
 
   return (
     <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/70 p-3 text-xs shadow-sm">

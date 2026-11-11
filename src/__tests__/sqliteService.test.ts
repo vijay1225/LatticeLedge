@@ -319,4 +319,33 @@ describe('SQLite Database Service', () => {
     const notesAfter = await getAllNotesFromSql();
     expect(notesAfter.length).toBe(countBefore);
   });
+
+  it('seamlessly saves and loads journal notes and preserves full backward compatibility', async () => {
+    const journalNote: Note = {
+      id: 'journal-2026-11-10',
+      type: 'journal',
+      title: 'Tuesday, November 10, 2026',
+      content: '- [ ] TODO Plan weekly roadmap\n- Completed [[Harry Potter]] reading log\n#routine',
+      tags: ['#routine'],
+      links: ['Harry Potter'],
+      createdAt: 1731234567000,
+      updatedAt: 1731234567000
+    };
+
+    await saveNoteToSql(journalNote);
+
+    const allNotes = await getAllNotesFromSql();
+    const fetchedJournal = allNotes.find(n => n.id === 'journal-2026-11-10');
+
+    expect(fetchedJournal).toBeDefined();
+    expect(fetchedJournal?.type).toBe('journal');
+    expect(fetchedJournal?.title).toBe('Tuesday, November 10, 2026');
+    expect(fetchedJournal?.content).toContain('- [ ] TODO');
+    expect(fetchedJournal?.links).toContain('Harry Potter');
+
+    // Verify existing wiki notes in the same DB load 100% intact
+    const harry = allNotes.find(n => n.id === 'wiki-harry-potter');
+    expect(harry).toBeDefined();
+    expect(harry?.type).toBe('wiki');
+  });
 });

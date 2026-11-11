@@ -11,14 +11,15 @@ export function buildKnowledgeGraph(notes: Note[]): KnowledgeGraphData {
   for (const note of notes) {
     if (!note) continue;
     const isWiki = note.type === 'wiki';
-    const safeTitle = note.title || (isWiki ? 'Untitled Page' : 'Quick Note');
+    const isJournal = note.type === 'journal';
+    const safeTitle = note.title || (isWiki ? 'Untitled Page' : isJournal ? 'Daily Journal' : 'Quick Note');
     const node: KnowledgeGraphNode = {
       id: `note-${note.id}`,
-      label: isWiki ? safeTitle : (note.title || (note.content || '').slice(0, 24) + '...'),
-      type: isWiki ? 'wiki' : 'quick',
+      label: isWiki || isJournal ? safeTitle : (note.title || (note.content || '').slice(0, 24) + '...'),
+      type: isJournal ? 'journal' : (isWiki ? 'wiki' : 'quick'),
       noteId: note.id,
-      size: isWiki ? 16 : 10,
-      color: isWiki ? '#f59e0b' : '#38bdf8' // Amber for Wiki, Sky Blue for Quick Notes
+      size: isWiki ? 16 : isJournal ? 13 : 10,
+      color: isJournal ? '#10b981' : (isWiki ? '#f59e0b' : '#38bdf8') // Emerald for Journal, Amber for Wiki, Sky Blue for Quick Notes
     };
     nodes.push(node);
     if (note.title) {

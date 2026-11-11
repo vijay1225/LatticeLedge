@@ -61,6 +61,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [hideQuickNotes, setHideQuickNotes] = useState(false);
   const [hideTags, setHideTags] = useState(false);
+  const [showJournals, setShowJournals] = useState(false);
 
   // Simulation references
   const simulationRef = useRef<d3Force.Simulation<D3Node, D3Link> | null>(null);
@@ -82,10 +83,11 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
 
   // Initialize D3 Force Simulation
   useEffect(() => {
-    // Filter out quick notes or tags if user has toggled them off
+    // Filter out quick notes or tags if user has toggled them off; journals are hidden by default unless enabled
     const sourceNodes = graphData.nodes.filter(n => {
       if (hideQuickNotes && n.type === 'quick') return false;
       if (hideTags && n.type === 'tag') return false;
+      if (!showJournals && n.type === 'journal') return false;
       return true;
     });
 
@@ -152,7 +154,11 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
       };
     });
 
-    if (selectedNode && ((selectedNode.isSatellite && hideQuickNotes) || (selectedNode.type === 'tag' && hideTags))) {
+    if (selectedNode && (
+      (selectedNode.isSatellite && hideQuickNotes && selectedNode.type === 'quick') || 
+      (selectedNode.type === 'tag' && hideTags) ||
+      (selectedNode.type === 'journal' && !showJournals)
+    )) {
       setSelectedNode(null);
     }
 
@@ -191,7 +197,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
     return () => {
       sim.stop();
     };
-  }, [graphData, hideQuickNotes, hideTags]);
+  }, [graphData, hideQuickNotes, hideTags, showJournals]);
 
   // Main Canvas Rendering Loop
   const renderCanvas = useCallback(() => {
@@ -1071,6 +1077,12 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
               <span className="text-zinc-400">Concept Tags</span>
             </div>
           )}
+          {showJournals && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+              <span className="text-zinc-200 font-medium">Journal Dates</span>
+            </div>
+          )}
           <div className="h-3 w-px bg-zinc-800" />
           <button
             onClick={() => setHideQuickNotes(prev => !prev)}
@@ -1096,6 +1108,19 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
           >
             {hideTags ? <Eye className="w-3 h-3 text-purple-400" /> : <EyeOff className="w-3 h-3" />}
             <span>{hideTags ? 'Show Tags' : 'Hide Tags'}</span>
+          </button>
+
+          <button
+            onClick={() => setShowJournals(prev => !prev)}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+              showJournals 
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold' 
+                : 'bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700'
+            }`}
+            title={showJournals ? 'Hide Journal Date Nodes' : 'Show Journal Date Nodes connected to referred pages'}
+          >
+            {showJournals ? <Eye className="w-3 h-3 text-emerald-400" /> : <EyeOff className="w-3 h-3" />}
+            <span>{showJournals ? 'Hide Journals' : 'Show Journals'}</span>
           </button>
         </div>
 

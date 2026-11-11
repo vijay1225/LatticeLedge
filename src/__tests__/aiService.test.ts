@@ -236,5 +236,32 @@ describe('Strict AI Service (Direct Gemini Only - Zero Simulated Heuristics)', (
 
       vi.unstubAllGlobals();
     });
+
+    it('does not return random notes or citations when query matches nothing in vault', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: 'No notes match quantum astrophysics in your vault.'
+              }
+            }
+          ]
+        })
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await queryKnowledgeBase('zxkqp999 completelyunrelatednonsense', HARRY_POTTER_SEED_NOTES, {
+        provider: 'openai',
+        apiKey: 'sk-proj-valid-openai-key',
+        modelName: 'gpt-4o-mini'
+      });
+
+      expect(result.citations).toEqual([]);
+      expect(result.relevantNoteIds).toEqual([]);
+
+      vi.unstubAllGlobals();
+    });
   });
 });

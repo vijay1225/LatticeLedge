@@ -590,11 +590,42 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 82/82 unit tests passing across all 8 test suites.
       - Fresh native Android APK: LatticeLedger.apk (7.84MB).
       - Fresh standalone Windows Desktop executable: LatticeLedger-Desktop.exe (124.8MB).
+  - [x] **Editable Quick Notes, Mobile Title Layout, Logseq-Style Continuous Journals Canvas, Graph Journals Toggle & Proportional AI Synthesis**:
+    - **Editable Quick Notes**:
+      - Added inline edit mode directly in `QuickNotesFeed.tsx` with textarea, "Save", "Cancel", and `Ctrl+Enter` shortcut.
+      - Edits dynamically recalculate extracted tags and wiki-links, updating the note in SQLite and UI state with zero friction.
+    - **Clean Page Conversion & Responsive Mobile Title Bar**:
+      - `handlePromoteQuickNote` now cleanly strips `Quick note:` prefixes and trailing ellipses `...`, adopting the first line as a neat, natural page title.
+      - `NoteEditor.tsx` Title Bar overhauled for mobile ergonomics: changes from single-line horizontal flex to stacked layout (`flex-col md:flex-row`), giving the title input 100% full screen width on small screens so the title never shifts, gets squeezed, or hidden by toolbar buttons.
+      - Mobile header in `App.tsx` gives the active title `flex-1 min-w-0 truncate` with non-collapsing navigation controls.
+    - **Logseq-Style Continuous Journals Canvas (`JournalsView.tsx`)**:
+      - Built a dedicated Logseq-style daily stream view accessible via a prominent **Journals** menu button in the sidebar and mobile bottom nav.
+      - App defaults to launch on **Journals** view with recent dates at the top (Today first).
+      - If Today's entry is not written yet, Today's section is automatically ready at the top with an open input canvas.
+      - Supports interactive **TODO / DONE** options: Logseq-style clickable badges (`TODO` <-> `DONE` with checkbox and strikethrough) that toggle in real-time and persist directly to SQLite.
+      - Supports `[[wiki-links]]` referencing Wiki Pages and Quick Notes, rendered as clickable links navigating straight to destination notes.
+      - Helper buttons for `+ TODO`, `• Bullet`, `[[ ]] Page Link`, and date picker to jump to any specific past or future date.
+    - **Knowledge Graph Journal Backlinks Toggle**:
+      - Journal date nodes appear with emerald styling (`#10b981`) and link to referenced pages.
+      - By default, journals are hidden in the graph per design specification.
+      - Added a 1-click **"Show Journals" / "Hide Journals"** toggle in the graph toolbar, enabling date-wise backlink visualization on demand.
+    - **Eliminated Random AI Citations & Backlinks in Ask AI**:
+      - Filtered common stop words and replaced indiscriminate fallback (`notes.slice(0, 4)`) with strict relevance scoring.
+      - Only genuine matching notes that actually relate to the user's query are cited.
+    - **Proportional AI Summary Scaling**:
+      - Dynamic summary sizing based on note length: 2-3 points for short notes, 3-5 points for medium notes, 5-8 comprehensive points for long notes.
+      - Increased input slice to 20,000 characters and token limit to 1000, significantly improving deep knowledge synthesis.
+    - **Legacy Database Loadable**:
+      - Preserved 100% backward compatibility: journal entries are stored as `type: 'journal'` in the existing `notes` SQLite table without schema alterations. All existing databases load seamlessly.
+    - **Verified & Built**:
+      - 85/85 automated unit tests passing across all 8 test suites.
+      - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (249.8MB).
 
 - [ ] **Next Steps**:
-  - [ ] User installs fresh LatticeLedger.apk on phone.
-  - [ ] Tap "Select Vault Folder" in Settings -> Android native File Manager pops up -> tap any folder on device and tap "Use this folder".
-  - [ ] Confirm notes resume if existing .db is present or start clean if empty.
+  - [ ] User tests the updated APK and Desktop app.
+  - [ ] Verify Journals continuous stream, TODO toggles, and [[wiki-link]] navigation.
+  - [ ] Verify Quick Notes editing and "Show Journals" toggle in Knowledge Graph.
 
 ---
 

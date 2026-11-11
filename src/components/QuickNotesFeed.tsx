@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Zap, Send, Tag, FileText, Trash2, Clock, Sparkles } from 'lucide-react';
+import { Zap, Send, Tag, FileText, Trash2, Clock, Sparkles, Edit2, Check, X } from 'lucide-react';
 import { Note } from '../types';
 
 interface QuickNotesFeedProps {
   quickNotes: Note[];
   onAddQuickNote: (content: string) => void;
+  onUpdateQuickNote?: (id: string, content: string) => void;
   onDeleteQuickNote: (id: string) => void;
   onPromoteToWiki: (note: Note) => void;
   onTagClick?: (tag: string) => void;
@@ -13,12 +14,15 @@ interface QuickNotesFeedProps {
 export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
   quickNotes,
   onAddQuickNote,
+  onUpdateQuickNote,
   onDeleteQuickNote,
   onPromoteToWiki,
   onTagClick
 }) => {
   const [content, setContent] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
 
   const allTags = Array.from(
     new Set(quickNotes.flatMap(n => n.tags))
@@ -29,6 +33,23 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
     if (!content.trim()) return;
     onAddQuickNote(content);
     setContent('');
+  };
+
+  const startEditing = (note: Note) => {
+    setEditingNoteId(note.id);
+    setEditingText(note.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingNoteId(null);
+    setEditingText('');
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (!editingText.trim()) return;
+    onUpdateQuickNote?.(id, editingText);
+    setEditingNoteId(null);
+    setEditingText('');
   };
 
   const filteredNotes = selectedTag
@@ -43,7 +64,7 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
           <Zap className="w-4 h-4 text-zinc-400" />
         </h2>
         <p className="text-xs text-zinc-500 mt-0.5">
-          Zero-friction capture. AI extracts keywords and tags automatically.
+          Zero-friction capture. Editable anytime. AI extracts keywords and tags automatically.
         </p>
       </div>
 
@@ -109,58 +130,119 @@ export const QuickNotesFeed: React.FC<QuickNotesFeedProps> = ({
 
       {/* Feed */}
       <div className="space-y-2.5">
-        {filteredNotes.map((note) => (
-          <div
-            key={note.id}
-            className="p-3.5 rounded-lg bg-zinc-900/50 border border-zinc-800/80 hover:border-zinc-700/80 transition-all group"
-          >
-            <div className="flex items-center justify-between text-zinc-500 mb-1.5">
-              <div className="flex items-center gap-1 text-[11px]">
-                <Clock className="w-3 h-3" />
-                <span>{new Date(note.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
-              <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => onPromoteToWiki(note)}
-                  className="px-1.5 py-0.5 rounded text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 flex items-center gap-1"
-                  title="Promote to Wiki Page"
-                >
-                  <FileText className="w-3 h-3" />
-                  <span>Convert to Page</span>
-                </button>
-                <button
-                  onClick={() => onDeleteQuickNote(note.id)}
-                  className="p-1 rounded text-zinc-600 hover:text-rose-400 transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
+        {filteredNotes.map((note) => {
+          const isEditing = editingNoteId === note.id;
 
-            <p className="text-zinc-200 leading-relaxed text-xs whitespace-pre-wrap mb-2">
-              {note.content}
-            </p>
-
-            {note.tags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1 pt-1.5 border-t border-zinc-800/40">
-                <Tag className="w-3 h-3 text-zinc-600 mr-0.5" />
-                {note.tags.map((tag, idx) => (
+          return (
+            <div
+              key={note.id}
+              className="p-3.5 rounded-lg bg-zinc-900/50 border border-zinc-800/80 hover:border-zinc-700/80 transition-all group"
+            >
+              <div className="flex items-center justify-between text-zinc-500 mb-1.5">
+                <div className="flex items-center gap-1 text-[11px]">
+                  <Clock className="w-3 h-3" />
+                  <span>{new Date(note.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div className="flex items-center gap-1.5 opacity-70 group-hover:opacity-100 transition-opacity">
+                  {!isEditing && (
+                    <button
+                      onClick={() => startEditing(note)}
+                      className="px-1.5 py-0.5 rounded text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 flex items-center gap-1"
+                      title="Edit Quick Note"
+                    >
+                      <Edit2 className="w-3 h-3 text-indigo-400" />
+                      <span>Edit</span>
+                    </button>
+                  )}
                   <button
-                    key={idx}
-                    onClick={() => {
-                      setSelectedTag(tag);
-                      onTagClick?.(tag);
-                    }}
-                    className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-[10px] transition-colors"
+                    onClick={() => onPromoteToWiki(note)}
+                    className="px-1.5 py-0.5 rounded text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 flex items-center gap-1"
+                    title="Promote to Wiki Page"
                   >
-                    {tag}
+                    <FileText className="w-3 h-3" />
+                    <span>Convert to Page</span>
                   </button>
-                ))}
+                  <button
+                    onClick={() => onDeleteQuickNote(note.id)}
+                    className="p-1 rounded text-zinc-600 hover:text-rose-400 transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
-        ))}
+
+              {isEditing ? (
+                <div className="space-y-2 mt-1">
+                  <textarea
+                    value={editingText}
+                    onChange={(e) => setEditingText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        handleSaveEdit(note.id);
+                      } else if (e.key === 'Escape') {
+                        cancelEditing();
+                      }
+                    }}
+                    rows={4}
+                    className="w-full p-2.5 rounded-lg bg-zinc-950 border border-indigo-500/50 text-zinc-100 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500/50 resize-y"
+                    autoFocus
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-500">
+                      Press Ctrl+Enter to save, Esc to cancel
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={cancelEditing}
+                        className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] flex items-center gap-1 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                        <span>Cancel</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveEdit(note.id)}
+                        disabled={!editingText.trim()}
+                        className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-[11px] font-medium flex items-center gap-1 transition-colors shadow-sm"
+                      >
+                        <Check className="w-3 h-3" />
+                        <span>Save</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p 
+                  onClick={() => startEditing(note)}
+                  className="text-zinc-200 leading-relaxed text-xs whitespace-pre-wrap mb-2 cursor-pointer hover:text-zinc-100"
+                  title="Click to edit"
+                >
+                  {note.content}
+                </p>
+              )}
+
+              {note.tags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1 pt-1.5 border-t border-zinc-800/40">
+                  <Tag className="w-3 h-3 text-zinc-600 mr-0.5" />
+                  {note.tags.map((tag, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setSelectedTag(tag);
+                        onTagClick?.(tag);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-[10px] transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {filteredNotes.length === 0 && (
           <div className="py-12 text-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 p-6 space-y-2">

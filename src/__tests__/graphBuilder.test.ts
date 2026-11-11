@@ -147,4 +147,40 @@ describe('Knowledge Graph Construction', () => {
     expect(graph.edges.length).toBe(0);
     expect(graph.nodes.some(n => n.label.toLowerCase().includes('draft'))).toBe(false);
   });
+
+  it('builds journal date nodes and connects explicit edges to referred pages', () => {
+    const notesWithJournal = [
+      {
+        id: 'wiki-target',
+        type: 'wiki' as const,
+        title: 'Project Antigravity',
+        content: 'Core project architecture.',
+        tags: ['#code'],
+        links: [],
+        createdAt: 100,
+        updatedAt: 100
+      },
+      {
+        id: 'journal-2026-11-10',
+        type: 'journal' as const,
+        title: 'Tuesday, November 10, 2026',
+        content: 'Worked on [[Project Antigravity]] and reviewed milestones.',
+        tags: ['#routine'],
+        links: ['Project Antigravity'],
+        createdAt: 200,
+        updatedAt: 200
+      }
+    ];
+
+    const graph = buildKnowledgeGraph(notesWithJournal);
+    const journalNode = graph.nodes.find(n => n.type === 'journal');
+    expect(journalNode).toBeDefined();
+    expect(journalNode?.label).toBe('Tuesday, November 10, 2026');
+    expect(journalNode?.color).toBe('#10b981'); // Emerald color
+
+    const explicitEdge = graph.edges.find(e => e.type === 'explicit');
+    expect(explicitEdge).toBeDefined();
+    expect(explicitEdge?.source).toBe('note-journal-2026-11-10');
+    expect(explicitEdge?.target).toBe('note-wiki-target');
+  });
 });

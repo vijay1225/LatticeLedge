@@ -322,6 +322,21 @@ export async function generateNoteSummary(
   config?: AIProviderConfig
 ): Promise<AISummary> {
   const provider = config?.provider || 'gemini';
+  const charCount = (note.content || '').length;
+
+  // Proportional synthesis scaling: short notes get concise summaries; long notes get detailed, comprehensive breakdowns
+  let tldrInstruction = '2 to 3 concise bullet points summarizing key points.';
+  let maxTokens = 450;
+  let maxPoints = 4;
+  if (charCount > 2500) {
+    tldrInstruction = '5 to 8 detailed, comprehensive bullet points thoroughly capturing all core topics, technical points, arguments, decisions, and conclusions.';
+    maxTokens = 1000;
+    maxPoints = 8;
+  } else if (charCount > 800) {
+    tldrInstruction = '3 to 5 comprehensive bullet points capturing all essential concepts, takeaways, and context.';
+    maxTokens = 700;
+    maxPoints = 5;
+  }
 
   // 1. OpenAI Provider
   if (provider === 'openai') {
@@ -333,17 +348,17 @@ export async function generateNoteSummary(
     }
 
     const modelName = config?.modelName || 'gpt-4o-mini';
-    const prompt = `You are a high-speed knowledge synthesizer for LatticeLedger.
+    const prompt = `You are a knowledgeable synthesis engine for LatticeLedger.
 Note Title: "${note.title}"
 Content:
-${note.content.slice(0, 4000)}
+${note.content.slice(0, 20000)}
 
-Generate an ultra-fast JSON object:
+Generate a structured JSON object:
 {
-  "tldr": ["2 to 3 bullet points, each 1 brief sentence. Strictly <= 3 points."],
-  "actionItems": ["action items or open questions, max 3"],
-  "tags": ["relevant tags starting with #, max 4"],
-  "keyEntities": ["key people, places, concepts, max 4"]
+  "tldr": ["${tldrInstruction}"],
+  "actionItems": ["action items, tasks, or follow-up questions, max 5"],
+  "tags": ["relevant tags starting with #, max 6"],
+  "keyEntities": ["key people, concepts, technologies, places, max 6"]
 }
 Respond ONLY with valid JSON.`;
 
@@ -361,6 +376,7 @@ Respond ONLY with valid JSON.`;
             { role: 'user', content: prompt }
           ],
           response_format: { type: 'json_object' },
+          max_tokens: maxTokens,
           temperature: 0.2
         })
       });
@@ -384,10 +400,10 @@ Respond ONLY with valid JSON.`;
       }
 
       return {
-        tldr: parsed.tldr.slice(0, 3),
-        actionItems: (parsed.actionItems || []).slice(0, 3),
-        tags: (parsed.tags || note.tags || []).slice(0, 4),
-        keyEntities: (parsed.keyEntities || []).slice(0, 4),
+        tldr: parsed.tldr.slice(0, maxPoints),
+        actionItems: (parsed.actionItems || []).slice(0, 5),
+        tags: (parsed.tags || note.tags || []).slice(0, 6),
+        keyEntities: (parsed.keyEntities || []).slice(0, 6),
         generatedAt: Date.now(),
         model: modelName
       };
@@ -408,18 +424,17 @@ Respond ONLY with valid JSON.`;
   const modelName = config?.modelName || 'gemini-3.8-flash';
   const ai = new GoogleGenAI({ apiKey });
 
-  // Streamlined fast prompt capped at strictly 3 bullet points
-  const prompt = `You are a high-speed knowledge synthesizer for LatticeLedger.
+  const prompt = `You are a knowledgeable synthesis engine for LatticeLedger.
 Note Title: "${note.title}"
 Content:
-${note.content.slice(0, 4000)}
+${note.content.slice(0, 20000)}
 
-Generate an ultra-fast JSON object:
+Generate a structured JSON object:
 {
-  "tldr": ["2 to 3 bullet points, each 1 brief sentence. Strictly <= 3 points."],
-  "actionItems": ["action items or open questions, max 3"],
-  "tags": ["relevant tags starting with #, max 4"],
-  "keyEntities": ["key people, places, concepts, max 4"]
+  "tldr": ["${tldrInstruction}"],
+  "actionItems": ["action items, tasks, or follow-up questions, max 5"],
+  "tags": ["relevant tags starting with #, max 6"],
+  "keyEntities": ["key people, concepts, technologies, places, max 6"]
 }
 Respond ONLY with valid JSON.`;
 
@@ -428,7 +443,7 @@ Respond ONLY with valid JSON.`;
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
-        maxOutputTokens: 250,
+        maxOutputTokens: maxTokens,
         temperature: 0.2
       }
     });
@@ -445,10 +460,10 @@ Respond ONLY with valid JSON.`;
     }
 
     return {
-      tldr: parsed.tldr.slice(0, 3),
-      actionItems: (parsed.actionItems || []).slice(0, 3),
-      tags: (parsed.tags || note.tags).slice(0, 4),
-      keyEntities: (parsed.keyEntities || []).slice(0, 4),
+      tldr: parsed.tldr.slice(0, maxPoints),
+      actionItems: (parsed.actionItems || []).slice(0, 5),
+      tags: (parsed.tags || note.tags).slice(0, 6),
+      keyEntities: (parsed.keyEntities || []).slice(0, 6),
       generatedAt: Date.now(),
       model: usedModel
     };
@@ -475,6 +490,14 @@ export interface KnowledgeQueryResult {
   isDeepInvestigation?: boolean;
 }
 
+const COMMON_STOP_WORDS = new Set([
+  'the', 'and', 'for', 'that', 'this', 'with', 'from', 'have', 'what', 'when',
+  'where', 'which', 'who', 'how', 'why', 'can', 'could', 'should', 'would',
+  'are', 'was', 'were', 'will', 'been', 'about', 'there', 'their', 'they',
+  'some', 'any', 'tell', 'show', 'give', 'does', 'did', 'done', 'also', 'into',
+  'then', 'than', 'them', 'just', 'more', 'most', 'such', 'like', 'note', 'notes'
+]);
+
 /**
  * Ask Questions across knowledge base using Google Gemini API.
  * TWO-STAGE SYNTHESIS:
@@ -491,28 +514,39 @@ export async function queryKnowledgeBase(
   const provider = config?.provider || 'gemini';
 
   const qLower = question.toLowerCase();
-  const queryTokens = qLower.split(/\s+/).filter(t => t.length > 2);
+  const rawTokens = qLower.replace(/[^a-z0-9\s#\[\]]/g, ' ').split(/\s+/).filter(t => t.length > 2);
+  const queryTokens = rawTokens.filter(t => !COMMON_STOP_WORDS.has(t));
+  const effectiveTokens = queryTokens.length > 0 ? queryTokens : rawTokens;
 
-  // If specific target notes requested for deep dive, use them; otherwise match candidates
+  // If specific target notes requested for deep dive, use them; otherwise score candidates
   let relevantNotes: Note[] = [];
   if (targetNoteIds && targetNoteIds.length > 0) {
     relevantNotes = notes.filter(n => targetNoteIds.includes(n.id));
-  } else {
-    // Fast match on title, tags, and summary text without searching full document bodies
-    relevantNotes = notes.filter(n => {
-      const summaryText = n.summary?.tldr?.join(' ') || '';
-      const tagsText = n.tags.join(' ');
-      const matchIndex = `${n.title} ${tagsText} ${summaryText} ${n.type === 'quick' ? n.content : ''}`.toLowerCase();
-      return queryTokens.length === 0 || queryTokens.some(tok => matchIndex.includes(tok));
-    }).slice(0, 6);
+  } else if (effectiveTokens.length > 0) {
+    // Score each note based on relevance to query tokens
+    const scored = notes.map(n => {
+      let score = 0;
+      const titleLower = (n.title || '').toLowerCase();
+      const tagsLower = (n.tags || []).join(' ').toLowerCase();
+      const summaryLower = (n.summary?.tldr || []).join(' ').toLowerCase();
+      const contentSample = (n.type === 'quick' ? n.content : n.content.slice(0, 1500)).toLowerCase();
+
+      for (const tok of effectiveTokens) {
+        if (titleLower.includes(tok)) score += 10;
+        if (tagsLower.includes(tok)) score += 6;
+        if (summaryLower.includes(tok)) score += 4;
+        if (contentSample.includes(tok)) score += 1;
+      }
+      return { note: n, score };
+    }).filter(item => item.score > 0);
+
+    scored.sort((a, b) => b.score - a.score);
+    // Take top matching notes strictly matching query
+    relevantNotes = scored.slice(0, 6).map(item => item.note);
   }
 
-  // Fallback: if no summary matched, include top candidates by title & tags
-  if (relevantNotes.length === 0) {
-    relevantNotes = notes.slice(0, 4);
-  }
-
-  const citations = relevantNotes.map(n => n.title);
+  // Citations only include genuine matched notes (NO random notes from vault!)
+  const citations = relevantNotes.map(n => n.title).filter(Boolean);
   const relevantNoteIds = relevantNotes.map(n => n.id);
 
   let prompt = '';

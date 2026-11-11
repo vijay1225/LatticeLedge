@@ -25,6 +25,7 @@ import {
 } from './services/vaultSyncService';
 
 import { Sidebar } from './components/Sidebar';
+import { JournalsView } from './components/JournalsView';
 import { PagesView } from './components/PagesView';
 import { NoteEditor } from './components/NoteEditor';
 import { QuickNotesFeed } from './components/QuickNotesFeed';
@@ -134,9 +135,9 @@ export function App() {
     return HARRY_POTTER_SEED_NOTES;
   });
 
-  // Default mode starts on 'pages' so user immediately sees all page names with AI summaries
-  const [currentMode, setCurrentMode] = useState<ViewMode>('pages');
-  const [previousMode, setPreviousMode] = useState<ViewMode>('pages');
+  // Default mode starts on 'journals' (Logseq-style daily stream with recent dates at the top)
+  const [currentMode, setCurrentMode] = useState<ViewMode>('journals');
+  const [previousMode, setPreviousMode] = useState<ViewMode>('journals');
   const [activeNoteId, setActiveNoteId] = useState<string>('wiki-code-showcase');
 
   // Maintain live references to prevent stale closure bugs in sync/file watcher callbacks
@@ -364,7 +365,7 @@ export function App() {
 
     if (target) {
       setActiveNoteId(target.id);
-      setCurrentMode(target.type === 'wiki' ? 'notes' : 'quick');
+      setCurrentMode(target.type === 'wiki' ? 'notes' : target.type === 'journal' ? 'journals' : 'quick');
 
       const newHistory = history.slice(0, historyIndex + 1);
       newHistory.push(target.id);
@@ -401,7 +402,7 @@ export function App() {
       const noteId = history[prevIndex];
       setActiveNoteId(noteId);
       const target = notes.find(n => n.id === noteId);
-      if (target) setCurrentMode(target.type === 'wiki' ? 'notes' : 'quick');
+      if (target) setCurrentMode(target.type === 'wiki' ? 'notes' : target.type === 'journal' ? 'journals' : 'quick');
     }
   };
 
@@ -412,7 +413,7 @@ export function App() {
       const noteId = history[nextIndex];
       setActiveNoteId(noteId);
       const target = notes.find(n => n.id === noteId);
-      if (target) setCurrentMode(target.type === 'wiki' ? 'notes' : 'quick');
+      if (target) setCurrentMode(target.type === 'wiki' ? 'notes' : target.type === 'journal' ? 'journals' : 'quick');
     }
   };
 
@@ -508,10 +509,31 @@ export function App() {
     saveNoteToSql(newQuickNote).catch(e => console.warn('[SQLite] save error:', e));
   };
 
+  const handleUpdateQuickNote = (id: string, newContent: string) => {
+    const cleanContent = newContent.trim();
+    if (!cleanContent) return;
+    const newTags = extractTags(cleanContent);
+    const newLinks = extractWikiLinks(cleanContent);
+    const firstLine = cleanContent.split('\n')[0].replace(/^[#\-*\s]+/, '').trim();
+    const cleanTitle = `Quick note: ${firstLine ? firstLine.slice(0, 32) : cleanContent.slice(0, 32)}...`;
+
+    handleUpdateNote(id, {
+      content: cleanContent,
+      title: cleanTitle,
+      tags: newTags,
+      links: newLinks
+    });
+  };
+
   const handlePromoteQuickNote = (qNote: Note) => {
+    let cleanTitle = (qNote.title || '').replace(/^Quick note:\s*/i, '').replace(/\.\.\.$/, '').trim();
+    if (!cleanTitle || cleanTitle.toLowerCase() === 'quick note') {
+      const firstLine = (qNote.content || '').split('\n')[0].replace(/^[#\-*\s]+/, '').trim();
+      cleanTitle = firstLine ? firstLine.slice(0, 50) : 'New Page';
+    }
     handleUpdateNote(qNote.id, {
       type: 'wiki',
-      title: qNote.title.replace(/^Quick note:\s*/, '')
+      title: cleanTitle
     });
     setActiveNoteId(qNote.id);
     setCurrentMode('notes');
@@ -520,6 +542,43 @@ export function App() {
   const handleDeleteQuickNote = (id: string) => {
     setNotes(prev => prev.filter(n => n.id !== id));
     deleteNoteFromSql(id).catch(e => console.warn('[SQLite] delete error:', e));
+  };
+
+  const handleSaveJournal = (dateKey: string, content: string, title?: string) => {
+    const cleanContent = content.trim();
+    const extractedTags = extractTags(cleanContent);
+    const extractedLinks = extractWikiLinks(cleanContent);
+    const id = `journal-${dateKey}`;
+    const noteTitle = title || dateKey;
+
+    const existing = notes.find(n => n.id === id);
+    if (existing) {
+      handleUpdateNote(id, {
+        content: cleanContent,
+        tags: extractedTags,
+        links: extractedLinks,
+        title: noteTitle,
+        updatedAt: Date.now()
+      });
+    } else {
+      const newJournalNote: Note = {
+        id,
+        type: 'journal',
+        title: noteTitle,
+        content: cleanContent,
+        tags: extractedTags,
+        links: extractedLinks,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      setNotes(prev => [newJournalNote, ...prev]);
+      saveNoteToSql(newJournalNote).catch(e => console.warn('[SQLite] save journal error:', e));
+    }
+  };
+
+  const handleDeleteJournal = (id: string) => {
+    setNotes(prev => prev.filter(n => n.id !== id));
+    deleteNoteFromSql(id).catch(e => console.warn('[SQLite] delete journal error:', e));
   };
 
   const handleDeleteWikiPage = (id: string) => {
@@ -604,6 +663,7 @@ export function App() {
 
   const wikiNotes = notes.filter(n => n.type === 'wiki');
   const quickNotes = notes.filter(n => n.type === 'quick');
+  const journalNotes = notes.filter(n => n.type === 'journal');
   const activeNote = notes.find(n => n.id === activeNoteId) || (activeNoteId ? undefined : (wikiNotes[0] || notes[0]));
   const graphData = buildKnowledgeGraph(notes);
 
@@ -623,6 +683,7 @@ export function App() {
                 onGoForward={handleGoForward}
                 notesCount={wikiNotes.length}
                 quickNotesCount={quickNotes.length}
+                journalsCount={journalNotes.length}
                 onToggleCollapse={() => setIsSidebarCollapsed(true)}
                 syncConfigured={vaultSyncState?.isConfigured}
                 syncFolderName={vaultSyncState?.folderName}
@@ -649,11 +710,11 @@ export function App() {
         <header className="md:hidden flex items-center justify-between px-3.5 h-12 border-b border-zinc-800 bg-zinc-950 shrink-0">
           {currentMode === 'notes' ? (
             /* Note Reading / Editing Mode Header */
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-2">
               <button
                 onClick={handleGoBack}
                 disabled={historyIndex <= 0}
-                className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
+                className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30 shrink-0"
                 title="Previous Note"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -661,21 +722,21 @@ export function App() {
               <button
                 onClick={handleGoForward}
                 disabled={historyIndex >= history.length - 1}
-                className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
+                className="p-1 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30 shrink-0"
                 title="Next Note"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setCurrentMode('pages')}
-                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 font-medium transition-colors"
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 font-medium transition-colors shrink-0"
                 title="Back to Pages List"
               >
                 <FileText className="w-3 h-3 text-indigo-400" />
                 <span>Pages</span>
               </button>
               {activeNote && (
-                <span className="text-[11px] text-zinc-500 truncate max-w-[140px] pl-1 font-medium">
+                <span className="text-[11px] text-zinc-400 truncate flex-1 min-w-0 pl-1 font-medium">
                   {activeNote.title || 'Untitled'}
                 </span>
               )}
@@ -690,7 +751,7 @@ export function App() {
                 <span className="font-semibold text-xs tracking-tight text-zinc-100">LatticeLedger</span>
                 {currentMode !== 'pages' && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 capitalize">
-                    {currentMode === 'quick' ? 'Quick Notes' : currentMode}
+                    {currentMode === 'quick' ? 'Quick Notes' : currentMode === 'journals' ? 'Journals' : currentMode}
                   </span>
                 )}
               </div>
@@ -739,6 +800,19 @@ export function App() {
 
         {/* Content by Current View Mode */}
         <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
+          {/* 0. JOURNALS VIEW: Logseq-style daily stream with recent dates at top */}
+          {currentMode === 'journals' && (
+            <JournalsView
+              notes={notes}
+              onSaveJournal={handleSaveJournal}
+              onDeleteJournal={handleDeleteJournal}
+              onNavigateToNote={navigateToNote}
+              onTagClick={() => setCurrentMode('search')}
+              allWikiPages={wikiNotes}
+              allQuickNotes={quickNotes}
+            />
+          )}
+
           {/* 1. PAGES VIEW: Lists all wiki page names with AI summaries (or just names if no summary) */}
           {currentMode === 'pages' && (
             <PagesView
@@ -802,6 +876,7 @@ export function App() {
             <QuickNotesFeed
               quickNotes={quickNotes}
               onAddQuickNote={handleAddQuickNote}
+              onUpdateQuickNote={handleUpdateQuickNote}
               onDeleteQuickNote={handleDeleteQuickNote}
               onPromoteToWiki={handlePromoteQuickNote}
               onTagClick={() => setCurrentMode('search')}
@@ -839,7 +914,7 @@ export function App() {
               theme={theme}
               onThemeChange={setTheme}
               onClose={() => setCurrentMode(previousMode === 'settings' ? 'pages' : previousMode)}
-              returnModeLabel={previousMode === 'notes' ? (activeNote?.title || 'Note') : previousMode === 'graph' ? 'Graph' : previousMode === 'quick' ? 'Quick Notes' : 'Pages'}
+              returnModeLabel={previousMode === 'notes' ? (activeNote?.title || 'Note') : previousMode === 'graph' ? 'Graph' : previousMode === 'quick' ? 'Quick Notes' : previousMode === 'journals' ? 'Journals' : 'Pages'}
             />
           )}
         </div>

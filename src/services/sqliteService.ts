@@ -1,5 +1,5 @@
 import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
-import { Note } from '../types';
+import { Note, NoteType } from '../types';
 import { HARRY_POTTER_SEED_NOTES } from './harryPotterSeed';
 import { saveVaultDbToFolder, loadVaultDbFromFolder, getVaultSyncState } from './vaultSyncService';
 import { extractWikiLinks } from '../utils/wikiLinks';
@@ -322,8 +322,8 @@ export async function getAllNotesFromSql(): Promise<Note[]> {
 
     return {
       id: r[0] as string,
-      type: r[1] as ('wiki' | 'quick'),
-      title: r[2] as string || (r[1] === 'wiki' ? 'Untitled Page' : 'Quick Note'),
+      type: (r[1] as NoteType) || 'quick',
+      title: (r[2] as string) || (r[1] === 'wiki' ? 'Untitled Page' : r[1] === 'journal' ? 'Daily Journal' : 'Quick Note'),
       content: cleanContent,
       tags: cleanTags,
       links: finalLinks,
