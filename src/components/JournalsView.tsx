@@ -81,7 +81,7 @@ interface JournalDayCanvasProps {
   allNotes: Note[];
 }
 
-const JournalDayCanvas: React.FC<JournalDayCanvasProps> = ({
+const JournalDayCanvas = React.memo<JournalDayCanvasProps>(({
   dateKey,
   displayTitle,
   initialContent,
@@ -248,35 +248,38 @@ const JournalDayCanvas: React.FC<JournalDayCanvasProps> = ({
     }, 600);
   };
 
+  // Memoize TipTap Extensions to avoid rebuilding ProseMirror plugin schemas on every render
+  const dayExtensions = React.useMemo(() => [
+    StarterKit.configure({
+      codeBlock: false,
+      heading: {
+        levels: [1, 2, 3]
+      }
+    }),
+    CustomCodeBlockNode,
+    CustomImageNode,
+    CustomVideoNode,
+    TaskList,
+    TaskItem.configure({
+      nested: true
+    }),
+    Placeholder.configure({
+      placeholder: isToday
+        ? "Write today's journal... Type # for headings, - [ ] for TODOs, [[ to link pages..."
+        : `Log journal for ${displayTitle}...`
+    }),
+    Markdown.configure({
+      html: true,
+      tightLists: true,
+      bulletListMarker: '-',
+      transformPastedText: true,
+      transformCopiedText: true
+    })
+  ], [isToday, displayTitle]);
+
   // TipTap Live In-Place Realtime Markdown Editor
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        codeBlock: false,
-        heading: {
-          levels: [1, 2, 3]
-        }
-      }),
-      CustomCodeBlockNode,
-      CustomImageNode,
-      CustomVideoNode,
-      TaskList,
-      TaskItem.configure({
-        nested: true
-      }),
-      Placeholder.configure({
-        placeholder: isToday
-          ? "Write today's journal... Type # for headings, - [ ] for TODOs, [[ to link pages..."
-          : `Log journal for ${displayTitle}...`
-      }),
-      Markdown.configure({
-        html: true,
-        tightLists: true,
-        bulletListMarker: '-',
-        transformPastedText: true,
-        transformCopiedText: true
-      })
-    ],
+    extensions: dayExtensions,
     content: initialContent || '',
     editorProps: {
       attributes: {
@@ -649,7 +652,17 @@ const JournalDayCanvas: React.FC<JournalDayCanvasProps> = ({
       />
     </div>
   );
-};
+}, (prev, next) => {
+  return (
+    prev.dateKey === next.dateKey &&
+    prev.displayTitle === next.displayTitle &&
+    prev.initialContent === next.initialContent &&
+    prev.isToday === next.isToday &&
+    prev.isYesterday === next.isYesterday &&
+    prev.hasExistingNote === next.hasExistingNote &&
+    prev.allNotes === next.allNotes
+  );
+});
 
 export const JournalsView: React.FC<JournalsViewProps> = ({
   notes,

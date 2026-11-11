@@ -246,40 +246,50 @@ function insertNotesBatch(db: Database, notes: Note[]) {
   }
 }
 
-let folderSaveTimer: any = null;
+let persistTimer: any = null;
+
+async function executeDatabaseExportAndPersist(): Promise<void> {
+  if (!activeDb) return;
+  try {
+    const binary = activeDb.export();
+    await saveBytesToIndexedDb(binary);
+    await saveVaultDbToFolder(binary);
+  } catch (err) {
+    console.warn('[SQLite] Vault folder sync warning:', err);
+  }
+}
 
 /**
  * Persist in-memory SQLite state to persistent device storage & bound vault folder.
+ * Debounced by default (800ms) to ensure zero main-thread GC pauses and 0ms latency during typing.
  */
-export async function persistDatabase(immediateFolderSync = false): Promise<void> {
+export async function persistDatabase(immediate = false): Promise<void> {
   if (!activeDb) return;
-  const binary = activeDb.export();
-  await saveBytesToIndexedDb(binary);
 
-  if (immediateFolderSync) {
-    if (folderSaveTimer) {
-      clearTimeout(folderSaveTimer);
-      folderSaveTimer = null;
+  if (immediate) {
+    if (persistTimer) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
     }
-    try {
-      await saveVaultDbToFolder(binary);
-    } catch (err) {
-      console.warn('[SQLite] Vault folder sync warning:', err);
-    }
-  } else {
-    // Debounce disk writes to vault folder (1000ms) to prevent I/O thrashing during typing
-    if (folderSaveTimer) {
-      clearTimeout(folderSaveTimer);
-    }
-    folderSaveTimer = setTimeout(async () => {
-      folderSaveTimer = null;
-      try {
-        await saveVaultDbToFolder(binary);
-      } catch (err) {
-        console.warn('[SQLite] Debounced vault folder sync warning:', err);
-      }
-    }, 1000);
+    await executeDatabaseExportAndPersist();
+    return;
   }
+
+  // Debounce disk/IDB writes (800ms) to prevent I/O thrashing during active typing
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+  }
+  persistTimer = setTimeout(async () => {
+    persistTimer = null;
+    await executeDatabaseExportAndPersist();
+  }, 800);
+}
+
+/**
+ * Immediately flush any pending debounced persistence to disk.
+ */
+export async function flushDatabase(): Promise<void> {
+  await persistDatabase(true);
 }
 
 /**

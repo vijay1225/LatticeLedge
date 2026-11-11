@@ -362,33 +362,36 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   const editorRef = React.useRef<any>(null);
 
+  // Memoize TipTap Extensions to avoid rebuilding ProseMirror plugin schemas on every render
+  const editorExtensions = useMemo(() => [
+    StarterKit.configure({
+      codeBlock: false, // Replaced by CustomCodeBlockNode
+      heading: {
+        levels: [1, 2, 3]
+      }
+    }),
+    CustomCodeBlockNode,
+    CustomImageNode,
+    CustomVideoNode,
+    TaskList,
+    TaskItem.configure({
+      nested: true
+    }),
+    Placeholder.configure({
+      placeholder: 'Write directly on this page... Type # for headings, - [ ] for checklists, > for quotes, or [[ to link...'
+    }),
+    Markdown.configure({
+      html: true,
+      tightLists: true,
+      bulletListMarker: '-',
+      transformPastedText: true,
+      transformCopiedText: true
+    })
+  ], []);
+
   // Initialize TipTap Live In-Place WYSIWYG Editor
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        codeBlock: false, // Replaced by CustomCodeBlockNode
-        heading: {
-          levels: [1, 2, 3]
-        }
-      }),
-      CustomCodeBlockNode,
-      CustomImageNode,
-      CustomVideoNode,
-      TaskList,
-      TaskItem.configure({
-        nested: true
-      }),
-      Placeholder.configure({
-        placeholder: 'Write directly on this page... Type # for headings, - [ ] for checklists, > for quotes, or [[ to link...'
-      }),
-      Markdown.configure({
-        html: true,
-        tightLists: true,
-        bulletListMarker: '-',
-        transformPastedText: true,
-        transformCopiedText: true
-      })
-    ],
+    extensions: editorExtensions,
     content: cleanInitialContent,
     editorProps: {
       attributes: {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Note, 
   ViewMode, 
@@ -30,11 +30,15 @@ import { PagesView } from './components/PagesView';
 import { NoteEditor } from './components/NoteEditor';
 import { QuickNotesFeed } from './components/QuickNotesFeed';
 import { SearchView } from './components/SearchView';
-import { KnowledgeGraphView } from './components/KnowledgeGraphView';
 import { SettingsModal } from './components/SettingsModal';
 import { RightPane } from './components/RightPane';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
+
+// Lazy-load Knowledge Graph (including heavy D3 physics engine) on demand
+const KnowledgeGraphView = React.lazy(() => 
+  import('./components/KnowledgeGraphView').then(m => ({ default: m.KnowledgeGraphView }))
+);
 
 import { 
   FileText, 
@@ -418,6 +422,7 @@ export function App() {
   };
 
   const handleUpdateNote = (id: string, partial: Partial<Note>) => {
+    let noteToSave: Note | null = null;
     setNotes(prev => prev.map(note => {
       if (note.id !== id) return note;
 
@@ -462,9 +467,12 @@ export function App() {
       if (partial.content !== undefined || partial.title !== undefined) {
         updated.links = extractWikiLinks(cleanContent);
       }
-      saveNoteToSql(updated).catch(e => console.warn('[SQLite] save error:', e));
+      noteToSave = updated;
       return updated;
     }));
+    if (noteToSave) {
+      saveNoteToSql(noteToSave).catch(e => console.warn('[SQLite] save error:', e));
+    }
   };
 
   const handleCreateNewWikiPage = (customTitle?: string, customContent?: string) => {
@@ -661,11 +669,22 @@ export function App() {
     }
   };
 
-  const wikiNotes = notes.filter(n => n.type === 'wiki');
-  const quickNotes = notes.filter(n => n.type === 'quick');
-  const journalNotes = notes.filter(n => n.type === 'journal');
-  const activeNote = notes.find(n => n.id === activeNoteId) || (activeNoteId ? undefined : (wikiNotes[0] || notes[0]));
-  const graphData = buildKnowledgeGraph(notes);
+  // Memoize note projections to prevent unnecessary re-computations and re-renders
+  const wikiNotes = useMemo(() => notes.filter(n => n.type === 'wiki'), [notes]);
+  const quickNotes = useMemo(() => notes.filter(n => n.type === 'quick'), [notes]);
+  const journalNotes = useMemo(() => notes.filter(n => n.type === 'journal'), [notes]);
+  const activeNote = useMemo(
+    () => notes.find(n => n.id === activeNoteId) || (activeNoteId ? undefined : (wikiNotes[0] || notes[0])),
+    [notes, activeNoteId, wikiNotes]
+  );
+
+  // Strictly compute heavy D3 graph data ONLY when in graph mode
+  const graphData = useMemo(() => {
+    if (currentMode !== 'graph') {
+      return { nodes: [], edges: [] };
+    }
+    return buildKnowledgeGraph(notes);
+  }, [notes, currentMode]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-zinc-800 selection:text-zinc-50">
@@ -895,13 +914,19 @@ export function App() {
             />
           )}
 
-          {/* 5. KNOWLEDGE GRAPH VIEW: 2D Interactive Force-Directed Graph */}
+          {/* 5. KNOWLEDGE GRAPH VIEW: 2D Interactive Force-Directed Graph (Lazy-loaded on demand) */}
           {currentMode === 'graph' && (
-            <KnowledgeGraphView
-              graphData={graphData}
-              onSelectNode={navigateToNote}
-              theme={theme}
-            />
+            <React.Suspense fallback={
+              <div className="flex-1 flex items-center justify-center text-zinc-500 text-xs">
+                <span>Loading Knowledge Galaxy...</span>
+              </div>
+            }>
+              <KnowledgeGraphView
+                graphData={graphData}
+                onSelectNode={navigateToNote}
+                theme={theme}
+              />
+            </React.Suspense>
           )}
 
           {/* 6. SETTINGS VIEW: Directly inside middle space */}
