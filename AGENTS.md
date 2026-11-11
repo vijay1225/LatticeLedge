@@ -617,10 +617,14 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - Increased input slice to 20,000 characters and token limit to 1000, significantly improving deep knowledge synthesis.
     - **Legacy Database Loadable**:
       - Preserved 100% backward compatibility: journal entries are stored as `type: 'journal'` in the existing `notes` SQLite table without schema alterations. All existing databases load seamlessly.
+    - **Diagnosed and Resolved Desktop Executable Launch Failure**:
+      - Root Cause: Copying the bare `release/win-unpacked/LatticeLedger.exe` (249MB) produced an unbundled executable detached from its sibling Electron runtime dependencies (`app.asar`, `ffmpeg.dll`, `d3dcompiler_47.dll`, `.pak` locale and resource files). When double-clicked without those adjacent files in the same directory, Windows/Electron failed to start silently.
+      - Packaged the true standalone single-file portable Windows executable using `electron-builder --win portable`. This bundles the entire Electron runtime and application into a self-contained portable executable (`LatticeLedger 0.1.0.exe`, 124.81MB).
+      - Replaced `LatticeLedger-Desktop.exe` in the root workspace with this self-contained portable executable so it launches immediately on any Windows PC with a simple double-click.
     - **Verified & Built**:
       - 85/85 automated unit tests passing across all 8 test suites.
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
-      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (249.8MB).
+      - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.81MB, portable single-file executable).
 
 - [ ] **Next Steps**:
   - [ ] User tests the updated APK and Desktop app.
