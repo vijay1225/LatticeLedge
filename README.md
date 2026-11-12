@@ -24,29 +24,29 @@ Designed for researchers, thinkers, developers, and writers who want a distracti
 
 ```mermaid
 graph TD
-  subgraph Capture & Ideation
-    QN[⚡ Quick Notes / Scratchpad]
-    JN[📅 Continuous Daily Journals]
+  subgraph "Capture & Ideation"
+    QN["⚡ Quick Notes / Scratchpad"]
+    JN["📅 Continuous Daily Journals"]
   end
 
-  subgraph Evergreen Knowledge
-    WP[📚 Permanent Wiki Pages]
+  subgraph "Evergreen Knowledge"
+    WP["📚 Permanent Wiki Pages"]
   end
 
-  subgraph AI Engine [Google Gemini BYOK]
-    SUM[📝 Per-Note Summaries & Action Items]
-    REC[💡 Contextual Quick Note Recommendations]
-    ASK[🔍 Ask AI Knowledge Synthesis]
+  subgraph "AI Engine (Google Gemini BYOK)"
+    SUM["📝 Per-Note Summaries & Action Items"]
+    REC["💡 Contextual Quick Note Recommendations"]
+    ASK["🔍 Ask AI Knowledge Synthesis"]
   end
 
-  subgraph Visualization & Retrieval
-    KG[🌌 2D D3 Knowledge Galaxy]
-    SRCH[⚡ Dual-Tab Search & Full-Text Search]
+  subgraph "Visualization & Retrieval"
+    KG["🌌 2D D3 Knowledge Galaxy"]
+    SRCH["⚡ Dual-Tab Search & Full-Text Search"]
   end
 
-  QN -->|Reference / Convert| WP
-  JN -->|[[Wiki Links]]| WP
-  WP <-->|[[Bi-directional Backlinks]]| WP
+  QN -->|"Reference / Convert"| WP
+  JN -->|"Wiki Links"| WP
+  WP <-->|"Bi-directional Backlinks"| WP
   WP --> SUM
   QN --> REC --> WP
   WP & QN & JN --> KG
