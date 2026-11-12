@@ -666,9 +666,29 @@ LatticeLedger is a modern, AI-augmented Personal Knowledge Management (PKM) syst
       - 88/88 automated unit tests passing across all suites.
       - Fresh standalone Windows Desktop executable: `LatticeLedger-Desktop.exe` (124.81MB).
       - Fresh native Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Windows NSIS Setup Installer & In-Place App Updating (`v0.2.0`)**:
+    - **Diagnosed Why Portable EXE Did Not Update Installed Windows App**:
+      - Root Cause: `LatticeLedger-Desktop.exe` was previously built as a single-file portable target (`target: "portable"`). Portable executables run self-contained from `%TEMP%` without installing to `Program Files`, without modifying Windows registry or "Apps & Features", and without updating desktop or Start Menu shortcuts.
+      - On Android, `.apk` is an installer package, so Android OS automatically detects existing package signatures, prompts "Update App", and replaces the installed version cleanly.
+      - On Windows, to update an existing installed app (originally installed via `LatticeLedger Setup 0.1.0.exe`), an official **NSIS Installer** executable is required.
+    - **Configured NSIS Installer & Version Bump**:
+      - Bumped `package.json` version from `0.1.0` to `0.2.0`.
+      - Configured `nsis` in `package.json` with `createDesktopShortcut: true`, `createStartMenuShortcut: true`, and `allowToChangeInstallationDirectory: true`.
+      - Built both targets:
+        1. **`LatticeLedger-Setup.exe` (144.88MB, NSIS Installer)**: Detects existing Windows installation, performs clean in-place app update, refreshes Desktop & Start Menu shortcuts to `v0.2.0`, and launches the updated version.
+        2. **`LatticeLedger-Desktop.exe` (124.81MB, Portable Executable)**: Standalone single-file portable build for zero-install usage.
+    - **Verified & Built**:
+      - 88/88 automated unit tests passing across all suites.
+      - Windows Setup Installer: `LatticeLedger-Setup.exe` (144.88MB).
+      - Standalone Portable Executable: `LatticeLedger-Desktop.exe` (124.81MB).
+      - Standalone Android APK: `LatticeLedger.apk` (7.84MB).
+  - [x] **Comprehensive Documentation & Feature Showcase (`README.md` & `LICENSE`)**:
+    - Overhauled [`README.md`](file:///c:/Users/Vijay/Documents/LatticeLedger/README.md) with badges, interactive Mermaid architecture flowchart, detailed feature breakdowns (Triple-mode PKM, 2D D3 Knowledge Galaxy, TipTap WYSIWYG editor, Gemini BYOK AI, and Local-First SQLite + Google Drive sync).
+    - Documented quickstart guide, build instructions for Windows Desktop and Android APK, Google Drive cross-device sync guide, and test suite overview.
+    - Added standard MIT [`LICENSE`](file:///c:/Users/Vijay/Documents/LatticeLedger/LICENSE).
 
 - [ ] **Next Steps**:
-  - [ ] User tests the updated APK and Desktop app.
+  - [ ] User runs `LatticeLedger-Setup.exe` to update their existing Windows installation.
   - [ ] Verify Journals continuous stream, TODO toggles, and [[wiki-link]] navigation.
   - [ ] Verify Quick Notes editing and "Show Journals" toggle in Knowledge Graph.
 
